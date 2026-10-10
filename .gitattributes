@@ -1,0 +1,2 @@
+# LF everywhere, also on Windows checkouts (Git for Windows defaults to CRLF): bash cannot run a CRLF script.
+* text=auto eol=lf

@@ -1,0 +1,28 @@
+$ bash .claude/skills/session-start/ground-truth.sh
+GROUND TRUTH — 2026-10-12 09:14 CEST
+
+== api (api)
+  origin/main: 3365cea 10-09 16:02 Search recipes by ingredient (#39)
+  worktrees:
+    api [fix/unit-conversion]: = pushed
+  branches with no worktree, not in origin/main:
+    local/family-recipes: local only BY RULE, never push
+  open PRs (example-org/pantry-api):
+    #41 [fix/unit-conversion] CI RED: Convert recipe units to grams on import
+
+== web (web)
+  origin/main: 44a421b 10-07 11:30 Recipe page: print layout (#17)
+  worktrees:
+    web [main]: = origin/main
+    web-offline [feat/offline-list]: ahead 2 / behind 0 of the pushed branch
+  branches with no worktree, not in origin/main:
+    spike/pwa-cache: LOCAL ONLY: on no remote at all (or squash-merged, then deleted)
+  open PRs (example-org/pantry-web): none
+
+== workspace docs (.)
+  c44efa9 10-09 18:42: ahead 0 / behind 0 of origin/main, 0 uncommitted
+
+== background (transient user units of this project)
+  pantry-backfill.service: failed, since Sat 2026-10-10 01:12:44 CEST
+
+GROUND TRUTH: complete

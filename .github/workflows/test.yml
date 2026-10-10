@@ -1,0 +1,21 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Git for Windows' default: check out with CRLF. The repo's .gitattributes must still give bash LF scripts.
+      - if: runner.os == 'Windows'
+        run: git config --global core.autocrlf true
+      - uses: actions/checkout@v5
+      # /bin/bash: on macOS that is the stock bash 3.2, not Homebrew's; on Windows, Git Bash.
+      - run: /bin/bash test/run.sh
+        shell: bash

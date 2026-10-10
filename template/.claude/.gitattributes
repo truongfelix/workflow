@@ -1,0 +1,3 @@
+# Installed by the workflow: keep the skills, the ground-truth script and its config in LF on every checkout,
+# Windows included (Git for Windows defaults to CRLF, and bash cannot run a CRLF script).
+* text=auto eol=lf

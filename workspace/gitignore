@@ -1,0 +1,22 @@
+# Workspace docs repo — WHITELIST. Installed as .gitignore at the root of a multi-repo workspace by
+# `bin/adopt.sh --workspace`.
+#
+# A workspace holds nested code repos, data directories, keys and binaries. Only the docs below are tracked;
+# everything else stays out. Add a path deliberately (a `!/dir/` line, then re-exclude its heavy parts), never with
+# `git add -f`. Before the first commit: `git status --ignored`, and read the staged list.
+/*
+!/.gitignore
+!/CLAUDE.md
+!/BACKLOG.md
+!/questions.md
+!/.claude/
+/.claude/settings.local.json
+/.claude/worktrees/
+!/notes/
+
+# Small sources worth versioning, one directory at a time, e.g.:
+# !/tools/
+# /tools/*.bin
+
+__pycache__/
+*.pyc
