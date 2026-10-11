@@ -22,7 +22,7 @@ The other files are the trackers as they stand:
 | [`questions.md`](questions.md) | an open decision with options and a recommendation; two rulings, one of them a branch that must never be pushed |
 | [`notes/lessons.md`](notes/lessons.md) | lessons promoted from earlier handoffs |
 | [`notes/handoff-archive.md`](notes/handoff-archive.md) | Thursday's handoff, archived after its "Learned" line went into `lessons.md` |
-| [`CLAUDE.md`](CLAUDE.md) | the template's `CLAUDE.md`, filled in |
+| [`CLAUDE.example.md`](CLAUDE.example.md) | the template's `CLAUDE.md`, filled in (renamed here, so that Claude Code does not load Pantry's rules in a session working on the workflow) |
 | [`.claude/ground-truth.conf`](.claude/ground-truth.conf) | the two repos, and the branch kept local on purpose |
 
 The skills, the script and `notes/item-format.md` are the template's, unchanged, so they are not repeated here.

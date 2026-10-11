@@ -25,10 +25,17 @@ git_q() { git "$@" >/dev/null 2>&1; }
 echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 
 # A Windows checkout must still give bash LF scripts (.gitattributes).
-for f in bin/adopt.sh template/.claude/skills/session-start/ground-truth.sh \
-  template/.claude/skills/session-start/items.sh template/.claude/ground-truth.conf; do
+for f in bin/adopt.sh template/dot-claude/skills/session-start/ground-truth.sh \
+  template/dot-claude/skills/session-start/items.sh template/dot-claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
 done
+
+# Claude Code loads a CLAUDE.md, and registers .claude/skills, found in a subfolder of the session's project. Below
+# the root of this repo they would be the template's or the example's, taken as rules for working on the workflow:
+# they are stored as CLAUDE.template.md, CLAUDE.example.md and dot-claude/ (bin/adopt.sh restores the names).
+nested=$(find "$WF" -path "$WF/.git" -prune -o \( -path "$WF/*/CLAUDE.md" -o -path "$WF/*/CLAUDE.local.md" \
+  -o -path "$WF/*/.claude/skills" \) -print)
+check "no CLAUDE.md or .claude/skills below the repo root" [ -z "$nested" ]
 
 # The workspace: ws/ is the docs repo, ws/api a code repo, ws/api-feat its worktree.
 cd "$T" || exit 1
@@ -50,6 +57,8 @@ cd "$T/ws" || exit 1
 check "adopt.sh exits 0" [ $? = 0 ]
 check "adopt.sh installs /session-start" [ -f .claude/skills/session-start/ground-truth.sh ]
 check "adopt.sh installs /handoff" [ -f .claude/skills/handoff/SKILL.md ]
+check "adopt.sh installs CLAUDE.md and .claude/ under their real names" \
+  test -f CLAUDE.md -a -d .claude -a ! -e CLAUDE.template.md -a ! -e dot-claude
 check "adopt.sh installs the item format" [ -f notes/item-format.md ]
 check "adopt.sh installs the workspace .gitignore" [ -f .gitignore ]
 check "adopt.sh lists what is left to FILL" has "$T/adopt.txt" "CLAUDE.md:1:"
@@ -115,16 +124,17 @@ check "the timeout fallback passes the output through" [ "$out" = hello ]
 # The trackers' format check: the template, the example and an adopted project pass; a broken fixture fails on each
 # problem, with its line.
 IT=.claude/skills/session-start/items.sh
-"$SH" "$WF/template/$IT" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" >"$T/it.txt" 2>&1
+ITS="$WF/template/dot-claude/skills/session-start/items.sh"
+"$SH" "$ITS" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" >"$T/it.txt" 2>&1
 check "items.sh: the template's trackers pass" [ $? = 0 ]
-"$SH" "$WF/template/$IT" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
+"$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
 check "items.sh: the example's trackers pass" [ $? = 0 ]
-LC_ALL=C "$SH" "$WF/template/$IT" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
+LC_ALL=C "$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
 check "items.sh: the example's trackers pass in the C locale" [ $? = 0 ]
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the project's trackers, from any directory" [ $? = 0 ]
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
-"$SH" "$WF/template/$IT" check "$WF/test/fixtures/broken/BACKLOG.md" "$WF/test/fixtures/broken/questions.md" \
+"$SH" "$ITS" check "$WF/test/fixtures/broken/BACKLOG.md" "$WF/test/fixtures/broken/questions.md" \
   >"$T/it-broken.txt" 2>&1
 rc=$?
 sed 's/^/      | /' "$T/it-broken.txt"
@@ -138,7 +148,7 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'questions.md:1: no `next id: Q-<n>'; do
   check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
 done
-"$SH" "$WF/template/$IT" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
+"$SH" "$ITS" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
 check "items.sh: a file it cannot read exits 2" [ $? = 2 ]
 check "items.sh: a file it cannot read says UNKNOWN" has "$T/it-missing.txt" "UNKNOWN: $T/nowhere/BACKLOG.md"
 
@@ -174,7 +184,7 @@ check "two sessions, one number: the conflict is in BACKLOG.md" \
 git -C b show origin/main:BACKLOG.md >b/BACKLOG.md && give_id b b web
 git -C b add BACKLOG.md && git_q -C b -c core.editor=true rebase --continue && git_q -C b push origin main
 check "two sessions, one number: after renumbering, the push goes through" [ $? = 0 ]
-"$SH" "$WF/template/$IT" check b/BACKLOG.md >"$T/it-ids.txt" 2>&1
+"$SH" "$ITS" check b/BACKLOG.md >"$T/it-ids.txt" 2>&1
 check "two sessions, one number: the result passes the format check" [ $? = 0 ]
 check "two sessions, one number: they end with different ids" \
   [ "$(grep -c '^### 🔲 B-2 Added by a$' b/BACKLOG.md)$(grep -c '^### 🔲 B-3 Added by b$' b/BACKLOG.md)" = 11 ]
@@ -185,7 +195,7 @@ give_id c same api && git_q -C c commit -am "B-4 by c" && git_q -C c push origin
 give_id d same web && git_q -C d commit -am "B-4 by d"
 git_q -C d pull --rebase origin main
 check "the control: the same next id line merges without a conflict" [ $? = 0 ]
-"$SH" "$WF/template/$IT" check d/BACKLOG.md >"$T/it-dup.txt" 2>&1
+"$SH" "$ITS" check d/BACKLOG.md >"$T/it-dup.txt" 2>&1
 check "the control: the format check exits 2" [ $? = 2 ]
 check "the control: the format check names the id given twice" has "$T/it-dup.txt" "B-4 is given twice"
 

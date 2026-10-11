@@ -162,12 +162,13 @@ here, and neither do lessons: a lesson stays in the `notes/lessons.md` of the pr
 
 ```
 template/                     copied into a project's root by bin/adopt.sh
-  CLAUDE.md                   skeleton with FILL markers
+  CLAUDE.template.md          skeleton with FILL markers, installed as CLAUDE.md
   BACKLOG.md  questions.md  notes/handoff.md  notes/handoff-archive.md  notes/lessons.md
   notes/item-format.md        the shape of a tracker item and its id
-  .claude/ground-truth.conf   what the ground truth looks at: the project's repos
-  .claude/skills/session-start/{SKILL.md,ground-truth.sh,items.sh}
-  .claude/skills/handoff/SKILL.md
+  dot-claude/                 installed as .claude/
+    ground-truth.conf         what the ground truth looks at: the project's repos
+    skills/session-start/{SKILL.md,ground-truth.sh,items.sh}
+    skills/handoff/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
@@ -176,6 +177,10 @@ test/fixtures/broken/         trackers that break the item format in every way i
 memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why
 ```
+
+`CLAUDE.template.md` and `dot-claude/` get their real names only in a project. Under those names, Claude Code
+would load them (and the example's `CLAUDE.example.md`) as instructions and skills in a session working on this
+repo.
 
 The skills, their scripts and `notes/item-format.md` hold no project data, so a project can upgrade them from
 here. Project data lives in `ground-truth.conf`, `CLAUDE.md`, the trackers and the other notes. Nothing here
