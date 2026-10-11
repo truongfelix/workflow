@@ -11,7 +11,8 @@ docs repo at its root. Both code repos are public on GitHub; this docs repo has 
 
 **Trackers:** open work is in `BACKLOG.md` (a finished item is deleted), questions for the owner and standing rulings
 in `questions.md`, today's tasks and what runs in `notes/handoff.md`. This file keeps only state, rules and
-how-tos: no to-dos, no decisions waiting, no PR lists or history (git has them).
+how-tos: no to-dos, no decisions waiting, no PR lists or history (git has them). Both trackers as one page, with
+filters by repo, state and date: `bash .claude/skills/session-start/board.sh`.
 
 **Lessons** learned in this project, loaded every session: @notes/lessons.md
 

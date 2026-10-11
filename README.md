@@ -89,7 +89,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`, and `items.sh`, the trackers' format check) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the trackers' parser and format check; `board.sh`, the trackers as one page) and `/handoff` |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
@@ -167,12 +167,12 @@ template/                     copied into a project's root by bin/adopt.sh
   notes/item-format.md        the shape of a tracker item and its id
   dot-claude/                 installed as .claude/
     ground-truth.conf         what the ground truth looks at: the project's repos
-    skills/session-start/{SKILL.md,ground-truth.sh,items.sh}
+    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,board.sh}
     skills/handoff/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh and items.sh; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh and board.sh; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers that break the item format in every way items.sh reports
 memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why

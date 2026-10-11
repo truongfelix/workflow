@@ -2,7 +2,7 @@
 
 Every item in `BACKLOG.md` and `questions.md` has one shape, so a person reads it, Claude writes it, and a script can
 parse it. Both trackers point here; `/handoff` follows it when it adds or changes an item. Both skills check it with
-`items.sh` (the last section but one): `/session-start` after the ground truth, `/handoff` before committing.
+`items.sh` ("The check", below): `/session-start` after the ground truth, `/handoff` before committing.
 
 ## Shape
 
@@ -81,6 +81,7 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 | key | on | value |
 |---|---|---|
 | `repos` | ⚠ items | the repos in the order the work runs, producer first: `api → web` |
+| `repos` | questions, optional | the repos the decision is about: `api, web`; none = the whole project |
 | `waits` | ⏸️ items | the trigger: a date, a measurement, an owner answer, another id |
 | `blocks` | 💬 questions | what waits for the answer |
 | `ruled` | 🟢 rulings | `YYYY-MM-DD`, the date of the owner's words quoted in the body |
@@ -88,6 +89,10 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 
 No date fields otherwise: when an item was added, changed or closed comes from the commits that touched its id.
 `ruled` is the exception because it dates the owner's words, not a commit.
+
+**An item's repos**, for the board: its `repos:` line, else its section when the section's title starts with a repo's
+name from `.claude/ground-truth.conf` (`## api`), so a BACKLOG item rarely needs the line. A question's sections are
+"open" and "rulings", so a question names its repos with the line, in a project with more than one repo.
 
 ## Body
 
@@ -103,6 +108,15 @@ or duplicate id, a missing `next id` line or one not above every id in its file,
 as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
 `YYYY-MM-DD`. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a
 silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example.
+
+## The board
+
+`bash .claude/skills/session-start/board.sh` writes both trackers as one page and opens it: the repos and their
+count, every item with its state, repos and dates, filters by repo (one, several, or the items that span more than
+one), state, date (added, last changed, closed, ruled) and text, and each item's history from git. Closed items come
+back from git, under the "closed" state. The page is read-only and rebuilt at each run (no server, nothing to
+install): run the script again to refresh it. An item the parser cannot read shows in the problems box as written,
+never dropped.
 
 ## Moving a project to it
 

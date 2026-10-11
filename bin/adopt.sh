@@ -47,7 +47,7 @@ while IFS= read -r -d '' f; do
   install_file "$SRC/template/$f" "$(installed_name "$f")"
 done < <(cd "$SRC/template" && find . -type f -print0 | sort -z)
 [ "$workspace" = 1 ] && install_file "$SRC/workspace/gitignore" ".gitignore"
-chmod +x "$dst/.claude/skills/session-start/ground-truth.sh" "$dst/.claude/skills/session-start/items.sh" 2>/dev/null || true
+chmod +x "$dst/.claude/skills/session-start/"{ground-truth,items,board}.sh 2>/dev/null || true
 
 version=$(git -C "$SRC" log -1 --format='%h %cd' --date=short 2>/dev/null || echo "unversioned")
 echo "workflow $version, adopted $(date +%Y-%m-%d)" >"$dst/.claude/workflow-version"

@@ -26,7 +26,8 @@ echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 
 # A Windows checkout must still give bash LF scripts (.gitattributes).
 for f in bin/adopt.sh template/dot-claude/skills/session-start/ground-truth.sh \
-  template/dot-claude/skills/session-start/items.sh template/dot-claude/ground-truth.conf; do
+  template/dot-claude/skills/session-start/items.sh template/dot-claude/skills/session-start/board.sh \
+  template/dot-claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
 done
 
@@ -151,6 +152,74 @@ done
 "$SH" "$ITS" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
 check "items.sh: a file it cannot read exits 2" [ $? = 2 ]
 check "items.sh: a file it cannot read says UNKNOWN" has "$T/it-missing.txt" "UNKNOWN: $T/nowhere/BACKLOG.md"
+
+# items.sh list: the records the board reads. A heading it cannot read is kept as written, never dropped.
+tab=$(printf '\t')
+"$SH" "$ITS" list "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/list.txt" 2>&1
+check "items.sh list: the example exits 0" [ $? = 0 ]
+check "items.sh list: one record per item" [ "$(grep -c "^I$tab" "$T/list.txt")" = 8 ]
+check "items.sh list: an item with its state, ⚠, section, title and fields" \
+  has "$T/list.txt" "${tab}B-14${tab}open${tab}1${tab}web${tab}Show which ingredient matched a search${tab}repos: api → web$tab"
+check "items.sh list: a question with its repos" has "$T/list.txt" "${tab}Q-2${tab}ruling${tab}0$tab"
+"$SH" "$ITS" list "$WF/test/fixtures/broken/BACKLOG.md" >"$T/list-broken.txt" 2>&1
+check "items.sh list: a broken tracker exits 2" [ $? = 2 ]
+check "items.sh list: a heading that is not an item is kept as written" has "$T/list-broken.txt" \
+  "U$tab$WF/test/fixtures/broken/BACKLOG.md${tab}24$tab### Done: a heading that is not an item\nDone when: never."
+check "items.sh list: the problems, as records" has "$T/list-broken.txt" "P$tab$WF/test/fixtures/broken/BACKLOG.md${tab}9${tab}B-1:"
+
+# The board: a project with two repos and a history. B-1 is added then closed, B-2 goes from open to waiting, B-3
+# exists only on disk; B-2's text holds what could break the page: quotes, a backslash, a closing script tag.
+BD="$WF/template/dot-claude/skills/session-start/board.sh"
+mkdir -p "$T/board/.claude" && cd "$T/board" || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main
+printf '%s\n' 'REPOS=("api|api|origin||" "web|web|origin||")' >.claude/ground-truth.conf
+backlog() { # <B-2 state> <B-2 field>, then the items to add after it
+  printf '%s\n' '# Demo — Backlog' '' "next id: B-4 (last given to claude@test)" '' '## api' ''
+  [ "$1" = closed ] || printf '%s\n' '### 🔲 B-1 First' 'Done when: done.' ''
+  printf '%s\n' '## web' '' "### $2 B-2 Second" "$3" 'Says "hi" \o/ and </script> to the page.' 'Done when: done.' "${@:4}"
+}
+backlog open 🔲 "" >BACKLOG.md
+printf '%s\n' '# Demo — questions' '' 'next id: Q-2 (last given to claude@test)' '' '# 1. Open decisions' '' \
+  '### 💬 Q-1 Which one?' 'repos: api, web' 'The question.' >questions.md
+git add -A && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m "two items"
+backlog closed ⏸️ "waits: the API" >BACKLOG.md
+GIT_COMMITTER_DATE=2026-02-03T10:00:00 git_q commit -am "B-1 done, B-2 waits"
+backlog closed ⏸️ "waits: the API" '' '### 🔲 B-3 Third' 'Done when: done.' >BACKLOG.md
+"$SH" "$BD" --no-open --out "$T/board.html" "$T/board" >"$T/board.txt" 2>&1
+check "board.sh exits 0" [ $? = 0 ]
+check "board.sh prints where the page is" has "$T/board.txt" "Board: $T/board.html"
+item_has() { grep -F "\"id\":\"$1\"," "$T/board.html" | grep -qF -- "$2"; } # <id> <text>: on that item's line
+check "board: the project's name and its repos" has "$T/board.html" '{"project":"Demo",'
+check "board: the repos come from ground-truth.conf" has "$T/board.html" '"repos":["api","web"]'
+check "board: an open item, its section, its date added" \
+  item_has B-2 '"state":"waiting","cross":0,"section":"web","title":"Second","fields":"waits: the API",'
+check "board: the date an item was added" item_has B-2 '"added":"2026-01-02","changed":"2026-02-03","closed":""'
+check "board: a state change in the history" item_has B-2 '["2026-02-03","'
+check "board: how it changed" item_has B-2 '"B-1 done, B-2 waits","open → waiting"]'
+check "board: a deleted item comes back as closed, with its date" item_has B-1 '"closed":"2026-02-03"'
+check "board: a closed item keeps its last text" item_has B-1 '"title":"First"'
+check "board: an item not committed yet" item_has B-3 '"not committed yet","added"]'
+check "board: a question's repos" item_has Q-1 '"fields":"repos: api, web"'
+check "board: text cannot end the page's script early" [ "$(grep -c '</script>' "$T/board.html")" = 2 ]
+if command -v node >/dev/null 2>&1; then
+  node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
+    var d = JSON.parse(h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0]);
+    var b = d.items.filter(function (i) { return i.id === "B-2"; })[0];
+    process.exit(d.items.length === 4 && b.body.indexOf("Says \"hi\" \\o/ and </script>") === 0 ? 0 : 1);' "$T/board.html"
+  check "board: the data parses as JSON, the text intact" [ $? = 0 ]
+fi
+mkdir "$T/nogit" && cp "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$T/nogit/"
+(cd "$T" && "$SH" "$BD" --no-open --out "$T/nogit.html" "$T/nogit") >"$T/nogit.txt" 2>&1
+check "board: a folder with no git still gets a page" [ $? = 0 ]
+check "board: without git, it says so" has "$T/nogit.html" '"git":false'
+"$SH" "$BD" --no-open --out "$T/broken.html" "$WF/test/fixtures/broken" >/dev/null 2>&1
+check "board: broken trackers still get a page" [ $? = 0 ]
+check "board: a heading it cannot read is on the page, as written" has "$T/broken.html" \
+  '"type":"U","file":"BACKLOG.md","line":24,"text":"### Done: a heading that is not an item\nDone when: never."'
+"$SH" "$BD" --no-open "$T/nowhere" >"$T/board-missing.txt" 2>&1
+check "board: no trackers exits 2" [ $? = 2 ]
+check "board: no trackers says UNKNOWN" has "$T/board-missing.txt" "UNKNOWN"
+check "board: adopt.sh makes it executable" [ -x "$T/ws/.claude/skills/session-start/board.sh" ]
 
 # Two sessions give an id at once (notes/item-format.md, "Two sessions, same number"). The `next id` line names who
 # raised it, so the second push conflicts there instead of merging two items with one id.

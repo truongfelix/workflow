@@ -20,6 +20,7 @@ by its **id**, with its title for the reader.
 # 1. Open decisions 💬
 
 ### 💬 Q-3 Metric only on the shopping list?
+repos: web
 blocks: the totals row of the shopping list
 The shopping list adds quantities up, so once #41 lands it shows grams and millilitres. Cups and spoons would need
 a display switch.
@@ -29,11 +30,13 @@ a display switch.
 # 2. Rulings and deliberate non-fixes — do not "fix" these by reflex
 
 ### 🟢 Q-2 The API stores metric only
+repos: api, web
 ruled: 2026-10-02
 Owner: "Store one unit. Showing cups is a display problem." Don't add unit columns to the recipe
 tables; converting for display belongs in `web/`.
 
 ### 🟢 Q-1 `local/family-recipes` is never pushed
+repos: api
 ruled: 2026-09-28
 Owner: "Those are my grandmother's recipes, they stay on this laptop." The branch in `api/` holds seed
 data for local testing. It is in KEEP_LOCAL, so the ground truth lists it as "local only BY RULE".
