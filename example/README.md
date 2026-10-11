@@ -18,14 +18,14 @@ The other files are the trackers as they stand:
 
 | file | shows |
 |---|---|
-| [`BACKLOG.md`](BACKLOG.md) | open work cut by repo, a ⏸️ item waiting on a trigger, a ⚠ cross-repo item |
+| [`BACKLOG.md`](BACKLOG.md) | open work cut by repo, each item with its id; a ⏸️ item waiting on a trigger, a ⚠ cross-repo item |
 | [`questions.md`](questions.md) | an open decision with options and a recommendation; two rulings, one of them a branch that must never be pushed |
 | [`notes/lessons.md`](notes/lessons.md) | lessons promoted from earlier handoffs |
 | [`notes/handoff-archive.md`](notes/handoff-archive.md) | Thursday's handoff, archived after its "Learned" line went into `lessons.md` |
 | [`CLAUDE.md`](CLAUDE.md) | the template's `CLAUDE.md`, filled in |
 | [`.claude/ground-truth.conf`](.claude/ground-truth.conf) | the two repos, and the branch kept local on purpose |
 
-The skills and the script are the template's, unchanged, so they are not repeated here.
+The skills, the script and `notes/item-format.md` are the template's, unchanged, so they are not repeated here.
 
 The ground-truth output is real: it comes from repos built to match this story. Only the open-PR lines and the
 background unit were written by hand, in the script's format, because they need GitHub and systemd.

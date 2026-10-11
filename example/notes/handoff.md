@@ -8,11 +8,11 @@ Read by /session-start. Open work: `BACKLOG.md`. Decisions and rulings: `questio
    #41 is merged.
 2. [ops] Check that the ingredient backfill finished (see Running), then spot-check 20 recipes on staging. Done
    when the unit exited 0 and the 20 recipes show their ingredients.
-3. [web] "Shopping list works offline" (BACKLOG): continue on `feat/offline-list` in `web-offline/` (pushed). The
-   edit queue is not started: `web/src/list/sync.ts`. Done when the BACKLOG item is.
+3. [web] B-12 Shopping list works offline: continue on `feat/offline-list` in `web-offline/` (pushed). The edit
+   queue is not started: `web/src/list/sync.ts`. Done when B-12 is.
 
 ## Waiting for the user
-- questions.md "Metric only on the shopping list?": blocks the totals row of the shopping list.
+- Q-3 Metric only on the shopping list?: blocks the totals row of the shopping list.
 
 ## Running in the background
 | What | Unit / process | Ends | Check | Stop |

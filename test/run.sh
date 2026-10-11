@@ -49,6 +49,7 @@ cd "$T/ws" || exit 1
 check "adopt.sh exits 0" [ $? = 0 ]
 check "adopt.sh installs /session-start" [ -f .claude/skills/session-start/ground-truth.sh ]
 check "adopt.sh installs /handoff" [ -f .claude/skills/handoff/SKILL.md ]
+check "adopt.sh installs the item format" [ -f notes/item-format.md ]
 check "adopt.sh installs the workspace .gitignore" [ -f .gitignore ]
 check "adopt.sh lists what is left to FILL" has "$T/adopt.txt" "CLAUDE.md:1:"
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt2.txt" 2>&1
@@ -58,6 +59,7 @@ check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (id
 printf '%s\n' 'REPOS=("api|api|origin||")' 'KEEP_LOCAL="keepme"' 'UNITS=0' >.claude/ground-truth.conf
 git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
 check "the workspace .gitignore keeps the code repos out" [ -z "$(git status --porcelain --untracked-files=all)" ]
+check "the workspace .gitignore tracks the item format" [ -n "$(git ls-files notes/item-format.md)" ]
 
 GT=.claude/skills/session-start/ground-truth.sh
 "$SH" "$GT" >"$T/gt.txt" 2>&1

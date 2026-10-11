@@ -17,7 +17,7 @@ Read by /session-start. Open work: `BACKLOG.md`. Decisions and rulings: `questio
    `systemd-run --user` unit.
 
 ## Waiting for the user
-- questions.md "Metric only on the shopping list?"
+- Q-3 Metric only on the shopping list?
 
 ## Running in the background
 | What | Unit / process | Ends | Check | Stop |

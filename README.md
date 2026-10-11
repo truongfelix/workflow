@@ -83,8 +83,9 @@ session N:   /session-start ──► work ──► /handoff
 |---|---|
 | `notes/handoff.md` | today: next tasks, what waits for you, what runs in the background, the last session. Short, rewritten at each handoff |
 | `notes/handoff-archive.md` | every earlier handoff, word for word. Searched when needed, never read at start |
-| `BACKLOG.md` | open work only, one section per repo. A finished item is deleted, not ticked: git keeps the history |
-| `questions.md` | decisions only you can make, each with options and a recommendation; past rulings, so no session "fixes" them |
+| `BACKLOG.md` | open work only, one section per repo, each item with an id (`B-12`) that never changes. A finished item is deleted, not ticked: git keeps the history |
+| `questions.md` | decisions only you can make, each with options and a recommendation; past rulings, so no session "fixes" them. Ids too (`Q-4`) |
+| `notes/item-format.md` | the one shape of every item in both trackers, and how a new item gets its id |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
@@ -127,8 +128,10 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `CLAUDE.md`: what the project is, the rules, the **handoff rule** (may `/handoff` commit and push without
      asking?), repos and layout, commands. Move any existing to-do list out of it into `BACKLOG.md`.
    - `BACKLOG.md`: one section per repo or file tree, filled from what the project already tracks (issues, notes, an
-     old TODO). Each item: what is wrong or missing, a pointer, when it is done.
-   - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo.
+     old TODO). Each item in the shape of `notes/item-format.md`: an id from `next id`, what is wrong or missing, a
+     pointer, `Done when:`.
+   - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo,
+     in the same shape.
    - The skills' FILL item (project-specific checks, what is expected and not news).
 5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
@@ -145,6 +148,9 @@ project's content and the template's structure.
 template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which commit
 the project last took.
 
+From 1.x: the trackers' items moved from bullets cited by title to one shape with ids. `adopt.sh` installs the new
+`notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once.
+
 ## Improve the workflow
 
 When a project's session improves a generic piece (a skill step, a ground-truth check, a principle learned the hard
@@ -157,6 +163,7 @@ here, and neither do lessons: a lesson stays in the `notes/lessons.md` of the pr
 template/                     copied into a project's root by bin/adopt.sh
   CLAUDE.md                   skeleton with FILL markers
   BACKLOG.md  questions.md  notes/handoff.md  notes/handoff-archive.md  notes/lessons.md
+  notes/item-format.md        the shape of a tracker item and its id
   .claude/ground-truth.conf   what the ground truth looks at: the project's repos
   .claude/skills/session-start/{SKILL.md,ground-truth.sh}
   .claude/skills/handoff/SKILL.md
@@ -168,9 +175,9 @@ memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why
 ```
 
-The skills and `ground-truth.sh` hold no project data, so a project can upgrade them from here. Project data lives
-in `ground-truth.conf`, `CLAUDE.md`, the trackers and the notes. Nothing here depends on a machine, a session or an
-owner.
+The skills, `ground-truth.sh` and `notes/item-format.md` hold no project data, so a project can upgrade them from
+here. Project data lives in `ground-truth.conf`, `CLAUDE.md`, the trackers and the other notes. Nothing here
+depends on a machine, a session or an owner.
 
 ## License
 

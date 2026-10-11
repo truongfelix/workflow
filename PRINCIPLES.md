@@ -48,7 +48,9 @@ answered; a vague "what do you think about X" does not.
 **Record deliberate non-fixes.** A ruling not written down is "rediscovered" as a bug by the next session, or a
 private branch is "rescued" with a push. `questions.md` §2 and the ground truth's KEEP_LOCAL exist for that.
 
-**Cite by title, never by number.** Sections and items get renumbered; a title survives.
+**Cite by id, never by position.** Every tracker item has an id that never changes and is never reused (`B-12`,
+`Q-4`); its place in a list moves, and its title gets reworded. Give the title next to the id, for the reader. One
+shape for every item (`notes/item-format.md`) is what lets a person, Claude and a script read the same trackers.
 
 ## Verification
 

@@ -16,8 +16,8 @@ session can find out what happened and why.
 |---|---|---|
 | Next tasks (task of the day), what waits for the user, what runs in the background, the last session | `notes/handoff.md` (live) | Rewritten at each handoff, after the old one is distilled and archived |
 | Earlier handoffs | `notes/handoff-archive.md` | Newest first, word for word. Never read at session start; searched when needed |
-| Open work | `BACKLOG.md` | One section per repo or file tree. A landed item is deleted, not ticked. Cross-repo items marked ⚠ |
-| Questions for the user, rulings, deliberate non-fixes | `questions.md` | §1 💬 open; when the user rules, it moves to §2 as 🟢 with their words and the date |
+| Open work | `BACKLOG.md` | One section per repo or file tree; every item in the shape of `notes/item-format.md`, with its id. A landed item is deleted, not ticked. Cross-repo items marked ⚠ |
+| Questions for the user, rulings, deliberate non-fixes | `questions.md` | §1 💬 open; when the user rules, it moves to §2 as 🟢 with their words and a `ruled:` date. Same item shape as `BACKLOG.md` |
 | Long-term state, rules, how-tos | `CLAUDE.md` | State, not history: no PR lists, no commit hashes, no to-dos |
 | Details of a topic (plans, measurements, incident notes, how-tos) | `notes/*.md`, component READMEs | Linked from where they are needed |
 | Non-obvious learnings, user preferences, corrections | memory directory | One fact per file + one line in `MEMORY.md`; update instead of duplicating |
@@ -46,9 +46,14 @@ session can find out what happened and why.
      branches, units and commands, so the next session can act without searching.
 3. **Update the trackers.** `BACKLOG.md`: delete every item that landed, add what was found and not fixed in the
    section it touches (⚠ cross-repo if it needs two), fix anything the session proved wrong. `questions.md`: add new
-   questions to §1 with a recommendation; move a question the user answered to §2 as 🟢 with their words (or delete
-   it if nothing is left to guard). `CLAUDE.md` only when a rule, a how-to or the long-term state changed. Keep all
-   three short.
+   questions to §1 with a recommendation; move a question the user answered to §2 as 🟢 with their words and a
+   `ruled:` date (or delete it if nothing is left to guard). `CLAUDE.md` only when a rule, a how-to or the long-term
+   state changed. Keep all three short.
+   - **Every new item gets its file's `next id`**, and the same edit raises that line and names this session:
+     `next id: B-14 (last given to claude@<session>)` (`notes/item-format.md`, "The id"). An item keeps its id when
+     its title, state or section changes. If the push is rejected and the rebase conflicts on that line, keep the
+     remote's line and renumber your new items from it.
+   - Cite items by id with their title (`B-12 Shopping list works offline`), here and in the handoff.
 4. **Update the topic notes the session touched** (status lines, measurements, how-tos), so the trackers can stay
    short.
 5. **Save memories** for what a future session would otherwise get wrong: corrections from the user, surprising
@@ -76,10 +81,10 @@ session can find out what happened and why.
 Read by /session-start. Open work: `BACKLOG.md`. Decisions and rulings: `questions.md`. Rewritten at each /handoff.
 
 ## Next (task of the day, in order)
-1. [<repo or area>] <task>: <why now>, <where to start: file, branch, command>, <done when ...>
+1. [<repo or area>] <id and title, or the task>: <why now>, <where to start: file, branch, command>, <done when ...>
 
 ## Waiting for the user
-<the `questions.md` §1 titles that block the Next list; a new question goes into questions.md first>
+<the `questions.md` §1 ids and titles that block the Next list; a new question goes into questions.md first>
 
 ## Running in the background
 | What | Unit / process | Ends | Check | Stop |

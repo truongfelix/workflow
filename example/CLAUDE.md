@@ -27,7 +27,7 @@ session improves a generic piece (a skill, the ground-truth script), port that p
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.
-- The API stores metric quantities only (questions.md, "The API stores metric only").
+- The API stores metric quantities only (questions.md Q-2 The API stores metric only).
 - Every schema change ships with an Alembic migration and its downgrade, both run by the gate.
 
 ## Repos and layout
