@@ -119,6 +119,8 @@ IT=.claude/skills/session-start/items.sh
 check "items.sh: the template's trackers pass" [ $? = 0 ]
 "$SH" "$WF/template/$IT" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
 check "items.sh: the example's trackers pass" [ $? = 0 ]
+LC_ALL=C "$SH" "$WF/template/$IT" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers pass in the C locale" [ $? = 0 ]
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the project's trackers, from any directory" [ $? = 0 ]
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]

@@ -40,8 +40,13 @@ for f in "$@"; do
 done
 [ "$files" = 0 ] && exit 2
 
+# macOS awk reads non-ASCII text only in a UTF-8 locale: in C it stops ("towc: multibyte conversion failure").
+if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; then export LC_ALL=en_US.UTF-8; fi
+
 # One pass per file. An item runs from its `###` heading to the next heading of any level, a `---` line, or the end
-# of the file. Fenced code and multi-line HTML comments are skipped: they hold examples, not items.
+# of the file. Fenced code and multi-line HTML comments are skipped: they hold examples, not items. A state is kept
+# by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation
+# finds all these emoji equal. Exit 3 = problems found, so that awk failing on its own (exit 2) reads as UNKNOWN.
 awk '
 function problem(ln, msg) { printf "%s:%d: %s\n", file, ln, msg; problems++ }
 function starts(p) { if (index(R, p) != 1) return 0; R = substr(R, length(p) + 1); return 1 }
@@ -49,8 +54,11 @@ function starts(p) { if (index(R, p) != 1) return 0; R = substr(R, length(p) + 1
 function start_file() {
   file = FILENAME; fk = kind; fence = 0; in_comment = 0; id = ""
   nid = 0; nid_ln = 0; nid_seen = 0; maxid = 0; items_here = 0; split("", seen)
-  if (fk == "B") { states = "🔲 ⏸️ ⏸"; shown = "🔲 ⏸️"; fields = " repos waits " }
-  else { states = "💬 🟢 ⏸️ ⏸"; shown = "💬 🟢 ⏸️"; fields = " waits blocks ruled replaces " }
+  if (fk == "B") { states = "🔲 ⏸️ ⏸"; names = "open waiting waiting"; shown = "🔲 ⏸️"; fields = " repos waits " }
+  else {
+    states = "💬 🟢 ⏸️ ⏸"; names = "question ruling waiting waiting"; shown = "💬 🟢 ⏸️"
+    fields = " waits blocks ruled replaces "
+  }
 }
 
 function end_file() {
@@ -77,12 +85,11 @@ function next_id(   tok, rest) {
   }
 }
 
-function heading(   n, i, st, tok, tid) {
+function heading(   n, i, st, nm, tok, tid) {
   end_item(); items++; items_here++
   R = substr($0, 5); state = ""
-  n = split(states, st, " ")
-  for (i = 1; i <= n; i++) if (starts(st[i] " ")) { state = st[i]; break }
-  if (state == "⏸") state = "⏸️"
+  n = split(states, st, " "); split(names, nm, " ")
+  for (i = 1; i <= n; i++) if (starts(st[i] " ")) { state = nm[i]; break }
   if (state == "") {
     split(R, tok, " ")
     problem(FNR, "`### " tok[1] "`: not a state of this tracker (" shown "); an item is `### <state> [⚠ ]<id> <title>`")
@@ -147,9 +154,9 @@ function end_item() {
   if (id == "") return
   if (fk == "B" && !done_ln) problem(item_ln, id ": no `Done when:` line: a BACKLOG item ends with it")
   else if (fk == "B" && after_ln) problem(after_ln, id ": text after the `Done when:` paragraph, which ends the item")
-  if (state == "⏸️" && !("waits" in f)) problem(item_ln, id ": ⏸️ without a `waits:` line")
+  if (state == "waiting" && !("waits" in f)) problem(item_ln, id ": ⏸️ without a `waits:` line")
   if (cross && !("repos" in f)) problem(item_ln, id ": ⚠ without a `repos:` line")
-  if (state == "🟢" && !("ruled" in f)) problem(item_ln, id ": 🟢 without a `ruled:` line")
+  if (state == "ruling" && !("ruled" in f)) problem(item_ln, id ": 🟢 without a `ruled:` line")
   id = ""
 }
 
@@ -166,13 +173,14 @@ id != "" { item_line() }
 
 END {
   end_file()
-  if (problems) { printf "%d problem(s) in %d item(s); the format: notes/item-format.md\n", problems, items; exit 2 }
+  if (problems) { printf "%d problem(s) in %d item(s); the format: notes/item-format.md\n", problems, items; exit 3 }
   printf "OK: %d item(s), all in the format of notes/item-format.md\n", items
 }
 ' "${args[@]}"
 rc=$?
 case $rc in
-  0 | 2) ;;
+  0) ;;
+  3) rc=2 ;;
   *) echo "UNKNOWN: awk failed (exit $rc)"; rc=2 ;;
 esac
 [ "$failed" = 1 ] && rc=2
