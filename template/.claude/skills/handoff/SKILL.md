@@ -54,6 +54,8 @@ session can find out what happened and why.
      its title, state or section changes. If the push is rejected and the rebase conflicts on that line, keep the
      remote's line and renumber your new items from it.
    - Cite items by id with their title (`B-12 Shopping list works offline`), here and in the handoff.
+   - Then `bash .claude/skills/session-start/items.sh check`: it lists each item that departs from the format, with
+     its line. Fix them until it exits 0, before committing (step 7).
 4. **Update the topic notes the session touched** (status lines, measurements, how-tos), so the trackers can stay
    short.
 5. **Save memories** for what a future session would otherwise get wrong: corrections from the user, surprising

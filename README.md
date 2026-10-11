@@ -89,7 +89,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`, and `items.sh`, the trackers' format check) and `/handoff` |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
@@ -131,7 +131,7 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      old TODO). Each item in the shape of `notes/item-format.md`: an id from `next id`, what is wrong or missing, a
      pointer, `Done when:`.
    - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo,
-     in the same shape.
+     in the same shape. Then `bash .claude/skills/session-start/items.sh check` until it exits 0.
    - The skills' FILL item (project-specific checks, what is expected and not news).
 5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
@@ -149,7 +149,8 @@ template. Merge the generic parts; keep the project's FILL answers. `.claude/wor
 the project last took.
 
 From 1.x: the trackers' items moved from bullets cited by title to one shape with ids. `adopt.sh` installs the new
-`notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once.
+`notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once;
+`.claude/skills/session-start/items.sh check` lists what is left.
 
 ## Improve the workflow
 
@@ -165,17 +166,18 @@ template/                     copied into a project's root by bin/adopt.sh
   BACKLOG.md  questions.md  notes/handoff.md  notes/handoff-archive.md  notes/lessons.md
   notes/item-format.md        the shape of a tracker item and its id
   .claude/ground-truth.conf   what the ground truth looks at: the project's repos
-  .claude/skills/session-start/{SKILL.md,ground-truth.sh}
+  .claude/skills/session-start/{SKILL.md,ground-truth.sh,items.sh}
   .claude/skills/handoff/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh and ground-truth.sh; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh and items.sh; CI runs it on Linux, macOS and Windows
+test/fixtures/broken/         trackers that break the item format in every way items.sh reports
 memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why
 ```
 
-The skills, `ground-truth.sh` and `notes/item-format.md` hold no project data, so a project can upgrade them from
+The skills, their scripts and `notes/item-format.md` hold no project data, so a project can upgrade them from
 here. Project data lives in `ground-truth.conf`, `CLAUDE.md`, the trackers and the other notes. Nothing here
 depends on a machine, a session or an owner.
 

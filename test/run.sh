@@ -25,7 +25,8 @@ git_q() { git "$@" >/dev/null 2>&1; }
 echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 
 # A Windows checkout must still give bash LF scripts (.gitattributes).
-for f in bin/adopt.sh template/.claude/skills/session-start/ground-truth.sh template/.claude/ground-truth.conf; do
+for f in bin/adopt.sh template/.claude/skills/session-start/ground-truth.sh \
+  template/.claude/skills/session-start/items.sh template/.claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
 done
 
@@ -110,6 +111,81 @@ check "the timeout fallback stops it in time" [ $((SECONDS - start)) -le 6 ]
 out=$(with_timeout 5 sh -c 'echo hello; exit 3')
 check "the timeout fallback passes the exit code through" [ $? = 3 ]
 check "the timeout fallback passes the output through" [ "$out" = hello ]
+
+# The trackers' format check: the template, the example and an adopted project pass; a broken fixture fails on each
+# problem, with its line.
+IT=.claude/skills/session-start/items.sh
+"$SH" "$WF/template/$IT" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" >"$T/it.txt" 2>&1
+check "items.sh: the template's trackers pass" [ $? = 0 ]
+"$SH" "$WF/template/$IT" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers pass" [ $? = 0 ]
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
+check "items.sh: with no file, it checks the project's trackers, from any directory" [ $? = 0 ]
+check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
+"$SH" "$WF/template/$IT" check "$WF/test/fixtures/broken/BACKLOG.md" "$WF/test/fixtures/broken/questions.md" \
+  >"$T/it-broken.txt" 2>&1
+rc=$?
+sed 's/^/      | /' "$T/it-broken.txt"
+check "items.sh: a broken tracker exits 2" [ "$rc" = 2 ]
+for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: ⏸️ without a `waits:` line' \
+  'BACKLOG.md:15: B-2 is given twice' 'BACKLOG.md:19: B-4: unknown field `owner:`' \
+  'BACKLOG.md:18: B-4: ⚠ without a `repos:` line' 'BACKLOG.md:24: `### Done:`: not a state' \
+  'BACKLOG.md:27: `B-05` is not a B- id' 'BACKLOG.md:33: B-6: text after the `Done when:` paragraph' \
+  'BACKLOG.md:3: `next id` is B-3, not above the highest id here, B-6' 'questions.md:5: ⚠ marks a cross-repo' \
+  'questions.md:10: Q-1: 🟢 without a `ruled:` line' 'questions.md:14: Q-2: `ruled:` is not a YYYY-MM-DD date' \
+  'questions.md:1: no `next id: Q-<n>'; do
+  check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
+done
+"$SH" "$WF/template/$IT" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
+check "items.sh: a file it cannot read exits 2" [ $? = 2 ]
+check "items.sh: a file it cannot read says UNKNOWN" has "$T/it-missing.txt" "UNKNOWN: $T/nowhere/BACKLOG.md"
+
+# Two sessions give an id at once (notes/item-format.md, "Two sessions, same number"). The `next id` line names who
+# raised it, so the second push conflicts there instead of merging two items with one id.
+give_id() { # <clone> <session> <section>: a new item at the top of <section> takes `next id`, which goes up by one
+  local n
+  n=$(sed -n 's/^next id: B-\([0-9]*\) .*/\1/p' "$1/BACKLOG.md")
+  awk -v n="$n" -v who="$2" -v sec="## $3" '
+    { sub(/\r$/, "") } # a CRLF checkout (core.autocrlf, as on Windows CI)
+    /^next id: / { print "next id: B-" (n + 1) " (last given to claude@" who ")"; next }
+    { print }
+    $0 == sec { print ""; print "### 🔲 B-" n " Added by " who; print "Done when: it is done." }
+  ' "$1/BACKLOG.md" >"$T/give.tmp" && mv "$T/give.tmp" "$1/BACKLOG.md"
+}
+mkdir "$T/ids" && cd "$T/ids" || exit 1
+git_q init --bare remote.git && git -C remote.git symbolic-ref HEAD refs/heads/main
+git_q clone remote.git a
+git -C a symbolic-ref HEAD refs/heads/main
+printf '%s\n' '# Backlog' '' 'next id: B-2 (last given to claude@a)' '' '## api' '' '### 🔲 B-1 An old item' \
+  'Done when: it is done.' '' '## web' >a/BACKLOG.md
+git -C a add BACKLOG.md && git_q -C a commit -m start && git_q -C a push origin main
+git_q clone remote.git b
+give_id a a api && git_q -C a commit -am "B-2 by a" && git_q -C a push origin main
+give_id b b web && git_q -C b commit -am "B-2 by b"
+git_q -C b push origin main
+check "two sessions, one number: the second push is rejected" [ $? != 0 ]
+git_q -C b pull --rebase origin main
+check "two sessions, one number: the rebase stops on a conflict" [ $? != 0 ]
+check "two sessions, one number: the conflict is in BACKLOG.md" \
+  [ "$(git -C b diff --name-only --diff-filter=U)" = BACKLOG.md ]
+# Resolved as the format says: keep the remote's line, renumber the new item from it, raise it again.
+git -C b show origin/main:BACKLOG.md >b/BACKLOG.md && give_id b b web
+git -C b add BACKLOG.md && git_q -C b -c core.editor=true rebase --continue && git_q -C b push origin main
+check "two sessions, one number: after renumbering, the push goes through" [ $? = 0 ]
+"$SH" "$WF/template/$IT" check b/BACKLOG.md >"$T/it-ids.txt" 2>&1
+check "two sessions, one number: the result passes the format check" [ $? = 0 ]
+check "two sessions, one number: they end with different ids" \
+  [ "$(grep -c '^### 🔲 B-2 Added by a$' b/BACKLOG.md)$(grep -c '^### 🔲 B-3 Added by b$' b/BACKLOG.md)" = 11 ]
+# The control: two sessions with the same name write the same line, which git merges silently into two items with
+# one id. Only the format check sees it.
+git_q clone remote.git c && git_q clone remote.git d
+give_id c same api && git_q -C c commit -am "B-4 by c" && git_q -C c push origin main
+give_id d same web && git_q -C d commit -am "B-4 by d"
+git_q -C d pull --rebase origin main
+check "the control: the same next id line merges without a conflict" [ $? = 0 ]
+"$SH" "$WF/template/$IT" check d/BACKLOG.md >"$T/it-dup.txt" 2>&1
+check "the control: the format check exits 2" [ $? = 2 ]
+check "the control: the format check names the id given twice" has "$T/it-dup.txt" "B-4 is given twice"
 
 echo
 if [ "$failures" -gt 0 ]; then

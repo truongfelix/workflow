@@ -1,7 +1,8 @@
 # Item format
 
 Every item in `BACKLOG.md` and `questions.md` has one shape, so a person reads it, Claude writes it, and a script can
-parse it. Both trackers point here; `/handoff` follows it when it adds or changes an item.
+parse it. Both trackers point here; `/handoff` follows it when it adds or changes an item. Both skills check it with
+`items.sh` (the last section but one): `/session-start` after the ground truth, `/handoff` before committing.
 
 ## Shape
 
@@ -94,10 +95,19 @@ No date fields otherwise: when an item was added, changed or closed comes from t
 - 💬: the question, the options (A, B, …) with one marked recommended, and why.
 - 🟢: the owner's words, then what not to do because of them.
 
+## The check
+
+`bash .claude/skills/session-start/items.sh check` reads both trackers and lists, with its file and line, each place
+they depart from this format: a `###` heading that does not match the shape, an unknown state or field, a malformed
+or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without `Done when:`
+as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
+`YYYY-MM-DD`. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a
+silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example.
+
 ## Moving a project to it
 
 A project that adopted the workflow before this format (1.x: bullets, cited by title) converts its trackers once.
 Each item becomes a heading with an id, numbered from 1 in the order the items were created, oldest first
 (`git log --reverse -S'<title>' -- BACKLOG.md` dates one); states, ⚠ and triggers move into their fields; each file
 gets its `next id` line; and every place that cites an item by its title (the handoff, `CLAUDE.md`, the notes) puts
-the id in front of it.
+the id in front of it. `items.sh check` lists whatever is left.
