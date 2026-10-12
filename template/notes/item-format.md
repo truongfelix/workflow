@@ -76,8 +76,8 @@ silently, leaving two items numbered B-13.
 | questions | 🟢 | ruling in force |
 | questions | ⏸️ | deferred: the trigger is in `waits:` |
 
-A lesson has no state. There is no "in progress" or "done" state: work in flight is in the handoff's Next list, and a finished item is
-deleted (git keeps it). So a state can never disagree with the facts behind it.
+A lesson has no state. There is no "in progress" or "done" state: work in flight is in the handoff's Next list, and a
+finished item is deleted (git keeps it). So a state can never disagree with the facts behind it.
 
 ## Fields
 
@@ -112,22 +112,27 @@ name from `.claude/ground-truth.conf` (`## api`), so a BACKLOG item rarely needs
 ## The check
 
 `bash .claude/skills/session-start/items.sh check` reads both trackers and the lessons, and lists, with its file and
-line, each place they depart from this format: a `###` heading that does not match the shape, an unknown state or
-field, a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item
-without `Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a
-date not in `YYYY-MM-DD`, a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a
-silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example.
+line, each place they depart from this format: a `###` heading that does not match the shape, an unknown state or field,
+a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without
+`Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
+`YYYY-MM-DD`, a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2
+when one does not, or when a file cannot be read: never a silent pass. Fenced code and HTML comments are skipped, so a
+tracker can show an example. It checks the handoffs too (`notes/handoff-format.md`, "The check").
 
 ## The board
 
-`bash .claude/skills/session-start/board.sh` writes both trackers, the lessons and the handoffs as one page, a tab
-each, and opens it: the repos and their count, every item with its state, repos and dates, filters by repo (one,
-several, or the items that span more than one), state, date (added, last changed, closed, ruled) and text, each
-item's history from git, and the handoffs that name it. Closed items come back from git: a deleted item as
-"closed", a deleted lesson as "dropped", a replaced handoff as "replaced". Handoffs written before they had ids
-(one `notes/handoff.md`) are shown by their date. The page is read-only and rebuilt at each run (no server, nothing to
-install): run the script again to refresh it. An item the parser cannot read shows in the problems box as written,
-never dropped.
+`bash .claude/skills/session-start/board.sh` writes both trackers, the lessons and the handoffs as one page, a tab each,
+and opens it: the repos and their count, every item with its state, repos and dates, filters by repo (one, several, or
+the items that span more than one), state, date (added, last changed, closed, ruled) and text, each item's history from
+git, and the handoffs that name it. Each commit opens to its whole message and the files it changed; a commit hash
+quoted anywhere (an item, a handoff, a commit message, a PR) links to that commit in whichever repo of
+`.claude/ground-truth.conf` holds it, and so do the commits that name an item by its id. PRs come from GitHub, read by
+`gh` when the page is built: a PR that names an item (title, description, branch) and a PR an item names (`#41`) show
+with the item, with their description and merge commit. Without `gh`, or with `--offline`, the page says the PRs were
+not read. Closed items come back from git: a deleted item as "closed", a deleted lesson as "dropped", a replaced handoff
+as "replaced". Handoffs written before they had ids (one `notes/handoff.md`) are shown by their date. The page is
+read-only and rebuilt at each run (no server, nothing to install): run the script again to refresh it. An item the
+parser cannot read shows in the problems box as written, never dropped.
 
 ## Moving a project to it
 

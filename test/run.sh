@@ -259,12 +259,29 @@ check "board: no trackers exits 2" [ $? = 2 ]
 check "board: no trackers says UNKNOWN" has "$T/board-missing.txt" "UNKNOWN"
 check "board: adopt.sh makes it executable" [ -x "$T/ws/.claude/skills/session-start/board.sh" ]
 
+# Commits and PRs: a code repo whose commit names B-1, quoted by its hash in B-1, and a fake gh that knows the code
+# repo's PRs and fails for the docs repo's.
+mkdir "$T/board2-api" && cd "$T/board2-api" || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main && git remote add origin https://github.com/demo/api.git
+GIT_COMMITTER_DATE=2026-02-02T10:00:00 git_q commit --allow-empty -m "Round small quantities up to 1 g" \
+  -m "A pinch of salt rounded to 0 g (B-1)."
+api_sha=$(git rev-parse HEAD)
+mkdir "$T/fakebin"
+cat >"$T/fakebin/gh" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *"-R demo/api "*) printf '41\tRound to 1 g\tMERGED\tfix/B-1-rounding\tmain\t2026-02-01T09:00:00Z\t2026-02-02T10:00:00Z\t2026-02-02T10:00:00Z\thttps://github.com/demo/api/pull/41\tdev\t$api_sha\tFixes B-1.\\\\nA pinch of salt keeps 1 g.\n' ;;
+  *) echo "HTTP 404: Not Found" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$T/fakebin/gh"
+
 # The board's lessons and handoffs: L-2 is dropped; a 1.x notes/handoff.md is replaced by the session s1's H-1, which
 # H-2 replaces.
 mkdir -p "$T/board2/notes" && cd "$T/board2" || exit 1
-git_q init && git symbolic-ref HEAD refs/heads/main
+git_q init && git symbolic-ref HEAD refs/heads/main && git remote add origin https://github.com/demo/docs.git
 printf '%s\n' '# Demo — Backlog' '' 'next id: B-2 (last given to claude@s1)' '' '## api' '' '### 🔲 B-1 First' \
-  'Done when: done.' >BACKLOG.md
+  "Fixed by ${api_sha:0:7}, see #41." 'Done when: done.' >BACKLOG.md
 printf '%s\n' '# Demo — questions' '' 'next id: Q-1 (none given yet)' >questions.md
 lessons() { printf '%s\n' '# Lessons' '' 'next id: L-3 (last given to claude@s1)' '' '## Git' '' "$@"; }
 lessons '### L-1 Kept' 'A rule.' '' '### L-2 Dropped later' 'A rule.' >notes/lessons.md
@@ -282,7 +299,7 @@ handoff H-1 >notes/handoff/s1.md
 git add -A && GIT_COMMITTER_DATE=2026-02-03T18:00:00 git_q commit -m "H-1 Handoff, L-2 dropped"
 sed 's/^next id: H-2 .*/next id: H-3 (last given to claude@s1)/' notes/handoff/README.md >"$T/r" && mv "$T/r" notes/handoff/README.md
 handoff H-2 "continues: H-1" >notes/handoff/s1.md
-git add -A && GIT_COMMITTER_DATE=2026-03-04T18:00:00 git_q commit -m "H-2 Handoff"
+git add -A && GIT_COMMITTER_DATE=2026-03-04T18:00:00 git_q commit -m "H-2 Handoff" -m "The second day."
 "$SH" "$BD" --no-open --out "$T/board2.html" "$T/board2" >"$T/board2.txt" 2>&1
 check "board, lessons and handoffs: exits 0" [ $? = 0 ]
 item2() { grep -F "\"id\":\"$1\"," "$T/board2.html" | grep -qF -- "$2"; } # <id> <text>
@@ -292,12 +309,33 @@ check "board: the live handoff, with the one it continues" \
   item2 H-2 '"kind":"H","id":"H-2","state":"handoff","cross":0,"section":"","title":"2026-02-03 18:00 CET · claude@s1","fields":"continues: H-1"'
 check "board: a replaced handoff, with the date it was replaced" item2 H-1 '"closed":"2026-03-04"'
 check "board: a 1.x handoff, by its date, replaced when it was deleted" item2 'H~2026-01-02T10:00' '"closed":"2026-02-03"'
-check "board, lessons and handoffs: no problem found" has "$T/board2.html" '"problems":[]}'
+check "board, lessons and handoffs: no problem found" has "$T/board2.html" '"problems":[],'
 if command -v node >/dev/null 2>&1; then
   node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
     var d = JSON.parse(h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0]);
     process.exit(d.items.length === 6 ? 0 : 1);' "$T/board2.html"
   check "board, lessons and handoffs: the data parses as JSON, every item in it" [ $? = 0 ]
+fi
+mkdir -p .claude && printf 'REPOS=("docs|.|origin||" "api|%s|origin||")\n' "$T/board2-api" >.claude/ground-truth.conf
+PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --out "$T/board3.html" "$T/board2" >"$T/board3.txt" 2>&1
+check "board, commits and PRs: exits 0" [ $? = 0 ]
+check "board: a commit's whole message" has "$T/board3.html" '"subject":"H-2 Handoff","body":"The second day."'
+check "board: a commit of another repo, quoted by its hash" has "$T/board3.html" \
+  "{\"sha\":\"$api_sha\",\"repo\":\"api\",\"date\":\"2026-02-02\",\"author\":\"test\",\"subject\":\"Round small quantities up to 1 g\","
+check "board: a PR, with its repo, branch and state" has "$T/board3.html" \
+  '{"repo":"api","gh":"demo/api","number":41,"title":"Round to 1 g","state":"MERGED","branch":"fix/B-1-rounding",'
+check "board: a PR's description, its newlines kept" has "$T/board3.html" '"body":"Fixes B-1.\nA pinch of salt keeps 1 g."}'
+check "board: PRs gh could not read are UNKNOWN, never none" has "$T/board3.html" \
+  '{"repo":"docs","gh":"demo/docs","status":"UNKNOWN: gh pr list failed: HTTP 404: Not Found"}'
+PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --offline --out "$T/board4.html" "$T/board2" >/dev/null 2>&1
+check "board --offline: asks GitHub nothing, and says so" has "$T/board4.html" '"gh":"demo/api","status":"not read: --offline"'
+check "board --offline: no PR" has "$T/board4.html" '"prs":[],'
+if command -v node >/dev/null 2>&1; then
+  node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
+    var d = JSON.parse(h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0]);
+    process.exit(d.prs.length === 1 && d.prs[0].body === "Fixes B-1.\nA pinch of salt keeps 1 g." && d.commits.length >= 4 ? 0 : 1);' \
+    "$T/board3.html"
+  check "board, commits and PRs: the data parses as JSON, the text intact" [ $? = 0 ]
 fi
 
 # Two sessions give an id at once (notes/item-format.md, "Two sessions, same number"). The `next id` line names who

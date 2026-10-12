@@ -5,7 +5,8 @@ is in flight today (running jobs, the task of the day) is in the handoffs, `note
 
 **Rules**
 - **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading
-  as authoritative. Measured results go to `notes/`.
+  as authoritative. The commit that deletes it says where it landed (a commit hash, a PR number), so the board leads
+  from the closed item to the work. Measured results go to `notes/`.
 - **Sections are cut along repos or file trees**, so one session (or one worktree) can take a section while another
   session takes another, and their work merges cleanly.
 - **Every item has one shape** (`notes/item-format.md`): `### <state> <id> <title>`, its fields, a body, and

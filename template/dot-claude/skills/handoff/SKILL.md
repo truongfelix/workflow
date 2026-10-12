@@ -51,7 +51,8 @@ session can find out what happened and why.
    - **The session ends for good** (its work landed, nothing live is left): delete its file instead of rewriting it.
    - **Moving from 1.x, once** (a `notes/handoff.md` and its archive): `notes/handoff-format.md`, "Moving a project
      to it".
-3. **Update the trackers.** `BACKLOG.md`: delete every item that landed, add what was found and not fixed in the
+3. **Update the trackers.** `BACKLOG.md`: delete every item that landed (the commit says where: `B-12 done: a1b2c3d
+   on main, PR #41`, so the board links the closed item to that commit and PR), add what was found and not fixed in the
    section it touches (⚠ cross-repo if it needs two), fix anything the session proved wrong. `questions.md`: add new
    questions to §1 with a recommendation; move a question the user answered to §2 as 🟢 with their words and a
    `ruled:` date (or delete it if nothing is left to guard). `CLAUDE.md` only when a rule, a how-to or the long-term

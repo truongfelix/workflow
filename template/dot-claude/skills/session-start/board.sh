@@ -13,25 +13,32 @@
 # when that names a repo; with one repo configured, every item is in it.
 # Dates: from the commits that changed each file (first parent only, so a merge counts once): added, last changed,
 # closed (the commit that deleted the item). Edits not committed yet count as today's.
+# Commits and PRs: each commit's whole message and the files it changed, for the commits in an item's history, the
+# commits of every repo in ground-truth.conf that name an id, and every commit hash quoted in an item, a handoff, a
+# commit message or a PR, looked up in those repos. PRs: one `gh pr list` per GitHub repo when the page is built
+# (the page itself needs no network); a PR names an item by its id (title, description, branch), an item names a PR
+# by `#<number>`. When gh cannot answer, the page says the PRs were not read, never that there are none.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
-# Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [<project dir>]
+# Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [--offline] [<project dir>]
 #   <project dir>  default: the project this script is installed in
 #   --out          where to write the page. Default: <temp folder>/<project>-board.html, the same file at each run
 #   --no-open      only print the page's path
+#   --offline      do not ask GitHub for the PRs
 # Exit 0 = the page is written (problems in the trackers are shown on it). 2 = no page (UNKNOWN). 1 = usage error.
 
 set -uo pipefail
 
-usage() { echo "usage: $0 [--out <file>] [--no-open] [<project dir>]" >&2; exit 1; }
+usage() { echo "usage: $0 [--out <file>] [--no-open] [--offline] [<project dir>]" >&2; exit 1; }
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SH=${BASH:-bash}
-out="" open=1 dir=""
+out="" open=1 offline=0 dir=""
 while [ $# -gt 0 ]; do
   case $1 in
     --out) [ $# -ge 2 ] || usage; out=$2; shift 2 ;;
     --no-open) open=0; shift ;;
+    --offline) offline=1; shift ;;
     -*) usage ;;
     *) [ -z "$dir" ] || usage; dir=$1; shift ;;
   esac
@@ -127,6 +134,105 @@ if [ ! -s "$T/now" ] && [ -s "$T/now.err" ]; then echo "UNKNOWN: items.sh read n
 awk '{ print "P\t\t0\t" $0 }' "$T/now.err" >>"$T/now" # its own complaints: no file, no line
 [ -f notes/handoff.md ] && old_handoff notes/handoff.md notes/handoff.md >>"$T/now"
 
+# The repos: each entry of ground-truth.conf that is a git repo here (name, path, GitHub repo), then this project's own
+# repo when no entry is it.
+TIMEOUT_CMD=""
+for t in timeout gtimeout; do
+  command -v "$t" >/dev/null && "$t" 1 true </dev/null >/dev/null 2>&1 && { TIMEOUT_CMD=$t; break; }
+done
+with_timeout() { # <seconds> <command...>: as in ground-truth.sh
+  local secs=$1 pid n=0
+  shift
+  if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$secs" "$@"; return; fi
+  "$@" &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$n" -ge $((secs * 10)) ]; then kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; return 124; fi
+    sleep 0.1
+    n=$((n + 1))
+  done
+  wait "$pid"
+}
+: >"$T/conf" && : >"$T/repos"
+if [ -f .claude/ground-truth.conf ]; then
+  (REPOS=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
+    for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done) >"$T/conf"
+fi
+self=$(git rev-parse --show-toplevel 2>/dev/null)
+self_name=""
+while IFS='|' read -r name path remote def gh_repo; do
+  [ -n "$name" ] && [ -n "$path" ] && git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || continue
+  if [ -z "$gh_repo" ]; then
+    gh_repo=$(git -C "$path" remote get-url "${remote:-origin}" 2>/dev/null |
+      sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
+    gh_repo=${gh_repo%.git}
+  fi
+  [ -n "$self" ] && [ "$(git -C "$path" rev-parse --show-toplevel 2>/dev/null)" = "$self" ] && self_name=$name
+  printf '%s\t%s\t%s\n' "$name" "$path" "$gh_repo" >>"$T/repos"
+done <"$T/conf"
+if [ -n "$self" ] && [ -z "$self_name" ]; then
+  self_name=$(basename "$self")
+  gh_repo=$(git remote get-url origin 2>/dev/null | sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
+  printf '%s\t%s\t%s\n' "$self_name" . "${gh_repo%.git}" >>"$T/repos"
+fi
+
+# The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does.
+: >"$T/prs" && : >"$T/prs-read"
+cut -f3 "$T/repos" | grep -v '^$' | awk '!seen[$0]++' >"$T/ghs"
+while IFS= read -r gh_repo; do
+  names=$(awk -F '\t' -v g="$gh_repo" '$3 == g { printf "%s%s", (n++ ? ", " : ""), $1 }' "$T/repos")
+  if [ "$offline" = 1 ]; then st="not read: --offline"
+  elif ! command -v gh >/dev/null 2>&1; then st="not read: gh is not installed"
+  elif with_timeout 30 gh pr list -R "$gh_repo" --state all --limit 500 \
+    --json number,title,state,headRefName,baseRefName,createdAt,mergedAt,closedAt,url,author,mergeCommit,body \
+    --jq '.[] | [.number, .title, .state, .headRefName, .baseRefName, .createdAt, (.mergedAt // ""),
+      (.closedAt // ""), .url, (.author.login // ""), (.mergeCommit.oid // ""), (.body // "")] | @tsv' \
+    >"$T/pr" 2>"$T/pr.err" </dev/null; then
+    st="ok"
+    [ "$(wc -l <"$T/pr" | tr -d ' ')" -ge 500 ] && st="ok: the 500 latest only"
+    awk -v r="$names" -v g="$gh_repo" '{ print r "\t" g "\t" $0 }' "$T/pr" >>"$T/prs"
+  else
+    st="UNKNOWN: gh pr list failed: $(head -1 "$T/pr.err" | tr '\t' ' ')"
+    [ -s "$T/pr.err" ] || st="UNKNOWN: gh pr list failed or timed out"
+  fi
+  printf '%s\t%s\t%s\n' "$names" "$gh_repo" "$st" >>"$T/prs-read"
+done <"$T/ghs"
+
+# The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
+# described once, in the first repo that has it.
+: >"$T/commits"
+describe() { # <repo name> <path> <file of hashes>
+  [ -s "$3" ] || return 0
+  git -C "$2" log --no-walk=unsorted --stdin --date=short --name-status \
+    --format='%x1e%H%x1f%h%x1f%cd%x1f%an%x1f%s%x1f%b%x1f' <"$3" 2>/dev/null |
+    awk -v repo="$1" 'BEGIN { RS = "\036"; FS = "\037" } NF >= 7 { printf "%s\037%s\036", repo, $0 }' >>"$T/commits"
+}
+new_only() { # the hashes in want that no repo has described yet, in want2
+  awk 'BEGIN { RS = "\036"; FS = "\037" } NF >= 7 { print $2 }' "$T/commits" >"$T/have"
+  awk 'FILENAME == ARGV[1] { have[$0] = 1; next } !($0 in have)' "$T/have" "$T/want" >"$T/want2"
+}
+idre='(^|[^A-Za-z0-9-])[BQLH]-[1-9][0-9]*([^0-9]|$)'
+while IFS="$tab" read -r name path gh_repo; do
+  {
+    [ "$name" = "$self_name" ] && awk -F '\t' '$3 != "" { print $3 }' "$T/versions"
+    git -C "$path" log --all -E --grep="$idre" --format=%H 2>/dev/null
+  } | awk '!seen[$0]++' >"$T/want"
+  new_only
+  describe "$name" "$path" "$T/want2"
+done <"$T/repos"
+cat "$T/now" "$T/hist" "$T/prs" "$T/commits" 2>/dev/null | awk '
+  { gsub(/\\[nt]/, " "); gsub(/[^0-9A-Za-z]/, " "); n = split($0, w, " ")
+    for (i = 1; i <= n; i++) if (length(w[i]) >= 7 && length(w[i]) <= 40 && w[i] ~ /^[0-9a-f]+$/ && !seen[w[i]]++) print w[i] }
+' >"$T/tokens"
+if [ -s "$T/tokens" ]; then
+  while IFS="$tab" read -r name path gh_repo; do
+    awk '{ print $0 "^{commit}" }' "$T/tokens" | git -C "$path" cat-file --batch-check='%(objectname) %(objecttype)' 2>/dev/null |
+      awk '$2 == "commit" { print $1 }' | awk '!seen[$0]++' >"$T/want"
+    new_only
+    describe "$name" "$path" "$T/want2"
+  done <"$T/repos"
+fi
+
 # The data: one JSON object, one item per line. An item's events come from comparing each version with the one
 # before: added, changed (and how), closed when a version no longer has it, reopened when a later one has it again.
 # Text from items.sh is already escaped for JSON but for its quotes; "</" is cut so the page's script cannot end early.
@@ -138,9 +244,9 @@ function swap(s, a, b,   out, i) {
   return out s
 }
 function je(s) { return "\"" swap(swap(s, "\"", "\\\""), "</", "<\\/") "\"" }
-function js(s) { return je(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n")) }
+function js(s) { return je(swap(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n"), "\r", "\\r")) }
 function ev(id, n, what) {
-  hist[id] = hist[id] (hist[id] == "" ? "" : ",") "[" js(vday[n]) "," js(substr(vsha[n], 1, 7)) "," js(vsubj[n]) "," js(what) "]"
+  hist[id] = hist[id] (hist[id] == "" ? "" : ",") "[" js(vday[n]) "," js(vsha[n]) "," js(vsubj[n]) "," js(what) "]"
   if (!(id in added)) added[id] = vday[n]
   changed[id] = vday[n]
   closed[id] = (what == "closed") ? n : 0
@@ -203,9 +309,44 @@ END {
       (F[2] == "" ? js(F[4]) : je(F[4]))
     sep = ","
   }
-  printf "]}\n"
+  printf "],\n"
 }
 ' "$T/versions" "$T/hist" "$T/now" >"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
+
+# The commits, the PRs and whether each repo's PRs could be read. A PR's text comes escaped by @tsv: quotes only.
+awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" '
+function swap(s, a, b,   out, i) {
+  out = ""
+  while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
+  return out s
+}
+function je(s) { return "\"" swap(swap(s, "\"", "\\\""), "</", "<\\/") "\"" }
+function js(s) { return je(swap(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n"), "\r", "\\r")) }
+function trim(s) { sub(/^\n+/, "", s); sub(/\n+$/, "", s); return s }
+BEGIN {
+  printf "\"commits\":["; sep = ""; RS = "\036"
+  while ((getline rec < cfile) > 0) {
+    if (split(rec, F, "\037") < 8) continue
+    printf "%s\n{\"sha\":%s,\"repo\":%s,\"date\":%s,\"author\":%s,\"subject\":%s,\"body\":%s,\"files\":%s}", sep, \
+      js(F[2]), js(F[1]), js(F[4]), js(F[5]), js(F[6]), js(trim(F[7])), js(trim(F[8]))
+    sep = ","
+  }
+  printf "],\n\"prs\":["; sep = ""; RS = "\n"
+  while ((getline rec < pfile) > 0) {
+    if (split(rec, F, "\t") < 14) continue
+    printf "%s\n{\"repo\":%s,\"gh\":%s,\"number\":%d,\"title\":%s,\"state\":%s,\"branch\":%s,\"base\":%s,", sep, \
+      je(F[1]), je(F[2]), F[3], je(F[4]), je(F[5]), je(F[6]), je(F[7])
+    printf "\"created\":%s,\"merged\":%s,\"closed\":%s,\"url\":%s,\"author\":%s,\"merge\":%s,\"body\":%s}", \
+      je(substr(F[8], 1, 10)), je(substr(F[9], 1, 10)), je(substr(F[10], 1, 10)), je(F[11]), je(F[12]), je(F[13]), je(F[14])
+    sep = ","
+  }
+  printf "],\n\"prsRead\":["; sep = ""
+  while ((getline rec < rfile) > 0) {
+    split(rec, F, "\t")
+    printf "%s{\"repo\":%s,\"gh\":%s,\"status\":%s}", sep, js(F[1]), js(F[2]), js(F[3]); sep = ","
+  }
+  printf "]}\n"
+}' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
 {
   cat <<'PAGE'
@@ -271,6 +412,11 @@ dt { color: var(--muted); }
 dd { margin: 0; }
 ol.hist { padding-left: 18px; margin: 4px 0; }
 ol.hist li { margin-bottom: 4px; }
+details.msg { margin: 2px 0 6px; }
+details.msg summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+details.msg .body { margin: 4px 0; }
+pre.files { white-space: pre-wrap; font: 12px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin: 4px 0 10px; }
+.note { margin: 4px 16px; color: var(--warn); }
 .problems { margin: 8px 16px; padding: 8px 12px; border: 1px solid var(--warn); background: var(--warnbg); border-radius: 6px; }
 .problems summary { cursor: pointer; color: var(--warn); font-weight: 600; }
 .problems pre { white-space: pre-wrap; margin: 6px 0; }
@@ -306,6 +452,7 @@ footer { padding: 8px 16px 20px; color: var(--muted); font-size: 12px; }
   <button class="chip" id="reset">Reset filters</button>
 </div>
 <div id="problems"></div>
+<div id="prnote"></div>
 <div class="main" id="main">
   <div class="tablewrap" id="list"></div>
   <aside id="panel" hidden></aside>
@@ -359,6 +506,43 @@ D.items.forEach(function (it) {
   it.text = (it.id + " " + it.title + " " + it.fields + " " + it.body + " " + it.section).toLowerCase();
   if (!byId[it.id] || !it.closed) byId[it.id] = it;
 });
+// Commits by hash, PRs by repo and number; which commits and PRs name each item, which PRs each item names.
+var commits = {}, shas = [];
+D.commits.forEach(function (c) { if (!commits[c.sha]) { commits[c.sha] = c; shas.push(c.sha); } });
+var prefix = {};
+function commitOf(h) { // a full or short hash, or ""
+  if (!h) return "";
+  if (commits[h]) return h;
+  if (!(h in prefix)) {
+    var m = shas.filter(function (s) { return s.indexOf(h) === 0; });
+    prefix[h] = m.length === 1 ? m[0] : "";
+  }
+  return prefix[h];
+}
+function idsIn(s) { var o = {}; (String(s).match(IDS) || []).forEach(function (m) { o[m] = 1; }); return Object.keys(o); }
+var namedBy = {}; // id -> commits whose message names it
+D.commits.forEach(function (c) {
+  idsIn(c.subject + "\n" + c.body).forEach(function (id) { (namedBy[id] = namedBy[id] || []).push(c); });
+});
+var prs = {}, prByNum = {};
+D.prs.forEach(function (pr) {
+  pr.key = pr.gh + "#" + pr.number;
+  pr.names = pr.repo.split(", ");
+  pr.ids = idsIn(pr.title + "\n" + pr.body + "\n" + pr.branch);
+  prs[pr.key] = pr;
+  (prByNum[pr.number] = prByNum[pr.number] || []).push(pr);
+});
+function prsOf(it) { // PRs that name the item, and PRs the item names by #number, in its repos
+  var out = D.prs.filter(function (pr) { return pr.ids.indexOf(it.id) >= 0; });
+  (it.body.match(/(^|[^&\w])#([1-9][0-9]*)\b/g) || []).forEach(function (m) {
+    (prByNum[m.replace(/^[^#]*#/, "")] || []).forEach(function (pr) {
+      var mine = !it.repos.length || pr.names.some(function (r) { return it.repos.indexOf(r) >= 0; });
+      if (mine && out.indexOf(pr) < 0) out.push(pr);
+    });
+  });
+  return out;
+}
+
 // Which handoffs name each item: the "continuous" link from a handoff back to the work it ordered.
 var citedBy = {};
 D.items.forEach(function (it) {
@@ -376,7 +560,7 @@ var S;
 function defaults() {
   return { tab: "B", repos: [],
     st: { B: ["open", "claimed", "waiting"], Q: ["question", "waiting", "ruling"], L: ["lesson"], H: ["handoff", "closed"] },
-    dk: "changed", from: "", to: "", q: "", sort: "old", sel: "" };
+    dk: "changed", from: "", to: "", q: "", sort: "old", sel: "", back: "" };
 }
 function load() {
   S = defaults();
@@ -385,7 +569,7 @@ function load() {
     if (h.get("tab") in KINDS) S.tab = h.get("tab");
     if (h.has("repos")) S.repos = h.get("repos").split(",").filter(Boolean);
     Object.keys(KINDS).forEach(function (k) { if (h.has("st" + k)) S.st[k] = h.get("st" + k).split(",").filter(Boolean); });
-    ["dk", "from", "to", "q", "sort", "sel"].forEach(function (k) { if (h.has(k)) S[k] = h.get(k); });
+    ["dk", "from", "to", "q", "sort", "sel", "back"].forEach(function (k) { if (h.has(k)) S[k] = h.get(k); });
   } catch (e) { S = defaults(); }
 }
 function save() {
@@ -393,7 +577,7 @@ function save() {
   h.set("tab", S.tab);
   if (S.repos.length) h.set("repos", S.repos.join(","));
   Object.keys(KINDS).forEach(function (k) { h.set("st" + k, S.st[k].join(",")); });
-  ["dk", "from", "to", "q", "sort", "sel"].forEach(function (k) { if (S[k]) h.set(k, S[k]); });
+  ["dk", "from", "to", "q", "sort", "sel", "back"].forEach(function (k) { if (S[k]) h.set(k, S[k]); });
   try { history.replaceState(null, "", "#" + h.toString()); } catch (e) { /* a browser that refuses it on file: */ }
 }
 
@@ -423,8 +607,16 @@ function shown(it, skip) {
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; });
 }
-function fmt(s) { // the little markdown the trackers use: `code`, **bold**, and ids as links
+function fmt(s) { // the little markdown the trackers use: `code`, **bold**; ids, commit hashes and #PRs as links
   return esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+    .replace(/\b[0-9a-f]{7,40}\b/g, function (m) {
+      var c = commitOf(m);
+      return c ? "<a href=\"#\" data-commit=\"" + c + "\">" + m + "</a>" : m;
+    })
+    .replace(/(^|[\s(\[])#([1-9][0-9]*)\b/g, function (m, pre, n) {
+      var l = prByNum[n] || [];
+      return l.length === 1 ? pre + "<a href=\"#\" data-pr=\"" + esc(l[0].key) + "\">#" + n + "</a>" : m;
+    })
     .replace(IDS, function (m) { return byId[m] ? "<a href=\"#\" data-id=\"" + m + "\">" + m + "</a>" : m; });
 }
 function fmtBody(s) { // a line wrapped in the markdown joins the one before, as markdown renders it
@@ -506,6 +698,11 @@ function render() {
         esc(p.text) + "</pre>" : "<div>" + esc((p.file ? p.file + ":" + p.line + ": " : "") + p.text) + "</div>";
     }).join("") + "</details>";
 
+  var unread = D.prsRead.filter(function (r) { return r.status.indexOf("ok") !== 0; });
+  document.getElementById("prnote").innerHTML = !unread.length ? (D.prsRead.length ? "" :
+    "<div class=\"note muted\">No GitHub repo in .claude/ground-truth.conf: no PRs.</div>") : unread.map(function (r) {
+      return "<div class=\"note\">PRs of " + esc(r.repo) + " (" + esc(r.gh) + ") " + esc(r.status) + ": an item may have PRs not shown.</div>";
+    }).join("");
   var rows = tabItems.filter(function (it) { return shown(it); });
   rows.sort(function (a, b) {
     var byAdded = when(a).localeCompare(when(b)); // orders the handoffs that have no id
@@ -528,10 +725,57 @@ function render() {
   panel();
 }
 
+function backLink() {
+  var b = byId[S.back] ? S.back : "";
+  return "<button class=\"chip close\" id=\"close\">Close</button>" +
+    (b ? "<a href=\"#\" data-id=\"" + esc(b) + "\">← " + esc(idOf(byId[b])) + "</a>" : "");
+}
+function prLine(pr) {
+  var st = pr.merged ? "merged " + pr.merged : pr.state === "OPEN" ? "open" : "closed " + pr.closed;
+  return "<a href=\"#\" data-pr=\"" + esc(pr.key) + "\">" + esc(pr.repo) + " #" + pr.number + "</a> " + esc(pr.title) +
+    " <span class=\"muted\">· " + esc(st) + "</span>";
+}
+function commitLine(c) {
+  return "<a href=\"#\" data-commit=\"" + c.sha + "\"><code>" + c.sha.slice(0, 7) + "</code></a> " + esc(c.subject) +
+    " <span class=\"muted\">· " + esc(c.repo) + " · " + esc(c.date) + "</span>";
+}
+function prose(body) { // a message body without its trailers (Co-Authored-By:, Signed-off-by:)
+  return String(body || "").split("\n").filter(function (l) { return !/^[A-Z][A-Za-z-]*-by: /.test(l); }).join("\n").trim();
+}
+function msg(c) { return c && prose(c.body) ? "<details class=\"msg\"><summary>message</summary><div class=\"body\">" + fmtBody(c.body) + "</div></details>" : ""; }
+function commitView(c) {
+  var h = backLink() + "<h2>" + fmt(c.subject) + "</h2><div class=\"muted\">commit <code>" + c.sha.slice(0, 12) + "</code> · " +
+    esc(c.repo) + " · " + esc(c.date) + " · " + esc(c.author) + "</div><div class=\"body\">" + (fmtBody(c.body) || "<span class=\"muted\">No message beyond its subject.</span>") + "</div>";
+  if (c.files) h += "<b>Files</b><pre class=\"files\">" + esc(c.files) + "</pre>";
+  var its = idsIn(c.subject + "\n" + c.body).filter(function (id) { return byId[id]; });
+  if (its.length) h += "<b>Items it names</b><div class=\"body\">" + its.map(function (id) {
+    return "<a href=\"#\" data-id=\"" + id + "\">" + esc(idOf(byId[id])) + "</a> " + esc(byId[id].title);
+  }).join("\n") + "</div>";
+  var merged = D.prs.filter(function (pr) { return pr.merge === c.sha; });
+  if (merged.length) h += "<b>Merge of</b><div class=\"body\">" + merged.map(prLine).join("\n") + "</div>";
+  return h;
+}
+function prView(pr) {
+  var h = backLink() + "<h2>" + esc(pr.repo) + " #" + pr.number + " " + fmt(pr.title) + "</h2><div class=\"muted\">" +
+    esc(pr.state.toLowerCase()) + " · " + esc(pr.branch) + " → " + esc(pr.base) + " · opened " + esc(pr.created) +
+    (pr.merged ? " · merged " + esc(pr.merged) : pr.closed ? " · closed " + esc(pr.closed) : "") + " · " + esc(pr.author) +
+    " · <a href=\"" + esc(pr.url) + "\" target=\"_blank\" rel=\"noopener\">on GitHub</a></div>" +
+    "<div class=\"body\">" + (fmtBody(pr.body) || "<span class=\"muted\">No description.</span>") + "</div>";
+  var mc = commitOf(pr.merge);
+  if (mc) h += "<b>Merge commit</b><div class=\"body\">" + commitLine(commits[mc]) + "</div>";
+  var its = pr.ids.filter(function (id) { return byId[id]; });
+  if (its.length) h += "<b>Items it names</b><div class=\"body\">" + its.map(function (id) {
+    return "<a href=\"#\" data-id=\"" + id + "\">" + esc(idOf(byId[id])) + "</a> " + esc(byId[id].title);
+  }).join("\n") + "</div>";
+  return h;
+}
 function panel() {
-  var it = byId[S.sel], p = document.getElementById("panel");
-  document.getElementById("main").classList.toggle("open", !!it);
-  p.hidden = !it;
+  var p = document.getElementById("panel"), sel = S.sel || "";
+  var c = sel.indexOf("c:") === 0 ? commits[sel.slice(2)] : null, pr = sel.indexOf("p:") === 0 ? prs[sel.slice(2)] : null;
+  var it = c || pr ? null : byId[sel];
+  document.getElementById("main").classList.toggle("open", !!(it || c || pr));
+  p.hidden = !(it || c || pr);
+  if (c || pr) { p.innerHTML = c ? commitView(c) : prView(pr); return; }
   if (!it) return;
   var where = it.closed ? "closed on " + it.closed + "; last in " + it.file : it.file + ":" + it.line;
   var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + idOf(it) + " " + fmt(it.title) + "</h2>" +
@@ -540,6 +784,8 @@ function panel() {
     (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>");
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
   h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
+  var ps = prsOf(it);
+  if (ps.length) h += "<b>Pull requests</b><div class=\"body\">" + ps.map(prLine).join("\n") + "</div>";
   var by = (citedBy[it.id] || []).filter(function (x) { return x !== it; }).sort(newest);
   if (by.length) h += "<b>Named in handoffs</b><div class=\"body\">" + by.map(function (x) {
     return "<a href=\"#\" data-id=\"" + esc(x.id) + "\">" + esc(idOf(x)) + "</a> " + esc(x.title) + (x.closed ? " (replaced)" : "");
@@ -547,26 +793,36 @@ function panel() {
   h += "<b>History</b>";
   h += !it.history.length ? "<div class=\"muted\">No commit has it yet.</div>" : "<ol class=\"hist\">" +
     it.history.slice().reverse().map(function (e) {
-      return "<li><b>" + esc(e[3]) + "</b> " + esc(e[0]) + (e[1] ? " · <code>" + esc(e[1]) + "</code> " : " · ") + esc(e[2]) + "</li>";
+      var c = commits[e[1]];
+      return "<li><b>" + esc(e[3]) + "</b> " + esc(e[0]) + " · " + (c ? "<a href=\"#\" data-commit=\"" + c.sha + "\"><code>" +
+        e[1].slice(0, 7) + "</code></a> " : e[1] ? "<code>" + esc(e[1].slice(0, 7)) + "</code> " : "") + fmt(e[2]) + msg(c) + "</li>";
     }).join("") + "</ol>";
+  var inHist = {};
+  it.history.forEach(function (e) { inHist[e[1]] = 1; });
+  var other = (namedBy[it.id] || []).filter(function (c) { return !inHist[c.sha]; });
+  if (other.length) h += "<b>Other commits that name it</b><div class=\"body\">" + other.map(commitLine).join("\n") + "</div>";
   p.innerHTML = h;
 }
 
 document.addEventListener("click", function (e) {
-  var t = e.target.closest("[data-repo],[data-tab],[data-state],[data-id],#close,#reset");
+  var t = e.target.closest("[data-repo],[data-tab],[data-state],[data-id],[data-commit],[data-pr],#close,#reset");
   if (!t) return;
   if (t.tagName === "A") e.preventDefault();
   var list, v;
-  if (t.id === "close") S.sel = "";
+  if (t.id === "close") { S.sel = ""; S.back = ""; }
+  else if (t.dataset.commit || t.dataset.pr) {
+    if (byId[S.sel]) S.back = S.sel;
+    S.sel = t.dataset.commit ? "c:" + t.dataset.commit : "p:" + t.dataset.pr;
+  }
   else if (t.id === "reset") { v = S.tab; S = defaults(); S.tab = v; }
   else if (t.dataset.repo) { list = S.repos; v = t.dataset.repo; }
   else if (t.dataset.state) { list = S.st[S.tab]; v = t.dataset.state; }
   else if (t.dataset.tab) { S.tab = t.dataset.tab; }
-  else if (t.dataset.id) S.sel = (S.sel === t.dataset.id && t.tagName === "TR") ? "" : t.dataset.id;
+  else if (t.dataset.id) { S.sel = (S.sel === t.dataset.id && t.tagName === "TR") ? "" : t.dataset.id; S.back = ""; }
   if (list) { var i = list.indexOf(v); if (i >= 0) list.splice(i, 1); else list.push(v); }
   render();
 });
-document.addEventListener("keydown", function (e) { if (e.key === "Escape" && S.sel) { S.sel = ""; render(); } });
+document.addEventListener("keydown", function (e) { if (e.key === "Escape" && S.sel) { S.sel = ""; S.back = ""; render(); } });
 ["dk", "from", "to", "sort"].forEach(function (k) {
   document.getElementById(k).addEventListener("change", function (e) { S[k] = e.target.value; render(); });
 });

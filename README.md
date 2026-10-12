@@ -89,7 +89,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item) and `/handoff` |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
