@@ -1,7 +1,8 @@
 # <!-- FILL: project name -->
 
-<!-- FILL: one paragraph. What this is, who owns it (the owner decides priorities and anything outward), where the
-code lives (one repo, or the repos inside this workspace), what is public and what must stay private. -->
+<!-- FILL: one paragraph. What this is, who owns it (the owner decides priorities, and what Claude does alone:
+below), where the code lives (one repo, or the repos inside this workspace), what is public and what must stay
+private. -->
 
 **Sessions:** start with `/session-start`, end with `/handoff` (skills in `.claude/skills/`). Both first run
 `.claude/skills/session-start/ground-truth.sh` (repos, worktrees, open PRs + CI, background jobs; configured in
@@ -18,13 +19,43 @@ by repo, state and date: `bash .claude/skills/session-start/board.sh`.
 This setup comes from the workflow repo (`.claude/workflow-version` names the commit). When a
 session improves a generic piece (a skill, the ground-truth script), port that part back there.
 
+## What Claude does alone
+
+The owner's answer for each step where a session could stop and ask. **ask first**: say what you are about to do
+and wait for a yes. **do, then tell**: do it, then say so in your next message, or in the handoff.
+
+<!-- FILL: ask the owner for a preset (the last bullet below), then show the rows and ask which to change; set them,
+then delete this comment. Until then every row is Careful. -->
+
+| Step | Here |
+|---|---|
+| Start the day's task after the brief | ask first |
+| Commit the docs (handoff, trackers, notes, this file) | ask first |
+| Push the docs | ask first |
+| Add an item to the backlog | ask first |
+| Claim an item (commit and push its claim line) | ask first |
+| Commit code | ask first |
+| Push a work branch | ask first |
+| Open a pull request | ask first |
+| Merge a pull request, or push to a default branch | ask first |
+| Delete a branch or worktree whose work has landed | ask first |
+| Stop a background job this session started | ask first |
+| Release: tag, publish | ask first |
+| Comment, or message anyone | ask first |
+
+- A row is a standing answer. A yes in the chat covers that one action, not the next one.
+- The owner changes a row at any time ("from now on, push the docs without asking"): edit the row here, at once; it
+  holds from the next action on.
+- An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
+  its ask-first steps in one question.
+- Presets, for setup or a reset: **Careful** asks first on every row. **Balanced** asks first to start the day's
+  task, to open or merge a pull request (or push to a default branch), to release, and to comment or message; it
+  does the rest, then tells. **Hands-off** asks first only to release, and to comment or message.
+
 ## Rules
 
-- **Outward actions need the owner's OK:** push, PR, merge, release, comments, messages to anyone. An approval
-  covers the action it was given for, not the next one.
-- **Handoff rule:** <!-- FILL: one of: "/handoff asks before committing" · "/handoff commits and pushes the docs
-  (handoff, trackers, notes) without asking; code still needs an OK" · "/handoff commits and pushes everything,
-  wip included" -->
+- **Whatever the table says:** never rewrite a branch others may have fetched (a fix is a new commit), never skip a
+  hook (`--no-verify`).
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.

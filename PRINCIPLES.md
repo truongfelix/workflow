@@ -18,7 +18,16 @@ since; a "pushed" branch may never have reached the remote. Re-confirm a claim i
 repeating it to the owner.
 
 **Propose, then wait.** The session brief ends with a recommendation and a question. The owner sets the day's
-priorities; the handoff can be stale. Reading and checking need no permission; long work and outward actions do.
+priorities; the handoff can be stale. Reading and checking need no permission; what comes after them is the
+owner's to allow (next principle).
+
+**The owner chooses what Claude does alone.** A solo side project and a repo other people clone need different
+stops, so a rule fixed in the template is too slow for one or too loose for the other. One table in CLAUDE.md lists
+each step where a session could stop and ask (the day's task, commits, pushes, claims, PRs, merges, releases,
+messages) with the owner's answer: ask first, or do it and then tell. Setup asks; the owner changes a row whenever
+they want. A yes in the chat covers one action: a permission given in passing and remembered by nobody is the one
+that surprises later, so only a row stands. What protects other people or the history is not on the table: no
+rewrite of a branch others fetched, no skipped hook, no secret in a tracked file.
 
 ## The trackers
 
@@ -90,9 +99,6 @@ work on a dead laptop does not exist.
 
 **Stage the paths you touched.** `git add -A` sweeps in whatever the owner dropped into the tree; a clean status
 afterwards cannot catch it, because it is clean BECAUSE everything was staged.
-
-**Outward actions need an OK, one at a time.** Push, PR, merge, release, comments, messages. Approval for one does not
-extend to the next.
 
 **Background jobs must be findable.** Launch long jobs as named transient units (`systemd-run --user --unit <name>`)
 so the ground truth lists them, and record each one in the handoff's Running table with how to check and stop it.

@@ -38,6 +38,29 @@ nested=$(find "$WF" -path "$WF/.git" -prune -o \( -path "$WF/*/CLAUDE.md" -o -pa
   -o -path "$WF/*/.claude/skills" \) -print)
 check "no CLAUDE.md or .claude/skills below the repo root" [ -z "$nested" ]
 
+# What Claude does alone: one table in CLAUDE.md, the only place where a skill learns whether to ask first. The
+# template's rows all ask first until the owner chooses; the example has the same rows; a row a skill names exists.
+rows() { # <CLAUDE.md>: the table's rows, "| <step> | <answer> |"
+  sed -n '/^## What Claude does alone/,/^## /p' "$1" | tr -d '\r' | grep '^| ' | grep -v '^| Step | Here |$'
+}
+steps() { rows "$1" | sed 's/^| \(.*\) | [^|]* |$/\1/'; } # <CLAUDE.md>: the steps alone
+CT="$WF/template/CLAUDE.template.md" CE="$WF/example/CLAUDE.example.md"
+SKILLS=("$WF/template/dot-claude/skills/session-start/SKILL.md" "$WF/template/dot-claude/skills/handoff/SKILL.md")
+check "the template's table has its rows" [ "$(rows "$CT" | wc -l | tr -d ' ')" -ge 10 ]
+check "the template's table asks first on every row" [ -z "$(rows "$CT" | grep -v '| ask first |$')" ]
+check "the example's table answers each row with ask first or do, then tell" \
+  [ -z "$(rows "$CE" | grep -v -e '| ask first |$' -e '| do, then tell |$')" ]
+check "the example's table has the template's rows" [ "$(steps "$CE")" = "$(steps "$CT")" ]
+check "no fixed rule for asking left beside the table" lacks "$CT" "Outward actions need"
+for f in "${SKILLS[@]}"; do
+  check "${f#"$WF"/}: no rule of its own for asking" lacks "$f" "handoff rule"
+done
+for r in "Start the day's task after the brief" "Commit the docs" "Push the docs" "Add an item to the backlog" \
+  "Commit code" "Push a work branch" "Stop a background job this session started"; do
+  check "the row \"$r\", named by a skill, is in the table" \
+    eval 'steps "$CT" | grep -q "^$r" && cat "${SKILLS[@]}" | grep -qF "\"$r\""'
+done
+
 # The workspace: ws/ is the docs repo, ws/api a code repo, ws/api-feat its worktree.
 cd "$T" || exit 1
 git_q init --bare remote-api.git && git_q init --bare remote-docs.git
@@ -66,6 +89,8 @@ check "adopt.sh installs the handoff format and the handoffs' folder" \
 check "adopt.sh installs no single handoff and no archive" test ! -e notes/handoff.md -a ! -e notes/handoff-archive.md
 check "adopt.sh installs the workspace .gitignore" [ -f .gitignore ]
 check "adopt.sh lists what is left to FILL" has "$T/adopt.txt" "CLAUDE.md:1:"
+check "adopt.sh lists the table of what Claude does alone as left to FILL" has "$T/adopt.txt" \
+  "FILL: ask the owner for a preset"
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt2.txt" 2>&1
 check "adopt.sh run again exits 0" [ $? = 0 ]
 check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (identical)"

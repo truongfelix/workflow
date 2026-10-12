@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: End-of-session handoff. Distils the session's previous handoff, records what was done, what still runs in the background, what is next (the task of the day) and what waits for the user, in the session's own notes/handoff/<session>.md, BACKLOG.md, questions.md, CLAUDE.md, the topic notes and memory, then commits and pushes per the project's handoff rule, so any session on any machine can start from an empty context. Use it whenever the user wants to finish, close or wrap up a session ("handoff", "end of day", "save where we are", "switching machines", "battery dying"), before a /clear, or when the conversation is about to be compacted after a long stretch of work.
+description: End-of-session handoff. Distils the session's previous handoff, records what was done, what still runs in the background, what is next (the task of the day) and what waits for the user, in the session's own notes/handoff/<session>.md, BACKLOG.md, questions.md, CLAUDE.md, the topic notes and memory, then commits and pushes as CLAUDE.md's "What Claude does alone" allows, so any session on any machine can start from an empty context. Use it whenever the user wants to finish, close or wrap up a session ("handoff", "end of day", "save where we are", "switching machines", "battery dying"), before a /clear, or when the conversation is about to be compacted after a long stretch of work.
 ---
 
 # Handoff
@@ -33,8 +33,9 @@ session can find out what happened and why.
    - **Nothing may exist only on this disk without being named.** Every uncommitted worktree, LOCAL ONLY commit and
      unpushed branch that this session touched is either committed (a `wip:` commit whose body says what is
      unfinished and which tests fail, if any) and pushed, or listed under "Unfinished" with its path and what it
-     holds. Follow the project's handoff rule in CLAUDE.md for whether that needs the user's OK. A worktree listed in
-     an earlier handoff stays listed until it is cleaned up. Branches marked "local only BY RULE" are never pushed.
+     holds. The rows "Commit code" and "Push a work branch" in CLAUDE.md ("What Claude does alone") say whether that
+     needs the user's OK. A worktree listed in an earlier handoff stays listed until it is cleaned up. Branches
+     marked "local only BY RULE" are never pushed.
 2. **Distil, then rewrite this session's handoff**, `notes/handoff/<session>.md` (`<session>`: the worktree's
    folder name unless the owner named the session). Two layers: the live file and what is distilled out of it. Git
    keeps every earlier version; nobody reads it whole, so a lesson left only in an old handoff is a lesson lost.
@@ -53,10 +54,10 @@ session can find out what happened and why.
      to it".
 3. **Update the trackers.** `BACKLOG.md`: delete every item that landed (the commit says where: `B-12 done: a1b2c3d
    on main, PR #41`, so the board links the closed item to that commit and PR), add what was found and not fixed in the
-   section it touches (⚠ cross-repo if it needs two), fix anything the session proved wrong. `questions.md`: add new
-   questions to §1 with a recommendation; move a question the user answered to §2 as 🟢 with their words and a
-   `ruled:` date (or delete it if nothing is left to guard). `CLAUDE.md` only when a rule, a how-to or the long-term
-   state changed. Keep all three short.
+   section it touches (⚠ cross-repo if it needs two; the row "Add an item to the backlog"), fix anything the session
+   proved wrong. `questions.md`: add new questions to §1 with a recommendation; move a question the user answered to
+   §2 as 🟢 with their words and a `ruled:` date (or delete it if nothing is left to guard). `CLAUDE.md` only when a
+   rule, a how-to or the long-term state changed. Keep all three short.
    - **Every new item gets its file's `next id`**, and the same edit raises that line and names this session:
      `next id: B-14 (last given to claude@<session>)` (`notes/item-format.md`, "The id"). An item keeps its id when
      its title, state or section changes. If the push is rejected and the rebase conflicts on that line, keep the
@@ -78,12 +79,14 @@ session can find out what happened and why.
      machine or a cloud session needs goes in the repo);
    - an improvement to the session loop itself (a skill step, a ground-truth check) → its generic part goes back to
      the workflow repo in its own commit (README, "Improve the workflow"). Never a lesson.
-6. **Background work:** stop anything that should not keep running; ask the user if unsure. Everything left running
-   goes in the "Running" table with how to check it and how to stop it.
-7. **Commit and push the docs** (handoff, trackers, notes) per the project's handoff rule. The message starts with
-   the handoff's id: `H-5 Handoff: <what was done>; next <ids>`. Then verify that the
-   remote has the tip (`git log origin/<branch> -1`, or run the ground truth again): a push that failed is a
-   handoff that did not happen. Never commit secrets: if a secret is needed, write THAT it is needed, never its
+6. **Background work:** stop anything that should not keep running, as the row
+   "Stop a background job this session started" allows; ask the user if unsure, and always for a job another
+   session started. Everything left running goes in the "Running" table with how to check it and how to stop it.
+7. **Commit and push the docs** (handoff, trackers, notes) as the rows "Commit the docs" and "Push the docs" allow.
+   Every ask-first step of this handoff (steps 1, 3, 6 and this one) goes to the user in one question, with what
+   each would do. The message starts with the handoff's id: `H-5 Handoff: <what was done>; next <ids>`. Then verify
+   that the remote has the tip (`git log origin/<branch> -1`, or run the ground truth again): a push that failed is
+   a handoff that did not happen. Never commit secrets: if a secret is needed, write THAT it is needed, never its
    value.
 8. **Tell the user in a few lines:** where the state is written, the next task, and what waits for them.
 

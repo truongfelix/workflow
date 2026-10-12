@@ -54,9 +54,11 @@ open that already shipped, "done" items whose code changed since).
      marked ⚠ cross-repo runs alone, in its order (producer first, then each consumer).
    - **Waiting for you:** the `questions.md` §1 items that block today's work, each with a recommendation, named by
      what the user sees (a screen's title, a command), not by a code name. These are never self-serve.
-   - End by recommending one task and asking which to start.
-5. **Wait for the user's choice** before long work or anything outward (push, PR, merge, release, comments,
-   messages). Reading and checking are fine. The user decides the day's priorities, and the handoff can be stale.
+   - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
+     CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
+5. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
+   release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
+   day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
 
 ## Notes
 

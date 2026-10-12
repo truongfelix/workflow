@@ -11,7 +11,7 @@ This template keeps a project going across sessions, machines and weeks with two
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
   worktree against its remote, open PRs and their CI, background jobs. Then it reads the last handoff, reports
-  where the two disagree, proposes the day's task, and waits for you.
+  where the two disagree, proposes the day's task, and waits for you (or starts it, if you told it to).
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
   decisions, lessons learned), and commits.
 
@@ -67,9 +67,10 @@ Then open Claude Code in your project and ask:
 
 > Set up the workflow: follow "Adopt in a new project" in /path/to/workflow/README.md
 
-Claude fills in the blanks (what the project is, its repos, its rules), runs the ground truth until it comes back
-clean, and runs `/handoff` once to write the first handoff. From then on: `/session-start` when you sit down,
-`/handoff` before you stop.
+Claude first asks what it may do without asking you (commit, push, open a PR, merge, …: a preset, then any change),
+then fills in the blanks (what the project is, its repos, its rules), runs the ground truth until it comes back
+clean, and runs `/handoff` once to write the first handoff. You change any of those answers whenever you want: "from
+now on, push the docs without asking". From then on: `/session-start` when you sit down, `/handoff` before you stop.
 
 ## What you get
 
@@ -87,7 +88,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/item-format.md` | the one shape of every item in both trackers and the lessons, and how a new item gets its id |
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
-| `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
+| `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
 | `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item) and `/handoff` |
 
@@ -106,7 +107,9 @@ wrong. A few:
 - **An unreadable result is UNKNOWN, never a pass.** A check that crashes prints nothing, which reads as "found
   nothing". The script says UNKNOWN and exits 2.
 - **Nothing exists only on one disk without being named.** Uncommitted work on a dead laptop does not exist.
-- **Propose, then wait.** The session recommends; you pick the day's work and approve each push, PR or merge.
+- **Propose, then wait.** The session recommends; you pick the day's work.
+- **You choose what Claude does alone.** One table: for each step (the day's task, commit, push, PR, merge, release,
+  messages), ask you first, or do it and tell you. Set at setup, changed whenever you say so.
 
 ## Adopt in a new project
 
@@ -122,11 +125,15 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` for the second shape). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
 4. **Fill**, in this order:
+   - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset
+     (Careful, Balanced or Hands-off, as its last bullet defines them) as a multiple-choice question. Then show the
+     table with that preset and ask which rows to change; the owner names them, or none. Set the rows, then
+     delete its FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
-   - `CLAUDE.md`: what the project is, the rules, the **handoff rule** (may `/handoff` commit and push without
-     asking?), repos and layout, commands. Move any existing to-do list out of it into `BACKLOG.md`.
+   - The rest of `CLAUDE.md`: what the project is, the rules, repos and layout, commands. Move any existing to-do
+     list out of it into `BACKLOG.md`.
    - `BACKLOG.md`: one section per repo or file tree, filled from what the project already tracks (issues, notes, an
      old TODO). Each item in the shape of `notes/item-format.md`: an id from `next id`, what is wrong or missing, a
      pointer, `Done when:`.
@@ -135,7 +142,7 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - The skills' FILL item (project-specific checks, what is expected and not news).
 5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
-   and push only with the owner's OK.
+   and push as the table allows.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
    ground truth. The next
    session starts with `/session-start`.
@@ -153,7 +160,10 @@ From 1.x: the trackers' items and the lessons moved from bullets cited by title 
 `notes/handoff.md` with its archive became one handoff per session, with git as the archive
 (`notes/handoff-format.md`, "Moving a project to it"). `adopt.sh` installs the new
 `notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once;
-`.claude/skills/session-start/items.sh check` lists what is left.
+`.claude/skills/session-start/items.sh check` lists what is left. In `CLAUDE.md`, the "outward actions" rule and the
+handoff rule became the table "What Claude does alone": copy it from the template, every row "ask first", then set
+what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs" and "Push the docs"; everything:
+"Commit code" and "Push a work branch" too), and ask the owner about the other rows.
 
 ## Improve the workflow
 
@@ -177,7 +187,7 @@ template/                     copied into a project's root by bin/adopt.sh
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh and board.sh; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used
