@@ -84,8 +84,10 @@ done
 T=$(mktemp -d "${TMPDIR:-/tmp}/board.XXXXXX") || { echo "UNKNOWN: no temp folder"; exit 2; }
 trap 'rm -rf "$T"' EXIT
 
-# The project's name: the trackers' title up to its dash ("# Pantry — Backlog"), else the folder's name.
+# The project's name: the trackers' title up to its dash ("# Pantry — Backlog"), else the folder's name (also while
+# the title is still the template's FILL marker).
 project=$(sed -n '1s/^# *\(.*\) — .*/\1/p' "${trackers[0]}" | tr -d '\r')
+case $project in *FILL*) project="" ;; esac
 [ -n "$project" ] || project=$(basename "$(pwd)")
 [ -n "$out" ] || out="${TMPDIR:-/tmp}/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
 cache="${out%.html}-prs.tsv" # the PRs last read, for an --offline build

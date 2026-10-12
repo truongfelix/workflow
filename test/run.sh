@@ -420,6 +420,11 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$T/opened" ] && break; sleep 0.2; done
 check "board, with a display: the page opens" has "$T/opened" "$T/board.html"
 check "board, with a display: no text board" lacks "$T/here.txt" "BACKLOG:"
 
+# Before the setup fills the title in, the page is named after the folder, not after the FILL marker.
+mkdir -p "$T/unfilled" "$T/tmpdir" && cp "$WF/template/BACKLOG.md" "$WF/template/questions.md" "$T/unfilled/"
+TMPDIR="$T/tmpdir" "$SH" "$BD" --no-open --offline "$T/unfilled" >/dev/null 2>&1
+check "board, before the setup: the page is named after the folder" [ -f "$T/tmpdir/unfilled-board.html" ]
+
 # The hook (.claude/settings.json, PostToolUse): the tool call as JSON on stdin. It rebuilds when the call names a
 # tracker or moves git, stays quiet and exits 0 whatever happens, and leaves no lock behind.
 hook() { printf '%s' "$1" | "$SH" "$BD" --hook --out "$T/hook.html" "${2:-$T/board}" >"$T/hook.txt" 2>&1; } # <json>
