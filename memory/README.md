@@ -2,17 +2,17 @@
 
 Memory is split two ways: by **time** (what is live, what is past, what was learned) and by **reach** (who needs it).
 
-## By time: live, archive, distilled
+## By time: live, git, distilled
 
 | layer | where | read |
 |---|---|---|
-| **Live** | `notes/handoff.md`: the current state, Next, Running, Waiting | every session start |
-| **Archive** | `notes/handoff-archive.md`: every earlier handoff, newest first, word for word | never whole; searched when something points there |
+| **Live** | `notes/handoff/<session>.md`, one per session: Next, Waiting, Running, Unfinished, Done, Learned | every session start |
+| **Git** | every earlier handoff, closed item and dropped lesson, word for word | never whole; searched by id when something points there |
 | **Distilled** | `notes/lessons.md`, memories, topic notes, CLAUDE.md, gate scripts | where each lesson acts |
 
-`/handoff` moves the live file down a layer each time, and distils it first: each lesson that still holds is
+`/handoff` replaces the session's live file each time, and distils it first: each lesson that still holds is
 promoted to where it acts, each still-live item (a deadline, an owed step) is carried into the new live file. Only
-then is the old file archived. An append-only log that skips the distilling grows until nobody reads it, with its
+then is the old file replaced; git keeps it. An append-only log that skips the distilling grows until nobody reads it, with its
 lessons buried inside.
 
 ## By reach: repo or machine
@@ -21,7 +21,7 @@ Three layers, kept apart on purpose.
 
 | layer | where | travels with | holds |
 |---|---|---|---|
-| **Project state** | the repo: `notes/handoff.md`, `BACKLOG.md`, `questions.md`, `CLAUDE.md`, `notes/` | git: every machine, every cloud session, every clone | what is true about the project and what is next |
+| **Project state** | the repo: `notes/handoff/`, `BACKLOG.md`, `questions.md`, `CLAUDE.md`, `notes/` | git: every machine, every cloud session, every clone | what is true about the project and what is next |
 | **Project lessons** | the repo: `notes/lessons.md`, imported by `CLAUDE.md` | git, like the state | rules every session of this project needs; added by `/handoff` step 5 |
 | **Working memory** | `~/.claude/projects/<path-slug>/memory/` (Claude Code auto-memory) | nothing: this machine and this project path only | how to work here: the owner's corrections and preferences, narrow facts, a machine's quirks |
 

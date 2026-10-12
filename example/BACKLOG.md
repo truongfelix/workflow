@@ -1,7 +1,7 @@
 # Pantry — Backlog (open work)
 
 The queue of **open** work. Owner decisions and deliberate non-fixes are not here: they are in `questions.md`. What
-is in flight today (running jobs, the task of the day) is in `notes/handoff.md`.
+is in flight today (running jobs, the task of the day) is in the handoffs, `notes/handoff/`.
 
 **Rules**
 - **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading
@@ -21,7 +21,7 @@ is in flight today (running jobs, the task of the day) is in `notes/handoff.md`.
 Order set by the owner: what the 2026-10-15 release needs first (B-7 Unit conversion on import), then `api`, then
 `web`.
 
-next id: B-16 (last given to claude@pantry)
+next id: B-17 (last given to claude@pantry)
 
 ---
 
@@ -35,6 +35,11 @@ Done when: an imported recipe stores grams and millilitres only, and #41 is merg
 ### 🔲 B-15 Import rejects recipes with no yield
 About 4% of imports fail with `yield is required` (the backfill's log).
 Done when: a missing yield defaults to 1 serving and the recipe page flags it.
+
+### 🔲 B-16 Backfill ingredients on staging
+Recipes imported before the ingredient index (#39) have no ingredients in it: 340 batches, run as the unit
+`pantry-backfill` so the ground truth lists it.
+Done when: the unit exited 0, and 20 recipes picked at random show their ingredients on staging.
 
 ### ⏸️ B-13 Search on Postgres full-text instead of LIKE
 waits: the ingredient index size, once the backfill's 340 batches are in

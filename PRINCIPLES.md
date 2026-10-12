@@ -22,7 +22,7 @@ priorities; the handoff can be stale. Reading and checking need no permission; l
 
 ## The trackers
 
-**One place for each kind of information.** Today's tasks and running jobs: `notes/handoff.md`. Open work:
+**One place for each kind of information.** Today's tasks and running jobs: the handoffs. Open work:
 `BACKLOG.md`. Owner decisions and rulings: `questions.md`. Rules and how-tos: `CLAUDE.md`. History: git. When the
 same fact lives in two places, one of them goes stale and still reads as authoritative.
 
@@ -30,9 +30,15 @@ same fact lives in two places, one of them goes stale and still reads as authori
 the open ones. Git keeps the narrative with dates. That is also why the docs of a multi-repo workspace must be a
 git repo: pruning is only safe when the history is kept.
 
-**Live, archive, distilled.** One short live file beats an ever-growing log. At each handoff the old live file is
-archived word for word, but only after it is distilled: each lesson still true is promoted to where it acts, each
-still-live item carried forward. Nobody reads an archive whole, so a lesson left only there is lost.
+**Live, git, distilled.** One short live file beats an ever-growing log. At each handoff the old live file is
+replaced, and git keeps it word for word, but only after it is distilled: each lesson still true is promoted to
+where it acts, each still-live item carried forward. Nobody reads the history whole, so a lesson left only there is
+lost. No archive file copies what git already holds: a copy can disagree with its source, and two sessions adding
+to one file at once conflict.
+
+**One handoff per session.** Two sessions working at once each write their own handoff, so neither overwrites the
+other's. Each task in it starts with the id of its item: the handoff orders the trackers and holds no work of its
+own, so nothing waits in a place the trackers do not show.
 
 **Lessons stay with the project that learned them.** A lesson comes from one project's tools, owner and machines, so
 it goes into that project's `notes/lessons.md` and travels with its repo. The workflow carries no lessons: it stays

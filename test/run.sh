@@ -61,6 +61,9 @@ check "adopt.sh installs /handoff" [ -f .claude/skills/handoff/SKILL.md ]
 check "adopt.sh installs CLAUDE.md and .claude/ under their real names" \
   test -f CLAUDE.md -a -d .claude -a ! -e CLAUDE.template.md -a ! -e dot-claude
 check "adopt.sh installs the item format" [ -f notes/item-format.md ]
+check "adopt.sh installs the handoff format and the handoffs' folder" \
+  test -f notes/handoff-format.md -a -f notes/handoff/README.md
+check "adopt.sh installs no single handoff and no archive" test ! -e notes/handoff.md -a ! -e notes/handoff-archive.md
 check "adopt.sh installs the workspace .gitignore" [ -f .gitignore ]
 check "adopt.sh lists what is left to FILL" has "$T/adopt.txt" "CLAUDE.md:1:"
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt2.txt" 2>&1
@@ -71,6 +74,7 @@ printf '%s\n' 'REPOS=("api|api|origin||")' 'KEEP_LOCAL="keepme"' 'UNITS=0' >.cla
 git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
 check "the workspace .gitignore keeps the code repos out" [ -z "$(git status --porcelain --untracked-files=all)" ]
 check "the workspace .gitignore tracks the item format" [ -n "$(git ls-files notes/item-format.md)" ]
+check "the workspace .gitignore tracks the handoffs' folder" [ -n "$(git ls-files notes/handoff/README.md)" ]
 
 GT=.claude/skills/session-start/ground-truth.sh
 "$SH" "$GT" >"$T/gt.txt" 2>&1
@@ -129,21 +133,34 @@ ITS="$WF/template/dot-claude/skills/session-start/items.sh"
 "$SH" "$ITS" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" "$WF/template/notes/lessons.md" \
   >"$T/it.txt" 2>&1
 check "items.sh: the template's trackers and lessons pass" [ $? = 0 ]
-"$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$WF/example/notes/lessons.md" >"$T/it.txt" 2>&1
-check "items.sh: the example's trackers and lessons pass" [ $? = 0 ]
-check "items.sh: the example's lessons are read" has "$T/it.txt" "OK: 11 item(s)"
-LC_ALL=C "$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$WF/example/notes/lessons.md" \
-  >"$T/it.txt" 2>&1
-check "items.sh: the example's trackers and lessons pass in the C locale" [ $? = 0 ]
+EX=("$WF/example/BACKLOG.md" "$WF/example/questions.md" "$WF/example/notes/lessons.md"
+  "$WF/example/notes/handoff/README.md" "$WF/example/notes/handoff/pantry.md")
+"$SH" "$ITS" check "${EX[@]}" >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers, lessons and handoff pass" [ $? = 0 ]
+check "items.sh: the example's lessons and handoff are read" has "$T/it.txt" "OK: 13 item(s)"
+LC_ALL=C "$SH" "$ITS" check "${EX[@]}" >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers, lessons and handoff pass in the C locale" [ $? = 0 ]
+TS="$WF/test/fixtures/two-sessions"
+"$SH" "$ITS" check "$TS/BACKLOG.md" "$TS/questions.md" "$TS/notes/handoff/README.md" "$TS/notes/handoff/api-fix.md" \
+  "$TS/notes/handoff/web-offline.md" >"$T/it.txt" 2>&1
+check "items.sh: two sessions' handoffs pass" [ $? = 0 ]
+check "items.sh: two sessions' handoffs are both read" has "$T/it.txt" "OK: 5 item(s)"
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the project's trackers, from any directory" [ $? = 0 ]
 cp "$T/ws/notes/lessons.md" "$T/lessons.bak" && printf '%s\n' '## Git' '- A lesson with no id.' >>"$T/ws/notes/lessons.md"
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the lessons too" has "$T/it.txt" "notes/lessons.md:"
 cp "$T/lessons.bak" "$T/ws/notes/lessons.md"
+printf '%s\n' '# H-1 2026-10-12 18:40 CEST · claude@ws' '' '## Next' '1. B-1 An item that does not exist' '' \
+  '## Waiting for the user' 'None.' '' '## Running' 'None.' '' '## Unfinished' 'None.' '' '## Done' 'None.' '' \
+  '## Learned' 'None.' >"$T/ws/notes/handoff/ws.md"
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
+check "items.sh: with no file, it checks the handoffs too" has "$T/it.txt" "notes/handoff/ws.md:4: H-1: B-1 is in no tracker"
+rm "$T/ws/notes/handoff/ws.md"
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
-"$SH" "$ITS" check "$WF/test/fixtures/broken/BACKLOG.md" "$WF/test/fixtures/broken/questions.md" \
-  "$WF/test/fixtures/broken/lessons.md" >"$T/it-broken.txt" 2>&1
+BR="$WF/test/fixtures/broken"
+"$SH" "$ITS" check "$BR/BACKLOG.md" "$BR/questions.md" "$BR/lessons.md" "$BR/notes/handoff/README.md" \
+  "$BR/notes/handoff/web.md" >"$T/it-broken.txt" 2>&1
 rc=$?
 sed 's/^/      | /' "$T/it-broken.txt"
 check "items.sh: a broken tracker exits 2" [ "$rc" = 2 ]
@@ -156,7 +173,12 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'questions.md:1: no `next id: Q-<n>' 'lessons.md:8: L-1 is given twice' \
   'lessons.md:11: `### 🔲`: a lesson is `### L-<n> <title>`, with no state' 'lessons.md:16: a lesson without an id' \
   'lessons.md:19: L-3: unknown field `owner:`' 'lessons.md:22: ⚠ marks a cross-repo BACKLOG item, not a lesson' \
-  'lessons.md:1: no `next id: L-<n>'; do
+  'lessons.md:1: no `next id: L-<n>' 'web.md:1: H-4: the file is not named after its session' \
+  'web.md:2: H-4: `continues: H-7`: it names an older handoff' 'web.md:3: H-4: unknown field `owner:`' \
+  'web.md:6: H-4: a task in Next without an id' 'web.md:7: H-4: B-99 is in no tracker' \
+  'web.md:12: H-4: no `## Running` before `## Unfinished`' 'web.md:15: H-4: `## Done` is empty' \
+  'web.md:17: H-4: `## Notes` is not a section of a handoff' 'web.md:18: H-4: no `## Learned` section' \
+  'handoff/README.md:3: `next id` is H-3, not above the highest handoff, H-4'; do
   check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
 done
 "$SH" "$ITS" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
@@ -167,13 +189,16 @@ check "items.sh: a file it cannot read says UNKNOWN" has "$T/it-missing.txt" "UN
 tab=$(printf '\t')
 "$SH" "$ITS" list "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/list.txt" 2>&1
 check "items.sh list: the example exits 0" [ $? = 0 ]
-check "items.sh list: one record per item" [ "$(grep -c "^I$tab" "$T/list.txt")" = 8 ]
+check "items.sh list: one record per item" [ "$(grep -c "^I$tab" "$T/list.txt")" = 9 ]
 check "items.sh list: an item with its state, ⚠, section, title and fields" \
   has "$T/list.txt" "${tab}B-14${tab}open${tab}1${tab}web${tab}Show which ingredient matched a search${tab}repos: api → web$tab"
 check "items.sh list: a question with its repos" has "$T/list.txt" "${tab}Q-2${tab}ruling${tab}0$tab"
 "$SH" "$ITS" list "$WF/example/notes/lessons.md" >"$T/list-lessons.txt" 2>&1
 check "items.sh list: a lesson, with its section and title" \
   has "$T/list-lessons.txt" "${tab}L-3${tab}lesson${tab}0${tab}Git${tab}Stacked PRs target main$tab$tab"
+"$SH" "$ITS" list "${EX[@]}" >"$T/list-handoff.txt" 2>&1
+check "items.sh list: a handoff, with its date, session and the handoff it continues" has "$T/list-handoff.txt" \
+  "${tab}H-9${tab}handoff${tab}0$tab${tab}2026-10-09 18:40 CEST · claude@pantry${tab}continues: H-8$tab## Next\n1. B-7 "
 "$SH" "$ITS" list "$WF/test/fixtures/broken/BACKLOG.md" >"$T/list-broken.txt" 2>&1
 check "items.sh list: a broken tracker exits 2" [ $? = 2 ]
 check "items.sh list: a heading that is not an item is kept as written" has "$T/list-broken.txt" \

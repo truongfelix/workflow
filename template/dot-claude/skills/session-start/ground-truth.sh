@@ -2,7 +2,7 @@
 #
 # ground-truth.sh — what is TRUE right now, read from git, GitHub and the machine.
 #
-# notes/handoff.md, BACKLOG.md and questions.md are CLAIMS written by a past session; this script prints the FACTS
+# The handoffs, BACKLOG.md and questions.md are CLAIMS written by a past session; this script prints the FACTS
 # they are checked against. /session-start runs it before reading the handoff, /handoff before writing one, so the
 # reader and the writer look at the same picture.
 #

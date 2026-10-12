@@ -1,0 +1,82 @@
+# Handoff format
+
+A handoff is what a session leaves for the next one: what to do next, what waits for the owner, what still runs,
+what is unfinished, what was done and learned. `/handoff` writes it in this shape, `/session-start` reads it, and
+`items.sh check` checks it, like the items of `notes/item-format.md`, whose id rules it follows.
+
+## One per session
+
+- `notes/handoff/<session>.md`: one file per live session. `<session>` is the worktree's folder name, unless the
+  owner names the session. A project worked by one session at a time has one file; two sessions working at once
+  each write their own, so neither overwrites the other.
+- `notes/handoff/README.md`: what the folder holds, and the `next id` line:
+  `next id: H-13 (last given to claude@web-offline)`. Two sessions handing off at once conflict on that line and
+  renumber, as with items.
+- A session writes only its own file. Taking over another session's work: the new handoff names that session's
+  handoff in `continues:`, and deletes its file in the same commit.
+- A session that ends for good (its work landed, or another session took it over) deletes its file.
+
+## Shape
+
+```markdown
+# H-12 2026-10-09 18:40 CEST · claude@web-offline
+continues: H-11
+
+## Next
+1. B-12 Shopping list works offline: <why now>, <where to start: file, branch, command>.
+
+## Waiting for the user
+- Q-3 Metric only on the shopping list?: blocks the totals row.
+
+## Running
+None.
+
+## Unfinished
+- web: `web-offline/` on `feat/B-12-offline-list`, pushed; the edit queue is not started.
+
+## Done
+- B-11 Search recipes by ingredient: #39 merged.
+
+## Learned
+- L-3 Stacked PRs target main (new).
+- `npm test` in `web/` runs against the staging API unless `API_URL` is set.
+```
+
+- **Heading:** `# H-<n> YYYY-MM-DD HH:MM <zone> · <agent>@<session>`, on the first line. The file is named after the
+  session: `web-offline.md`. `continues:`, right under it, names the handoff this one replaces (the session's
+  previous one, or the one taken over); a session's first handoff has none.
+- **Sections:** these six, in this order. An empty one says `None.`, so a missing section is an error, not
+  "nothing".
+- **Every task names an id.** Each task in Next (a numbered line) and in Waiting for the user (a bullet) starts with
+  the B- or Q- id of its item. A task without one becomes a BACKLOG item, or a question, first: the handoff orders
+  and comments the trackers, it holds no work of its own.
+- **Running** is a table: what, the unit or process, when it ends, how to check it, how to stop it.
+- **Learned** names the lessons this session added or changed, by id, then any fact the next session needs that is
+  not a lesson. That fact is distilled at the next handoff: it goes where it acts (a lesson, a memory, a topic note,
+  `CLAUDE.md`, a gate script) or is dropped.
+- **The commit** that writes it starts with its id: `H-12 Handoff: search merged (B-11); next offline (B-12)`.
+
+Keep it under about 60 lines: what needs more space goes in a topic note, linked from here.
+
+## Git is the archive
+
+There is no archive file. A replaced handoff, a finished item, a ruling that no longer guards anything and a lesson
+that no longer holds are deleted from their live file, and git keeps each one word for word: `git log -p
+-S'H-11 ' -- notes/handoff/` finds a handoff, `git log -S'B-12 '` an item's whole life (search with the next
+character too, so `B-12` does not match `B-120`). The board shows closed items from git.
+
+## The check
+
+`bash .claude/skills/session-start/items.sh check` reads every handoff with the trackers and reports, with its file
+and line: a first line not in the heading's shape, a file not named after its session, an unknown field, a
+`continues:` that is not an older H- id, a missing, unknown, repeated or out-of-order section, an empty one, a task
+without an id, an id that is in no tracker (a task names an open item: one that landed goes under Done), an H- id
+given twice, and a `next id` not above every handoff's id.
+
+## Moving a project to it
+
+A project that adopted the workflow before this format (1.x) has one `notes/handoff.md` and a
+`notes/handoff-archive.md`. Its next `/handoff` distils `notes/handoff.md` as usual, writes
+`notes/handoff/<session>.md` as H-1 with `notes/handoff/README.md` at `next id: H-2`, and deletes both old files,
+once git holds every handoff in the archive (`git log -p -- notes/handoff.md` shows each version); keep the archive,
+frozen, if it holds handoffs older than the repo.

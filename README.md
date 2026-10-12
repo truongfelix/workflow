@@ -81,15 +81,15 @@ session N:   /session-start ──► work ──► /handoff
 
 | file | holds |
 |---|---|
-| `notes/handoff.md` | today: next tasks, what waits for you, what runs in the background, the last session. Short, rewritten at each handoff |
-| `notes/handoff-archive.md` | every earlier handoff, word for word. Searched when needed, never read at start |
+| `notes/handoff/<session>.md` | today, one file per session: next tasks, what waits for you, what runs in the background, what is unfinished, done and learned. Short, rewritten at each handoff; earlier ones are in git |
 | `BACKLOG.md` | open work only, one section per repo, each item with an id (`B-12`) that never changes. A finished item is deleted, not ticked: git keeps the history |
 | `questions.md` | decisions only you can make, each with options and a recommendation; past rulings, so no session "fixes" them. Ids too (`Q-4`) |
 | `notes/item-format.md` | the one shape of every item in both trackers and the lessons, and how a new item gets its id |
+| `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers and lessons; `board.sh`, the trackers as one page) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers as one page) and `/handoff` |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
@@ -136,7 +136,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
    and push only with the owner's OK.
-6. **Close the loop:** run `/handoff` once, so the first `notes/handoff.md` is written from the ground truth. The next
+6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
+   ground truth. The next
    session starts with `/session-start`.
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
@@ -148,7 +149,9 @@ project's content and the template's structure.
 template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which commit
 the project last took.
 
-From 1.x: the trackers' items and the lessons moved from bullets cited by title to one shape with ids. `adopt.sh` installs the new
+From 1.x: the trackers' items and the lessons moved from bullets cited by title to one shape with ids, and the one
+`notes/handoff.md` with its archive became one handoff per session, with git as the archive
+(`notes/handoff-format.md`, "Moving a project to it"). `adopt.sh` installs the new
 `notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once;
 `.claude/skills/session-start/items.sh check` lists what is left.
 
@@ -163,8 +166,10 @@ here, and neither do lessons: a lesson stays in the `notes/lessons.md` of the pr
 ```
 template/                     copied into a project's root by bin/adopt.sh
   CLAUDE.template.md          skeleton with FILL markers, installed as CLAUDE.md
-  BACKLOG.md  questions.md  notes/handoff.md  notes/handoff-archive.md  notes/lessons.md
+  BACKLOG.md  questions.md  notes/lessons.md
+  notes/handoff/README.md     the handoffs' folder, one file per session, and their next id
   notes/item-format.md        the shape of a tracker item and its id
+  notes/handoff-format.md     the shape of a handoff
   dot-claude/                 installed as .claude/
     ground-truth.conf         what the ground truth looks at: the project's repos
     skills/session-start/{SKILL.md,ground-truth.sh,items.sh,board.sh}
@@ -173,7 +178,8 @@ workspace/gitignore           whitelist .gitignore for a multi-repo workspace's 
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
 test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh and board.sh; CI runs it on Linux, macOS and Windows
-test/fixtures/broken/         trackers and lessons that break the item format in every way items.sh reports
+test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
+test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why
 ```

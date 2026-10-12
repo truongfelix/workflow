@@ -1,7 +1,7 @@
 # <!-- FILL: project name --> — Backlog (open work)
 
 The queue of **open** work. Owner decisions and deliberate non-fixes are not here: they are in `questions.md`. What
-is in flight today (running jobs, the task of the day) is in `notes/handoff.md`.
+is in flight today (running jobs, the task of the day) is in the handoffs, `notes/handoff/`.
 
 **Rules**
 - **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading

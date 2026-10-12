@@ -1,6 +1,6 @@
 ---
 name: session-start
-description: Start-of-session brief. Runs the ground-truth script (repos, worktrees, open PRs + CI, background jobs), reads notes/handoff.md and reconciles it against those facts, checks deadlines, then proposes the task of the day from the handoff, BACKLOG.md and questions.md. Use it at the start of every session, right after /clear, or whenever the user asks where things stand ("where are we", "what's next", "continue the work", "what's running", "resume", "start the day", "what did we do last time").
+description: Start-of-session brief. Runs the ground-truth script (repos, worktrees, open PRs + CI, background jobs), reads the handoffs in notes/handoff/ and reconciles them against those facts, checks deadlines, then proposes the task of the day from the handoff, BACKLOG.md and questions.md. Use it at the start of every session, right after /clear, or whenever the user asks where things stand ("where are we", "what's next", "continue the work", "what's running", "resume", "start the day", "what did we do last time").
 ---
 
 # Session start
@@ -17,15 +17,18 @@ open that already shipped, "done" items whose code changed since).
    the remote, LOCAL ONLY and uncommitted work, branches no worktree holds, open PRs with a CI verdict, background
    jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2 means a probe failed: that section is UNKNOWN,
    never "clean". An open PR is usually the active thread.
-   Then `bash .claude/skills/session-start/items.sh check`: the format of the trackers and the lessons
-   (`notes/item-format.md`). Exit 2
+   Then `bash .claude/skills/session-start/items.sh check`: the format of the trackers, the lessons and the
+   handoffs (`notes/item-format.md`, `notes/handoff-format.md`). Exit 2
    lists each item that breaks it, with its line (a hand edit, or a merge that gave one id twice): that goes in the
    brief, and an id given twice is fixed before any work cites it.
-2. **Read `notes/handoff.md`**: Next, Waiting for the user, Running, Last session.
-   - If it is missing, or older than the latest activity in git or on GitHub, say so, and build the brief from
-     `BACKLOG.md`, `questions.md` and the ground truth instead.
-   - `notes/handoff-archive.md` holds the earlier handoffs: never read it whole; search it when the handoff or a
-     question points there.
+2. **Read the handoffs**, one per live session in `notes/handoff/<session>.md` (`notes/handoff-format.md`): this
+   session's own first (`<session>`: the worktree's folder name unless the owner names it), in full; then each
+   other one's Next, Running and Unfinished, a line each: another session's work, never taken without the owner.
+   A project still on 1.x has one `notes/handoff.md`: read it; its next `/handoff` moves it.
+   - If there is none for this session, or it is older than the latest activity in git or on GitHub, say so, and
+     build the brief from `BACKLOG.md`, `questions.md` and the ground truth instead.
+   - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: search an id with
+     `git log -p -S'<id> ' -- <file>` when a handoff or a question points there.
    - Beyond the Next list, open work is in `BACKLOG.md` and the user's open questions in `questions.md` §1. Read them
      when the Next list is done or the user asks for something else. `questions.md` §2 holds rulings and deliberate
      non-fixes: never propose "fixing" one of those.

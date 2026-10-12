@@ -10,9 +10,10 @@ docs repo at its root. Both code repos are public on GitHub; this docs repo has 
 `.claude/ground-truth.conf`): the handoff is a claim, the script is the fact, and a contradiction is reported first.
 
 **Trackers:** open work is in `BACKLOG.md` (a finished item is deleted), questions for the owner and standing rulings
-in `questions.md`, today's tasks and what runs in `notes/handoff.md`. This file keeps only state, rules and
-how-tos: no to-dos, no decisions waiting, no PR lists or history (git has them). Both trackers as one page, with
-filters by repo, state and date: `bash .claude/skills/session-start/board.sh`.
+in `questions.md`, today's tasks and what runs in one handoff per session in `notes/handoff/`. No archive files:
+git keeps what is deleted. This file keeps only state, rules and how-tos: no to-dos, no decisions waiting, no PR
+lists or history (git has them). Both trackers as one page, with filters by repo, state and date:
+`bash .claude/skills/session-start/board.sh`.
 
 **Lessons** learned in this project, loaded every session: @notes/lessons.md
 
@@ -38,7 +39,7 @@ session improves a generic piece (a skill, the ground-truth script), port that p
 | `api/` | FastAPI service, Postgres | `main` | `origin` = github.com/example-org/pantry-api |
 | `web/` | React app | `main` | `origin` = github.com/example-org/pantry-web |
 | `<repo>-<topic>/` | worktrees, next to their repo (`web-offline/`) | | |
-| `notes/` | handoff, its archive, lessons | | |
+| `notes/` | the handoffs (one per session), lessons | | |
 
 Staging runs on this machine: Postgres on the `/var/lib/pantry` volume (20 GB), the site on http://localhost:8080.
 

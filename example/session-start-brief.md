@@ -1,7 +1,7 @@
 # What /session-start said on Monday
 
 The owner typed `/session-start` on Monday 2026-10-12 at 09:14. Claude ran the ground truth
-([`ground-truth-output.txt`](ground-truth-output.txt)), read Friday's [`notes/handoff.md`](notes/handoff.md),
+([`ground-truth-output.txt`](ground-truth-output.txt)), read Friday's handoff [`notes/handoff/pantry.md`](notes/handoff/pantry.md),
 checked each claim it was about to repeat (the failed unit's log, the two unpushed commits, the red CI job), and
 answered:
 
