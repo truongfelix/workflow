@@ -67,11 +67,14 @@ if [ ${#skipped[@]} -gt 0 ]; then
   done
 fi
 echo
+# The markers of every template file in the project, copied now or already there: the setup runs this script again
+# after the user did, and that run must still say what is left.
+installed=(${copied[@]+"${copied[@]}"} ${skipped[@]+"${skipped[@]}"})
 fills=""
-[ ${#copied[@]} -gt 0 ] && fills=$(grep -n 'FILL' "${copied[@]/#/$dst/}" 2>/dev/null || true)
+[ ${#installed[@]} -gt 0 ] && fills=$(cd "$dst" && grep -Hn 'FILL' "${installed[@]}" 2>/dev/null || true)
 if [ -n "$fills" ]; then
   echo "Left to fill (README.md, 'Adopt in a new project'):"
-  printf '%s\n' "$fills" | sed "s|^$dst/|  |"
-elif [ ${#copied[@]} -gt 0 ]; then
-  echo "No FILL markers left in the copied files."
+  printf '%s\n' "$fills" | sed 's|^|  |'
+else
+  echo "No FILL markers left."
 fi

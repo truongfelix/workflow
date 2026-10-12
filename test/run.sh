@@ -94,6 +94,7 @@ check "adopt.sh lists the table of what Claude does alone as left to FILL" has "
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt2.txt" 2>&1
 check "adopt.sh run again exits 0" [ $? = 0 ]
 check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (identical)"
+check "adopt.sh run again still lists what is left to FILL" has "$T/adopt2.txt" "  CLAUDE.md:1:"
 
 printf '%s\n' 'REPOS=("api|api|origin||")' 'KEEP_LOCAL="keepme"' 'UNITS=0' >.claude/ground-truth.conf
 git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
