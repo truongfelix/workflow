@@ -63,7 +63,7 @@ Keep it under about 60 lines: what needs more space goes in a topic note, linked
 There is no archive file. A replaced handoff, a finished item, a ruling that no longer guards anything and a lesson
 that no longer holds are deleted from their live file, and git keeps each one word for word: `git log -p
 -S'H-11 ' -- notes/handoff/` finds a handoff, `git log -S'B-12 '` an item's whole life (search with the next
-character too, so `B-12` does not match `B-120`). The board shows closed items from git.
+character too, so `B-12` does not match `B-120`). The board shows them all, from git: past handoffs, closed items, dropped lessons.
 
 ## The check
 

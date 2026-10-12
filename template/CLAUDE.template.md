@@ -10,8 +10,8 @@ code lives (one repo, or the repos inside this workspace), what is public and wh
 **Trackers:** open work is in `BACKLOG.md` (a finished item is deleted), questions for the owner and standing rulings
 in `questions.md`, today's tasks and what runs in one handoff per session in `notes/handoff/`. No archive files:
 git keeps what is deleted. This file keeps only state, rules and how-tos: no to-dos, no decisions waiting, no PR
-lists or history (git has them). Both trackers as one page, with filters by repo, state and date:
-`bash .claude/skills/session-start/board.sh`.
+lists or history (git has them). The trackers, lessons and handoffs as one page, closed ones included, with filters
+by repo, state and date: `bash .claude/skills/session-start/board.sh`.
 
 **Lessons** learned in this project, loaded every session: @notes/lessons.md
 

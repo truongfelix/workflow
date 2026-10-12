@@ -120,10 +120,12 @@ silent pass. Fenced code and HTML comments are skipped, so a tracker can show an
 
 ## The board
 
-`bash .claude/skills/session-start/board.sh` writes both trackers as one page and opens it: the repos and their
-count, every item with its state, repos and dates, filters by repo (one, several, or the items that span more than
-one), state, date (added, last changed, closed, ruled) and text, and each item's history from git. Closed items come
-back from git, under the "closed" state. The page is read-only and rebuilt at each run (no server, nothing to
+`bash .claude/skills/session-start/board.sh` writes both trackers, the lessons and the handoffs as one page, a tab
+each, and opens it: the repos and their count, every item with its state, repos and dates, filters by repo (one,
+several, or the items that span more than one), state, date (added, last changed, closed, ruled) and text, each
+item's history from git, and the handoffs that name it. Closed items come back from git: a deleted item as
+"closed", a deleted lesson as "dropped", a replaced handoff as "replaced". Handoffs written before they had ids
+(one `notes/handoff.md`) are shown by their date. The page is read-only and rebuilt at each run (no server, nothing to
 install): run the script again to refresh it. An item the parser cannot read shows in the problems box as written,
 never dropped.
 

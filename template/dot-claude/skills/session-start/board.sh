@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 #
-# board.sh — BACKLOG.md and questions.md as one read-only page: every item, filtered by repo, state, date and text,
-# the closed ones included (from git), each with its history.
+# board.sh — BACKLOG.md, questions.md, notes/lessons.md and the handoffs in notes/handoff/ as one read-only page:
+# every item, filtered by repo, state, date and text, the closed ones included (from git), each with its history.
+# A lesson that is deleted shows as dropped, a handoff that is replaced or deleted as replaced. Handoffs written
+# before they had ids (one notes/handoff.md, workflow 1.x) are shown too, by their date.
 #
 # The page is rebuilt from the markdown at each run, by items.sh (the parser of the format check) and git. It never
 # writes to the trackers, which stay the only source. One self-contained HTML file: plain JavaScript, no server, no
@@ -9,7 +11,7 @@
 #
 # Repos: the names in .claude/ground-truth.conf. An item's repos are its `repos:` line, else its section's first word
 # when that names a repo; with one repo configured, every item is in it.
-# Dates: from the commits that changed each tracker (first parent only, so a merge counts once): added, last changed,
+# Dates: from the commits that changed each file (first parent only, so a merge counts once): added, last changed,
 # closed (the commit that deleted the item). Edits not committed yet count as today's.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
@@ -37,9 +39,13 @@ done
 [ -n "$out" ] && case $out in /*) ;; *) out="$(pwd)/$out" ;; esac
 cd "${dir:-$HERE/../../..}" 2>/dev/null || { echo "UNKNOWN: cannot reach the project folder ${dir:-}"; exit 2; }
 
-trackers=()
+trackers=() # what items.sh reads now: the trackers, the lessons, the handoffs and their README
 for f in BACKLOG.md questions.md; do [ -f "$f" ] && trackers+=("$f"); done
 [ ${#trackers[@]} -gt 0 ] || { echo "UNKNOWN: no BACKLOG.md or questions.md in $(pwd)"; exit 2; }
+for f in notes/lessons.md notes/handoff/README.md notes/handoff/*.md; do
+  case " ${trackers[*]} " in *" $f "*) continue ;; esac
+  [ -f "$f" ] && trackers+=("$f")
+done
 T=$(mktemp -d "${TMPDIR:-/tmp}/board.XXXXXX") || { echo "UNKNOWN: no temp folder"; exit 2; }
 trap 'rm -rf "$T"' EXIT
 
@@ -54,37 +60,72 @@ if [ -f .claude/ground-truth.conf ]; then
     for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s ' "${r%%|*}"; done)
 fi
 
-# Every version of each tracker in git, oldest first, then what is on disk when it differs from the last commit.
+# Every version of each file in git, oldest first, then what is on disk when it differs from the last commit. A file
+# deleted from disk, or by a commit, gives an empty version: the items it held are closed there.
 tab=$(printf '\t')
 today=$(date +%Y-%m-%d)
 head=""
-mkdir "$T/v" && : >"$T/versions"
-versions=()
+mkdir "$T/v" && : >"$T/versions" && : >"$T/old"
+versions=() # versions items.sh reads
+oldv=()     # versions of a 1.x notes/handoff.md, read by old_handoff
+add_version() { # <file> <sha or ""> <day> <subject>: one version of <file>, from git or from the disk
+  local n=$((${#versions[@]} + ${#oldv[@]} + 1))
+  mkdir -p "$T/v/$n/$(dirname "$1")"
+  if [ -n "$2" ]; then git show "$2:./$1" >"$T/v/$n/$1" 2>/dev/null
+  elif [ -f "$1" ]; then cp "$1" "$T/v/$n/$1"
+  else : >"$T/v/$n/$1"
+  fi
+  printf '%s\t%s\t%s\t%s\t%s\n' "$n" "$1" "$2" "$3" "${4//$tab/ }" >>"$T/versions"
+  if [ "$1" = notes/handoff.md ]; then oldv+=("$n/$1"); else versions+=("$n/$1"); fi
+}
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   head=$(git rev-parse --short HEAD 2>/dev/null)
-  for f in "${trackers[@]}"; do
+  {
+    printf '%s\n' "${trackers[@]}" notes/handoff.md
+    git log --format= --name-only --relative -- notes/handoff/ 2>/dev/null
+  } | grep -v '^notes/handoff/README\.md$' | grep '\.md$' | awk '!seen[$0]++' >"$T/files"
+  while IFS= read -r f; do
     git log --first-parent --reverse --date=short --format="%H$tab%cd$tab%s" -- "$f" >"$T/log" 2>/dev/null
-    while IFS="$tab" read -r sha day subject; do
-      n=$((${#versions[@]} + 1))
-      mkdir "$T/v/$n" && git show "$sha:./$f" >"$T/v/$n/$f" 2>/dev/null
-      printf '%s\t%s\t%s\t%s\t%s\n' "$n" "$f" "$sha" "$day" "${subject//$tab/ }" >>"$T/versions"
-      versions+=("$n/$f")
-    done <"$T/log"
-    if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || ! git diff --quiet HEAD -- "$f" 2>/dev/null; then
-      n=$((${#versions[@]} + 1))
-      mkdir "$T/v/$n" && cp "$f" "$T/v/$n/$f"
-      printf '%s\t%s\t\t%s\t%s\n' "$n" "$f" "$today" "not committed yet" >>"$T/versions"
-      versions+=("$n/$f")
+    while IFS="$tab" read -r sha day subject; do add_version "$f" "$sha" "$day" "$subject"; done <"$T/log"
+    if [ -f "$f" ]; then
+      if ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1 || ! git diff --quiet HEAD -- "$f" 2>/dev/null; then
+        add_version "$f" "" "$today" "not committed yet"
+      fi
+    elif git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+      add_version "$f" "" "$today" "not committed yet" # deleted, the deletion not committed
     fi
-  done
+  done <"$T/files"
 fi
+
+# A 1.x handoff (`# Handoff (YYYY-MM-DD HH:MM <zone>)`, no id) as an items.sh record: its id is `H~` and its date, so
+# two versions of the same handoff are one item, edited. One with no date ("not written yet") is no handoff.
+old_handoff() { # <file> <record path>
+  awk -v rec="$2" '
+    function swap(s, a, b,   out, i) {
+      out = ""
+      while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
+      return out s
+    }
+    function esc(s) { return swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n") }
+    { sub(/\r$/, "") }
+    head == "" { if ($0 ~ /^# /) head = $0; next }
+    { body = body "\n" $0 }
+    END {
+      t = head; sub(/^# *Handoff */, "", t); gsub(/[()]/, "", t)
+      if (t !~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]/) exit
+      sub(/^\n+/, "", body); sub(/\n+$/, "", body)
+      print "I\t" rec "\t1\tH~" substr(t, 1, 10) "T" substr(t, 12, 5) "\thandoff\t0\t\t" esc(t " · before handoffs had ids") "\t\t" esc(body)
+    }' "$1"
+}
 : >"$T/hist"
 [ ${#versions[@]} -gt 0 ] && (cd "$T/v" && "$SH" "$HERE/items.sh" list "${versions[@]}" >"$T/hist" 2>/dev/null)
+for v in ${oldv[@]+"${oldv[@]}"}; do old_handoff "$T/v/$v" "$v" >>"$T/hist"; done
 "$SH" "$HERE/items.sh" list "${trackers[@]}" >"$T/now" 2>"$T/now.err"
 rc=$?
 if [ "$rc" != 0 ] && [ "$rc" != 2 ]; then echo "UNKNOWN: items.sh failed (exit $rc)"; cat "$T/now.err"; exit 2; fi
 if [ ! -s "$T/now" ] && [ -s "$T/now.err" ]; then echo "UNKNOWN: items.sh read nothing"; cat "$T/now.err"; exit 2; fi
 awk '{ print "P\t\t0\t" $0 }' "$T/now.err" >>"$T/now" # its own complaints: no file, no line
+[ -f notes/handoff.md ] && old_handoff notes/handoff.md notes/handoff.md >>"$T/now"
 
 # The data: one JSON object, one item per line. An item's events come from comparing each version with the one
 # before: added, changed (and how), closed when a version no longer has it, reopened when a later one has it again.
@@ -281,14 +322,19 @@ var D;
 try { D = JSON.parse(document.getElementById("data").textContent); }
 catch (e) { document.body.textContent = "The board data could not be read: " + e; throw e; }
 
-var KINDS = { B: "Backlog", Q: "Questions" };
-var FILES = { B: "BACKLOG.md", Q: "questions.md" };
+var KINDS = { B: "Backlog", Q: "Questions", L: "Lessons", H: "Handoffs" };
+var FILES = { B: "BACKLOG.md", Q: "questions.md", L: "notes/lessons.md", H: "notes/handoff" };
 var STATES = {
   B: [["open", "🔲", "open"], ["claimed", "🔲", "claimed"], ["waiting", "⏸️", "waiting"], ["closed", "✓", "closed"]],
-  Q: [["question", "💬", "open question"], ["waiting", "⏸️", "deferred"], ["ruling", "🟢", "ruling"], ["closed", "✓", "closed"]]
+  Q: [["question", "💬", "open question"], ["waiting", "⏸️", "deferred"], ["ruling", "🟢", "ruling"], ["closed", "✓", "closed"]],
+  L: [["lesson", "📘", "holds"], ["closed", "✗", "dropped"]],
+  H: [["handoff", "📍", "live"], ["closed", "↩", "replaced"]]
 };
 var DATES = { B: [["added", "added"], ["changed", "last changed"], ["closed", "closed"]],
-  Q: [["added", "added"], ["changed", "last changed"], ["ruled", "ruled"], ["closed", "closed"]] };
+  Q: [["added", "added"], ["changed", "last changed"], ["ruled", "ruled"], ["closed", "closed"]],
+  L: [["added", "added"], ["changed", "last changed"], ["closed", "dropped"]],
+  H: [["added", "written"], ["closed", "replaced"]] };
+var IDS = /\b([BQLH]-[1-9][0-9]*)\b/g;
 var NOREPO = "(no repo)", MULTI = "(several)";
 
 var byId = {};
@@ -300,7 +346,8 @@ D.items.forEach(function (it) {
     if (i > 0) it.f[l.slice(0, i)] = l.slice(i + 1).trim();
   });
   it.status = it.closed ? "closed" : (it.kind === "B" && it.f.claimed ? "claimed" : it.state);
-  it.num = parseInt(it.id.slice(2), 10);
+  it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
+  it.num = it.old ? 0 : parseInt(it.id.slice(2), 10);
   it.ruled = it.f.ruled || "";
   if (it.f.repos) it.repos = it.f.repos.split(/\s*(?:→|->|,)\s*|\s+/).filter(Boolean);
   else if (D.repos.length === 1) it.repos = [D.repos[0]];
@@ -312,11 +359,23 @@ D.items.forEach(function (it) {
   it.text = (it.id + " " + it.title + " " + it.fields + " " + it.body + " " + it.section).toLowerCase();
   if (!byId[it.id] || !it.closed) byId[it.id] = it;
 });
+// Which handoffs name each item: the "continuous" link from a handoff back to the work it ordered.
+var citedBy = {};
+D.items.forEach(function (it) {
+  if (it.kind !== "H") return;
+  var seen = {};
+  (it.body.match(IDS) || []).forEach(function (m) {
+    if (seen[m]) return;
+    seen[m] = 1;
+    (citedBy[m] = citedBy[m] || []).push(it);
+  });
+});
 
 // The view: kept in the address (#...), so a reload after a new run keeps the filters.
 var S;
 function defaults() {
-  return { tab: "B", repos: [], st: { B: ["open", "claimed", "waiting"], Q: ["question", "waiting", "ruling"] },
+  return { tab: "B", repos: [],
+    st: { B: ["open", "claimed", "waiting"], Q: ["question", "waiting", "ruling"], L: ["lesson"], H: ["handoff", "closed"] },
     dk: "changed", from: "", to: "", q: "", sort: "old", sel: "" };
 }
 function load() {
@@ -325,7 +384,7 @@ function load() {
     var h = new URLSearchParams(location.hash.slice(1));
     if (h.get("tab") in KINDS) S.tab = h.get("tab");
     if (h.has("repos")) S.repos = h.get("repos").split(",").filter(Boolean);
-    ["B", "Q"].forEach(function (k) { if (h.has("st" + k)) S.st[k] = h.get("st" + k).split(",").filter(Boolean); });
+    Object.keys(KINDS).forEach(function (k) { if (h.has("st" + k)) S.st[k] = h.get("st" + k).split(",").filter(Boolean); });
     ["dk", "from", "to", "q", "sort", "sel"].forEach(function (k) { if (h.has(k)) S[k] = h.get(k); });
   } catch (e) { S = defaults(); }
 }
@@ -333,7 +392,7 @@ function save() {
   var h = new URLSearchParams();
   h.set("tab", S.tab);
   if (S.repos.length) h.set("repos", S.repos.join(","));
-  h.set("stB", S.st.B.join(",")); h.set("stQ", S.st.Q.join(","));
+  Object.keys(KINDS).forEach(function (k) { h.set("st" + k, S.st[k].join(",")); });
   ["dk", "from", "to", "q", "sort", "sel"].forEach(function (k) { if (S[k]) h.set(k, S[k]); });
   try { history.replaceState(null, "", "#" + h.toString()); } catch (e) { /* a browser that refuses it on file: */ }
 }
@@ -366,7 +425,7 @@ function esc(s) {
 }
 function fmt(s) { // the little markdown the trackers use: `code`, **bold**, and ids as links
   return esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-    .replace(/\b([BQ]-[1-9][0-9]*)\b/g, function (m) { return byId[m] ? "<a href=\"#\" data-id=\"" + m + "\">" + m + "</a>" : m; });
+    .replace(IDS, function (m) { return byId[m] ? "<a href=\"#\" data-id=\"" + m + "\">" + m + "</a>" : m; });
 }
 function fmtBody(s) { // a line wrapped in the markdown joins the one before, as markdown renders it
   var out = "", fence = false, joinable = false;
@@ -375,10 +434,13 @@ function fmtBody(s) { // a line wrapped in the markdown joins the one before, as
     if (isFence) fence = !fence;
     var cont = joinable && !isFence && !fence && l.trim() !== "" && !/^\s*([-*+] |\d+[.)] |\||>|#|Done when:)/.test(l);
     out += out === "" ? l : cont ? " " + l.trim() : "\n" + l;
-    joinable = !isFence && !fence && l.trim() !== "" && !/^\s*\|/.test(l);
+    joinable = !isFence && !fence && l.trim() !== "" && !/^\s*(\||#)/.test(l);
   });
-  return fmt(out);
+  return fmt(out).replace(/^#{1,6} (.*)$/gm, "<b>$1</b>"); // a heading in a body (a handoff's sections)
 }
+function idOf(it) { return it.old ? "1.x" : it.id; }
+function when(it) { return it.old ? it.id.slice(2) : it.added || ""; } // a 1.x handoff: the date and time in its id
+function newest(a, b) { return b.num - a.num || when(b).localeCompare(when(a)); }
 function stateOf(it) {
   var s = STATES[it.kind].filter(function (x) { return x[0] === it.status; })[0] || ["", "", it.status];
   return s[1] + " " + s[2] + (it.cross ? " ⚠" : "");
@@ -436,32 +498,33 @@ function render() {
   if (document.activeElement !== document.getElementById("q")) document.getElementById("q").value = S.q;
   document.getElementById("sort").value = S.sort;
 
-  var probs = D.problems.filter(function (p) { return !p.file || p.file === FILES[S.tab]; });
+  var probs = D.problems.filter(function (p) { return !p.file || p.file.indexOf(FILES[S.tab]) === 0; });
   document.getElementById("problems").innerHTML = !probs.length ? "" :
     "<details class=\"problems\"><summary>" + probs.length + " problem(s) in " + FILES[S.tab] +
-    ": not in the item format (notes/item-format.md)</summary>" + probs.map(function (p) {
+    ": not in its format (" + (S.tab === "H" ? "notes/handoff-format.md" : "notes/item-format.md") + ")</summary>" + probs.map(function (p) {
       return p.type === "U" ? "<div>" + esc(p.file + ":" + p.line) + ": not read as an item, shown as written:</div><pre>" +
         esc(p.text) + "</pre>" : "<div>" + esc((p.file ? p.file + ":" + p.line + ": " : "") + p.text) + "</div>";
     }).join("") + "</details>";
 
   var rows = tabItems.filter(function (it) { return shown(it); });
   rows.sort(function (a, b) {
-    if (S.sort === "changed") return (b.changed || "").localeCompare(a.changed || "") || b.num - a.num;
-    return S.sort === "new" ? b.num - a.num : a.num - b.num;
+    var byAdded = when(a).localeCompare(when(b)); // orders the handoffs that have no id
+    if (S.sort === "changed") return (b.changed || "").localeCompare(a.changed || "") || b.num - a.num || -byAdded;
+    return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
     "<table><thead><tr><th>Id</th><th>State</th><th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\">" + it.id + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td><td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td><td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";
     }).join("") + "</tbody></table>";
   document.getElementById("list").innerHTML = h;
   document.getElementById("foot").textContent = rows.length + " of " + tabItems.length + " " + KINDS[S.tab].toLowerCase() +
-    " items shown. Built from " + FILES[S.tab] + " and its git history by board.sh: run it again to refresh.";
+    " shown. Built from " + FILES[S.tab] + " and its git history by board.sh: run it again to refresh.";
   panel();
 }
 
@@ -471,12 +534,17 @@ function panel() {
   p.hidden = !it;
   if (!it) return;
   var where = it.closed ? "closed on " + it.closed + "; last in " + it.file : it.file + ":" + it.line;
-  var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + it.id + " " + fmt(it.title) + "</h2>" +
+  var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + idOf(it) + " " + fmt(it.title) + "</h2>" +
     "<div class=\"muted\">" + esc(stateOf(it)) + " · " + esc(where) + "</div><dl>" +
     "<dt>section</dt><dd>" + (fmt(it.section) || "—") + "</dd>" +
     (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>");
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
-  h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div><b>History</b>";
+  h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
+  var by = (citedBy[it.id] || []).filter(function (x) { return x !== it; }).sort(newest);
+  if (by.length) h += "<b>Named in handoffs</b><div class=\"body\">" + by.map(function (x) {
+    return "<a href=\"#\" data-id=\"" + esc(x.id) + "\">" + esc(idOf(x)) + "</a> " + esc(x.title) + (x.closed ? " (replaced)" : "");
+  }).join("\n") + "</div>";
+  h += "<b>History</b>";
   h += !it.history.length ? "<div class=\"muted\">No commit has it yet.</div>" : "<ol class=\"hist\">" +
     it.history.slice().reverse().map(function (e) {
       return "<li><b>" + esc(e[3]) + "</b> " + esc(e[0]) + (e[1] ? " · <code>" + esc(e[1]) + "</code> " : " · ") + esc(e[2]) + "</li>";

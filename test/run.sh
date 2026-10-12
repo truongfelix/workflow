@@ -259,6 +259,47 @@ check "board: no trackers exits 2" [ $? = 2 ]
 check "board: no trackers says UNKNOWN" has "$T/board-missing.txt" "UNKNOWN"
 check "board: adopt.sh makes it executable" [ -x "$T/ws/.claude/skills/session-start/board.sh" ]
 
+# The board's lessons and handoffs: L-2 is dropped; a 1.x notes/handoff.md is replaced by the session s1's H-1, which
+# H-2 replaces.
+mkdir -p "$T/board2/notes" && cd "$T/board2" || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main
+printf '%s\n' '# Demo — Backlog' '' 'next id: B-2 (last given to claude@s1)' '' '## api' '' '### 🔲 B-1 First' \
+  'Done when: done.' >BACKLOG.md
+printf '%s\n' '# Demo — questions' '' 'next id: Q-1 (none given yet)' >questions.md
+lessons() { printf '%s\n' '# Lessons' '' 'next id: L-3 (last given to claude@s1)' '' '## Git' '' "$@"; }
+lessons '### L-1 Kept' 'A rule.' '' '### L-2 Dropped later' 'A rule.' >notes/lessons.md
+printf '%s\n' '# Handoff (2026-01-02 10:00 CET)' '' '## Next' '1. B-1 First' >notes/handoff.md
+git add -A && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m "start, 1.x handoff"
+lessons '### L-1 Kept' 'A rule.' >notes/lessons.md
+git rm -q notes/handoff.md && mkdir notes/handoff
+printf '%s\n' '# Handoffs' '' 'next id: H-2 (last given to claude@s1)' >notes/handoff/README.md
+handoff() { # <id> <continues line or "">
+  printf '%s\n' "# $1 2026-02-03 18:00 CET · claude@s1" ${2:+"$2"} '' '## Next' '1. B-1 First: go on.' '' \
+    '## Waiting for the user' 'None.' '' '## Running' 'None.' '' '## Unfinished' 'None.' '' '## Done' 'None.' '' \
+    '## Learned' 'L-1 Kept.'
+}
+handoff H-1 >notes/handoff/s1.md
+git add -A && GIT_COMMITTER_DATE=2026-02-03T18:00:00 git_q commit -m "H-1 Handoff, L-2 dropped"
+sed 's/^next id: H-2 .*/next id: H-3 (last given to claude@s1)/' notes/handoff/README.md >"$T/r" && mv "$T/r" notes/handoff/README.md
+handoff H-2 "continues: H-1" >notes/handoff/s1.md
+git add -A && GIT_COMMITTER_DATE=2026-03-04T18:00:00 git_q commit -m "H-2 Handoff"
+"$SH" "$BD" --no-open --out "$T/board2.html" "$T/board2" >"$T/board2.txt" 2>&1
+check "board, lessons and handoffs: exits 0" [ $? = 0 ]
+item2() { grep -F "\"id\":\"$1\"," "$T/board2.html" | grep -qF -- "$2"; } # <id> <text>
+check "board: a lesson that holds" item2 L-1 '"kind":"L","id":"L-1","state":"lesson",'
+check "board: a dropped lesson, with the date it was dropped" item2 L-2 '"closed":"2026-02-03"'
+check "board: the live handoff, with the one it continues" \
+  item2 H-2 '"kind":"H","id":"H-2","state":"handoff","cross":0,"section":"","title":"2026-02-03 18:00 CET · claude@s1","fields":"continues: H-1"'
+check "board: a replaced handoff, with the date it was replaced" item2 H-1 '"closed":"2026-03-04"'
+check "board: a 1.x handoff, by its date, replaced when it was deleted" item2 'H~2026-01-02T10:00' '"closed":"2026-02-03"'
+check "board, lessons and handoffs: no problem found" has "$T/board2.html" '"problems":[]}'
+if command -v node >/dev/null 2>&1; then
+  node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
+    var d = JSON.parse(h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0]);
+    process.exit(d.items.length === 6 ? 0 : 1);' "$T/board2.html"
+  check "board, lessons and handoffs: the data parses as JSON, every item in it" [ $? = 0 ]
+fi
+
 # Two sessions give an id at once (notes/item-format.md, "Two sessions, same number"). The `next id` line names who
 # raised it, so the second push conflicts there instead of merging two items with one id.
 give_id() { # <clone> <session> <section>: a new item at the top of <section> takes `next id`, which goes up by one
