@@ -22,7 +22,9 @@ session improves a generic piece (a skill, the ground-truth script), port that p
 ## What Claude does alone
 
 The owner's answer for each step where a session could stop and ask. **ask first**: say what you are about to do
-and wait for a yes. **do, then tell**: do it, then say so in your next message, or in the handoff.
+and wait for a yes. **do, then tell**: do it, then say so in your next message, or in the handoff. **The docs** are
+the handoffs, the trackers, `notes/`, this file and `.claude/`: a push whose new commits hold only docs is "Push the
+docs", on any branch, the default one included.
 
 <!-- FILL: ask the owner for a preset (the last bullet below), then show the rows and ask which to change; set them,
 then delete this comment. Until then every row is Careful. -->
@@ -30,14 +32,14 @@ then delete this comment. Until then every row is Careful. -->
 | Step | Here |
 |---|---|
 | Start the day's task after the brief | ask first |
-| Commit the docs (handoff, trackers, notes, this file) | ask first |
+| Commit the docs | ask first |
 | Push the docs | ask first |
 | Add an item to the backlog | ask first |
 | Claim an item (commit and push its claim line) | ask first |
 | Commit code | ask first |
 | Push a work branch | ask first |
 | Open a pull request | ask first |
-| Merge a pull request, or push to a default branch | ask first |
+| Merge a pull request, or push code to a default branch | ask first |
 | Delete a branch or worktree whose work has landed | ask first |
 | Stop a background job this session started | ask first |
 | Release: tag, publish | ask first |
@@ -49,8 +51,8 @@ then delete this comment. Until then every row is Careful. -->
 - An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
   its ask-first steps in one question.
 - Presets, for setup or a reset: **Careful** asks first on every row. **Balanced** asks first to start the day's
-  task, to open or merge a pull request (or push to a default branch), to release, and to comment or message; it
-  does the rest, then tells. **Hands-off** asks first only to release, and to comment or message.
+  task, to open or merge a pull request (or push code to a default branch), to release, and to comment or message;
+  it does the rest, then tells. **Hands-off** asks first only to release, and to comment or message.
 
 ## Rules
 
@@ -59,7 +61,8 @@ then delete this comment. Until then every row is Careful. -->
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.
-- <!-- FILL: project rules (architecture, things never to touch, how work is verified). -->
+- <!-- FILL: project rules: what Claude must always or never do here (an architecture choice, a file never to touch,
+  how a change is verified). None is fine: delete this line, and add rules as the project meets them. -->
 
 ## Repos and layout
 

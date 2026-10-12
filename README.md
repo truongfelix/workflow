@@ -136,8 +136,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
-   - The rest of `CLAUDE.md`: what the project is, the rules, repos and layout, commands. Move any existing to-do
-     list out of it into `BACKLOG.md`.
+   - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
+     what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
+     "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
+     above and that none is fine: rules come as the project meets them. Move any existing to-do list out of
+     `CLAUDE.md` into `BACKLOG.md`.
    - `BACKLOG.md`: one section per repo or file tree, filled from what the project already tracks (issues, notes, an
      old TODO). Each item in the shape of `notes/item-format.md`: an id from `next id`, what is wrong or missing, a
      pointer, `Done when:`.
