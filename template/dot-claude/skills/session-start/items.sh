@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
 #
-# items.sh — the parser of BACKLOG.md and questions.md, which follow the item format (notes/item-format.md).
+# items.sh — the parser of BACKLOG.md, questions.md and notes/lessons.md, which follow the item format
+# (notes/item-format.md).
 #
 # The trackers are read by a person, written by Claude and parsed by scripts, so every item has one shape:
-# `### <state> [⚠ ]<id> <title>`, its fields, a body, and in BACKLOG `Done when:`. `check` lists each place a
-# tracker departs from it, with its file and line: /session-start runs it after the ground truth, /handoff before
-# committing the trackers. `list` prints the items themselves, for the board (board.sh).
+# `### <state> [⚠ ]<id> <title>`, its fields, a body, and in BACKLOG `Done when:`; a lesson has no state,
+# `### L-<n> <title>`. `check` lists each place a tracker departs from it, with its file and line: /session-start
+# runs it after the ground truth, /handoff before committing the trackers. `list` prints the items themselves, for the board (board.sh).
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
 # Usage: bash .claude/skills/session-start/items.sh check|list [file...]
-#   No file: BACKLOG.md and questions.md at the project root. A file named BACKLOG*.md holds B- items, one named
-#   questions*.md Q- items.
+#   No file: BACKLOG.md, questions.md and notes/lessons.md at the project root. A file named BACKLOG*.md holds B-
+#   items, one named questions*.md Q- items, one named lessons*.md L- items.
 #   list prints one record per line, tab-separated; in each field a backslash, a tab and a newline are written \\,
 #   \t and \n:
 #     I <file> <line> <id> <state> <cross> <section> <title> <fields> <body>   an item. state: open, waiting,
-#                                       question or ruling; cross: 1 for ⚠; fields: its `key: value` lines
+#                                       question, ruling or lesson; cross: 1 for ⚠; fields: its `key: value` lines
 #     U <file> <line> <text>            a block under a `###` heading that is not an item: never dropped
 #     P <file> <line> <problem>         what check would report
 # Exit 0 = every item follows the format. Exit 2 = a problem was found, or a file could not be read (UNKNOWN, never
@@ -30,7 +31,7 @@ esac
 shift
 if [ $# = 0 ]; then
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || { echo "UNKNOWN: cannot reach the project root"; exit 2; }
-  set -- BACKLOG.md questions.md
+  set -- BACKLOG.md questions.md notes/lessons.md
 fi
 
 say() { if [ "$mode" = list ]; then echo "$*" >&2; else echo "$*"; fi; } # list keeps stdout for records
@@ -42,7 +43,8 @@ for f in "$@"; do
   case $(basename "$f") in
     BACKLOG*.md) kind=B ;;
     questions*.md) kind=Q ;;
-    *) say "UNKNOWN: $f: not a tracker (BACKLOG*.md or questions*.md)"; failed=1; continue ;;
+    lessons*.md) kind=L ;;
+    *) say "UNKNOWN: $f: not a tracker (BACKLOG*.md, questions*.md or lessons*.md)"; failed=1; continue ;;
   esac
   if [ -d "$f" ] || [ ! -r "$f" ]; then say "UNKNOWN: $f: cannot be read"; failed=1; continue; fi
   if [ ! -s "$f" ]; then say "$f:1: empty: a tracker holds at least its \`next id\` line"; failed=1; continue; fi
@@ -57,7 +59,8 @@ if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; t
 # One pass per file. An item runs from its `###` heading to the next heading of any level, a `---` line, or the end
 # of the file. Fenced code and multi-line HTML comments are skipped: they hold examples, not items. A state is kept
 # by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation
-# finds all these emoji equal. Exit 3 = problems found, so that awk failing on its own (exit 2) reads as UNKNOWN.
+# finds all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never
+# skipped. Exit 3 = problems found, so that awk failing on its own (exit 2) reads as UNKNOWN.
 awk -v mode="$mode" '
 function problem(ln, msg) {
   problems++
@@ -77,6 +80,7 @@ function start_file() {
   file = FILENAME; fk = kind; fence = 0; in_comment = 0; id = ""; bad_ln = 0; section = ""
   nid = 0; nid_ln = 0; nid_seen = 0; maxid = 0; items_here = 0; split("", seen)
   if (fk == "B") { states = "🔲 ⏸️ ⏸"; names = "open waiting waiting"; shown = "🔲 ⏸️"; fields = " repos waits " }
+  else if (fk == "L") { states = ""; fields = " repos " }
   else {
     states = "💬 🟢 ⏸️ ⏸"; names = "question ruling waiting waiting"; shown = "💬 🟢 ⏸️"
     fields = " repos waits blocks ruled replaces "
@@ -110,6 +114,7 @@ function next_id(   tok, rest) {
 function heading(   n, i, st, nm, tok, tid) {
   end_item(); items++; items_here++
   R = substr($0, 5); state = ""; bad_ln = FNR; body = $0
+  if (fk == "L") state = "lesson"
   n = split(states, st, " "); split(names, nm, " ")
   for (i = 1; i <= n; i++) if (starts(st[i] " ")) { state = nm[i]; break }
   if (state == "") {
@@ -120,9 +125,14 @@ function heading(   n, i, st, nm, tok, tid) {
   cross = 0
   if (starts("⚠️ ") || starts("⚠ ")) {
     if (fk == "B") cross = 1
-    else problem(FNR, "⚠ marks a cross-repo BACKLOG item, not a question")
+    else problem(FNR, "⚠ marks a cross-repo BACKLOG item, not a " (fk == "Q" ? "question" : "lesson"))
   }
-  if (!match(R, /^[A-Za-z]+-[0-9]+/)) { problem(FNR, "no id after the state: expected `" fk "-<n>`"); return }
+  if (!match(R, /^[A-Za-z]+-[0-9]+/)) {
+    split(R, tok, " ")
+    if (fk == "L") problem(FNR, "`### " tok[1] "`: a lesson is `### L-<n> <title>`, with no state")
+    else problem(FNR, "no id after the state: expected `" fk "-<n>`")
+    return
+  }
   tid = substr(R, 1, RLENGTH); R = substr(R, RLENGTH + 1)
   if (tid !~ ("^" fk "-[1-9][0-9]*$")) {
     problem(FNR, "`" tid "` is not a " fk "- id (`" fk "-<n>`, no leading zero)"); return
@@ -203,7 +213,8 @@ fence { keep(); text_line(); next }
 /^### / { heading(); next }
 /^##? / || /^---+[ \t]*$/ { end_item(); if ($0 ~ /^#/) { section = $0; sub(/^#+ +/, "", section) }; next }
 id != "" { item_line(); next }
-bad_ln { keep() }
+bad_ln { keep(); next }
+fk == "L" && section != "" && /^[ \t]*[-*+] / { problem(FNR, "a lesson without an id: a lesson is `### L-<n> <title>`") }
 
 END {
   end_file()

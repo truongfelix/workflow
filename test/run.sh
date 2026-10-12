@@ -126,17 +126,24 @@ check "the timeout fallback passes the output through" [ "$out" = hello ]
 # problem, with its line.
 IT=.claude/skills/session-start/items.sh
 ITS="$WF/template/dot-claude/skills/session-start/items.sh"
-"$SH" "$ITS" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" >"$T/it.txt" 2>&1
-check "items.sh: the template's trackers pass" [ $? = 0 ]
-"$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
-check "items.sh: the example's trackers pass" [ $? = 0 ]
-LC_ALL=C "$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" >"$T/it.txt" 2>&1
-check "items.sh: the example's trackers pass in the C locale" [ $? = 0 ]
+"$SH" "$ITS" check "$WF/template/BACKLOG.md" "$WF/template/questions.md" "$WF/template/notes/lessons.md" \
+  >"$T/it.txt" 2>&1
+check "items.sh: the template's trackers and lessons pass" [ $? = 0 ]
+"$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$WF/example/notes/lessons.md" >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers and lessons pass" [ $? = 0 ]
+check "items.sh: the example's lessons are read" has "$T/it.txt" "OK: 11 item(s)"
+LC_ALL=C "$SH" "$ITS" check "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$WF/example/notes/lessons.md" \
+  >"$T/it.txt" 2>&1
+check "items.sh: the example's trackers and lessons pass in the C locale" [ $? = 0 ]
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the project's trackers, from any directory" [ $? = 0 ]
+cp "$T/ws/notes/lessons.md" "$T/lessons.bak" && printf '%s\n' '## Git' '- A lesson with no id.' >>"$T/ws/notes/lessons.md"
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
+check "items.sh: with no file, it checks the lessons too" has "$T/it.txt" "notes/lessons.md:"
+cp "$T/lessons.bak" "$T/ws/notes/lessons.md"
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
 "$SH" "$ITS" check "$WF/test/fixtures/broken/BACKLOG.md" "$WF/test/fixtures/broken/questions.md" \
-  >"$T/it-broken.txt" 2>&1
+  "$WF/test/fixtures/broken/lessons.md" >"$T/it-broken.txt" 2>&1
 rc=$?
 sed 's/^/      | /' "$T/it-broken.txt"
 check "items.sh: a broken tracker exits 2" [ "$rc" = 2 ]
@@ -146,7 +153,10 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'BACKLOG.md:27: `B-05` is not a B- id' 'BACKLOG.md:33: B-6: text after the `Done when:` paragraph' \
   'BACKLOG.md:3: `next id` is B-3, not above the highest id here, B-6' 'questions.md:5: ⚠ marks a cross-repo' \
   'questions.md:10: Q-1: 🟢 without a `ruled:` line' 'questions.md:14: Q-2: `ruled:` is not a YYYY-MM-DD date' \
-  'questions.md:1: no `next id: Q-<n>'; do
+  'questions.md:1: no `next id: Q-<n>' 'lessons.md:8: L-1 is given twice' \
+  'lessons.md:11: `### 🔲`: a lesson is `### L-<n> <title>`, with no state' 'lessons.md:16: a lesson without an id' \
+  'lessons.md:19: L-3: unknown field `owner:`' 'lessons.md:22: ⚠ marks a cross-repo BACKLOG item, not a lesson' \
+  'lessons.md:1: no `next id: L-<n>'; do
   check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
 done
 "$SH" "$ITS" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
@@ -161,6 +171,9 @@ check "items.sh list: one record per item" [ "$(grep -c "^I$tab" "$T/list.txt")"
 check "items.sh list: an item with its state, ⚠, section, title and fields" \
   has "$T/list.txt" "${tab}B-14${tab}open${tab}1${tab}web${tab}Show which ingredient matched a search${tab}repos: api → web$tab"
 check "items.sh list: a question with its repos" has "$T/list.txt" "${tab}Q-2${tab}ruling${tab}0$tab"
+"$SH" "$ITS" list "$WF/example/notes/lessons.md" >"$T/list-lessons.txt" 2>&1
+check "items.sh list: a lesson, with its section and title" \
+  has "$T/list-lessons.txt" "${tab}L-3${tab}lesson${tab}0${tab}Git${tab}Stacked PRs target main$tab$tab"
 "$SH" "$ITS" list "$WF/test/fixtures/broken/BACKLOG.md" >"$T/list-broken.txt" 2>&1
 check "items.sh list: a broken tracker exits 2" [ $? = 2 ]
 check "items.sh list: a heading that is not an item is kept as written" has "$T/list-broken.txt" \

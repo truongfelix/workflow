@@ -20,7 +20,8 @@ Read by /session-start. Open work: `BACKLOG.md`. Decisions and rulings: `questio
 | Ingredient backfill, 340 batches into staging | `pantry-backfill.service` (systemd-run --user) | ~Sat 03:00 CEST | `journalctl --user -u pantry-backfill -n 20` | `systemctl --user stop pantry-backfill` |
 
 ## Last session (2026-10-09)
-- Done: #39 search by ingredient merged; #41 opened (replaces #40, see lessons); backfill started 18:20.
+- Done: #39 search by ingredient merged; #41 opened (replaces #40, see L-3 Stacked PRs target main); backfill
+  started 18:20.
 - Unfinished: web: `web-offline/` [feat/offline-list], pushed, IndexedDB cache done, edit queue not started.
 - Learned: `npm test` in `web/` runs against the staging API unless `API_URL=http://localhost:8080` is set, so its
   results change with staging data.

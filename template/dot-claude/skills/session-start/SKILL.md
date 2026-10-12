@@ -17,7 +17,8 @@ open that already shipped, "done" items whose code changed since).
    the remote, LOCAL ONLY and uncommitted work, branches no worktree holds, open PRs with a CI verdict, background
    jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2 means a probe failed: that section is UNKNOWN,
    never "clean". An open PR is usually the active thread.
-   Then `bash .claude/skills/session-start/items.sh check`: the trackers' format (`notes/item-format.md`). Exit 2
+   Then `bash .claude/skills/session-start/items.sh check`: the format of the trackers and the lessons
+   (`notes/item-format.md`). Exit 2
    lists each item that breaks it, with its line (a hand edit, or a merge that gave one id twice): that goes in the
    brief, and an id given twice is fixed before any work cites it.
 2. **Read `notes/handoff.md`**: Next, Waiting for the user, Running, Last session.

@@ -85,11 +85,11 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-archive.md` | every earlier handoff, word for word. Searched when needed, never read at start |
 | `BACKLOG.md` | open work only, one section per repo, each item with an id (`B-12`) that never changes. A finished item is deleted, not ticked: git keeps the history |
 | `questions.md` | decisions only you can make, each with options and a recommendation; past rulings, so no session "fixes" them. Ids too (`Q-4`) |
-| `notes/item-format.md` | the one shape of every item in both trackers, and how a new item gets its id |
-| `notes/lessons.md` | what the project learned the hard way, loaded into every session |
+| `notes/item-format.md` | the one shape of every item in both trackers and the lessons, and how a new item gets its id |
+| `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the trackers' parser and format check; `board.sh`, the trackers as one page) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers and lessons; `board.sh`, the trackers as one page) and `/handoff` |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
@@ -148,7 +148,7 @@ project's content and the template's structure.
 template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which commit
 the project last took.
 
-From 1.x: the trackers' items moved from bullets cited by title to one shape with ids. `adopt.sh` installs the new
+From 1.x: the trackers' items and the lessons moved from bullets cited by title to one shape with ids. `adopt.sh` installs the new
 `notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once;
 `.claude/skills/session-start/items.sh check` lists what is left.
 
@@ -173,7 +173,7 @@ workspace/gitignore           whitelist .gitignore for a multi-repo workspace's 
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
 test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh and board.sh; CI runs it on Linux, macOS and Windows
-test/fixtures/broken/         trackers that break the item format in every way items.sh reports
+test/fixtures/broken/         trackers and lessons that break the item format in every way items.sh reports
 memory/README.md              how the memory layer is used
 PRINCIPLES.md                 the why
 ```

@@ -21,7 +21,7 @@ session can find out what happened and why.
 | Long-term state, rules, how-tos | `CLAUDE.md` | State, not history: no PR lists, no commit hashes, no to-dos |
 | Details of a topic (plans, measurements, incident notes, how-tos) | `notes/*.md`, component READMEs | Linked from where they are needed |
 | Non-obvious learnings, user preferences, corrections | memory directory | One fact per file + one line in `MEMORY.md`; update instead of duplicating |
-| Lessons that every session needs | `notes/lessons.md`, imported by `CLAUDE.md` | Short rules; merge, don't append; drop what no longer holds |
+| Lessons that every session needs | `notes/lessons.md`, imported by `CLAUDE.md` | Short rules, each with its id (`L-3`), in the shape of `notes/item-format.md`; merge, don't append; drop what no longer holds |
 | History (what changed when, and why) | git / GitHub | Never copied into the docs |
 
 ## Steps
@@ -54,15 +54,17 @@ session can find out what happened and why.
      its title, state or section changes. If the push is rejected and the rebase conflicts on that line, keep the
      remote's line and renumber your new items from it.
    - Cite items by id with their title (`B-12 Shopping list works offline`), here and in the handoff.
-   - Then `bash .claude/skills/session-start/items.sh check`: it lists each item that departs from the format, with
-     its line. Fix them until it exits 0, before committing (step 7).
+   - Then `bash .claude/skills/session-start/items.sh check`: it lists each item (lessons included) that departs
+     from the format, with its line. Fix them until it exits 0, before committing (step 7).
 4. **Update the topic notes the session touched** (status lines, measurements, how-tos), so the trackers can stay
    short.
 5. **Save memories** for what a future session would otherwise get wrong: corrections from the user, surprising
    facts, confirmed preferences. Check the index for an existing memory first. Route each one by how far it holds:
    - a rule every session needs (a tool quirk, a git habit, a verification rule, a way of working with the owner)
-     → one line in `notes/lessons.md`, even when it sounds generic: a lesson belongs to the project that learned it
-     and travels with its repo. Merge, don't append. Once a lesson is there, delete the memories it fully covers;
+     → a lesson in `notes/lessons.md`, even when it sounds generic: a lesson belongs to the project that learned it
+     and travels with its repo. A new one is `### L-<n> <title>` with the file's `next id`, raised in the same edit;
+     the handoff's "Learned" line names it by id. Merge, don't append: a merged lesson is deleted and the commit
+     says so (`notes/item-format.md`, Body). Once a lesson is there, delete the memories it fully covers;
    - a narrow fact or a preference → this project's memory directory (local to this machine: anything another
      machine or a cloud session needs goes in the repo);
    - an improvement to the session loop itself (a skill step, a ground-truth check) → its generic part goes back to

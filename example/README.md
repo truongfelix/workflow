@@ -20,7 +20,7 @@ The other files are the trackers as they stand:
 |---|---|
 | [`BACKLOG.md`](BACKLOG.md) | open work cut by repo, each item with its id; a ⏸️ item waiting on a trigger, a ⚠ cross-repo item |
 | [`questions.md`](questions.md) | an open decision with options and a recommendation; two rulings, one of them a branch that must never be pushed |
-| [`notes/lessons.md`](notes/lessons.md) | lessons promoted from earlier handoffs |
+| [`notes/lessons.md`](notes/lessons.md) | lessons promoted from earlier handoffs, each with its id; the handoff cites one |
 | [`notes/handoff-archive.md`](notes/handoff-archive.md) | Thursday's handoff, archived after its "Learned" line went into `lessons.md` |
 | [`CLAUDE.example.md`](CLAUDE.example.md) | the template's `CLAUDE.md`, filled in (renamed here, so that Claude Code does not load Pantry's rules in a session working on the workflow) |
 | [`.claude/ground-truth.conf`](.claude/ground-truth.conf) | the two repos, and the branch kept local on purpose |

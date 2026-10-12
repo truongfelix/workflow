@@ -68,5 +68,5 @@ repo; memory holds only what makes a session work BETTER. Never link from a trac
   issues, personal context), precisely because it does not travel. Keep it that way: never copy such a memory into
   a tracked file.
 - **Promote what every session needs.** A memory that every session of the project needs (a tool quirk, a git
-  habit) becomes one line in `notes/lessons.md`, which travels with the repo; once it is there, delete the memories
+  habit) becomes a lesson in `notes/lessons.md` (`### L-<n> <title>`), which travels with the repo; once it is there, delete the memories
   it fully covers, so it does not load twice.

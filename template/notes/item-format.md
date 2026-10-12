@@ -1,8 +1,9 @@
 # Item format
 
-Every item in `BACKLOG.md` and `questions.md` has one shape, so a person reads it, Claude writes it, and a script can
-parse it. Both trackers point here; `/handoff` follows it when it adds or changes an item. Both skills check it with
-`items.sh` ("The check", below): `/session-start` after the ground truth, `/handoff` before committing.
+Every item in `BACKLOG.md`, `questions.md` and `notes/lessons.md` has one shape, so a person reads it, Claude writes
+it, and a script can parse it. The three files point here; `/handoff` follows it when it adds or changes an item.
+Both skills check it with `items.sh` ("The check", below): `/session-start` after the ground truth, `/handoff`
+before committing.
 
 ## Shape
 
@@ -16,6 +17,9 @@ next id: <letter>-<n> (last given to <agent>@<session>)      in the file's heade
 <body: free markdown>
 Done when: <observable result>       BACKLOG only: required, the body's last line
 ```
+
+A lesson has no state: `### L-<n> <title>`, then its rule and the reason in a few words. A lesson in the file
+holds; one that no longer holds is deleted.
 
 ```markdown
 ## web
@@ -32,12 +36,13 @@ highlights it.
 Done when: searching "basil" highlights basil in every result.
 ```
 
-A whole project in this shape: the workflow repo's `example/BACKLOG.md` and `example/questions.md`.
+A whole project in this shape: the workflow repo's `example/BACKLOG.md`, `example/questions.md` and
+`example/notes/lessons.md`.
 
 ## The id
 
-- `B-` and a number in `BACKLOG.md`, `Q-` and a number in `questions.md`: `B-12`, `Q-4`. Numbers go up by one in
-  each file, so an id is short to say and remember, and a lower number is an older item.
+- `B-` and a number in `BACKLOG.md`, `Q-` in `questions.md`, `L-` in `notes/lessons.md`: `B-12`, `Q-4`, `L-3`.
+  Numbers go up by one in each file, so an id is short to say and remember, and a lower number is an older item.
 - Each file's header holds the next number and who took the last one:
   `next id: B-13 (last given to claude@web-offline)`. A new file starts at `next id: B-1 (none given yet)`.
 - An id never changes (a new title, state or section keeps it) and is never reused: `next id` only goes up, and a
@@ -71,7 +76,7 @@ silently, leaving two items numbered B-13.
 | questions | 🟢 | ruling in force |
 | questions | ⏸️ | deferred: the trigger is in `waits:` |
 
-There is no "in progress" or "done" state: work in flight is in the handoff's Next list, and a finished item is
+A lesson has no state. There is no "in progress" or "done" state: work in flight is in the handoff's Next list, and a finished item is
 deleted (git keeps it). So a state can never disagree with the facts behind it.
 
 ## Fields
@@ -82,6 +87,7 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 |---|---|---|
 | `repos` | ⚠ items | the repos in the order the work runs, producer first: `api → web` |
 | `repos` | questions, optional | the repos the decision is about: `api, web`; none = the whole project |
+| `repos` | lessons, optional | the repos the lesson is about; none = the whole project |
 | `waits` | ⏸️ items | the trigger: a date, a measurement, an owner answer, another id |
 | `blocks` | 💬 questions | what waits for the answer |
 | `ruled` | 🟢 rulings | `YYYY-MM-DD`, the date of the owner's words quoted in the body |
@@ -99,14 +105,17 @@ name from `.claude/ground-truth.conf` (`## api`), so a BACKLOG item rarely needs
 - BACKLOG: what is wrong or missing, a pointer to the detail (file, note, issue), then `Done when:`.
 - 💬: the question, the options (A, B, …) with one marked recommended, and why.
 - 🟢: the owner's words, then what not to do because of them.
+- Lesson: the rule, then its reason in a few words. **Merge, don't append:** when a new lesson says what an old one
+  says, the old one is rewritten and keeps its id; when two lessons merge, one keeps its id, the other is deleted,
+  and the commit says so (`L-4 merged into L-2`).
 
 ## The check
 
-`bash .claude/skills/session-start/items.sh check` reads both trackers and lists, with its file and line, each place
-they depart from this format: a `###` heading that does not match the shape, an unknown state or field, a malformed
-or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without `Done when:`
-as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
-`YYYY-MM-DD`. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a
+`bash .claude/skills/session-start/items.sh check` reads both trackers and the lessons, and lists, with its file and
+line, each place they depart from this format: a `###` heading that does not match the shape, an unknown state or
+field, a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item
+without `Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a
+date not in `YYYY-MM-DD`, a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a
 silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example.
 
 ## The board
@@ -122,6 +131,7 @@ never dropped.
 
 A project that adopted the workflow before this format (1.x: bullets, cited by title) converts its trackers once.
 Each item becomes a heading with an id, numbered from 1 in the order the items were created, oldest first
-(`git log --reverse -S'<title>' -- BACKLOG.md` dates one); states, ⚠ and triggers move into their fields; each file
-gets its `next id` line; and every place that cites an item by its title (the handoff, `CLAUDE.md`, the notes) puts
+(`git log --reverse -S'<title>' -- BACKLOG.md` dates one); states, ⚠ and triggers move into their fields; each
+lesson in `notes/lessons.md` becomes `### L-<n> <title>` the same way; each file gets its `next id` line; and every
+place that cites an item by its title (the handoff, `CLAUDE.md`, the notes) puts
 the id in front of it. `items.sh check` lists whatever is left.
