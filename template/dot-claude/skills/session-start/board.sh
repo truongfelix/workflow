@@ -7,7 +7,14 @@
 #
 # The page is rebuilt from the markdown at each run, by items.sh (the parser of the format check) and git. It never
 # writes to the trackers, which stay the only source. One self-contained HTML file: plain JavaScript, no server, no
-# library, no network. Run it again to refresh.
+# library, no network.
+#
+# Always current: the project's Claude Code hook (.claude/settings.json) runs `board.sh --hook` after each tool call
+# that edits a tracker, a lesson or a handoff, or runs git (commit, pull, merge, rebase, push...), and the page is
+# rebuilt, offline, with the PRs last read. An open page reloads itself when its file changes: its first lines, read
+# as JavaScript, set the build's stamp (the rest of the file is a comment then), so the page loads its own file as a
+# script every 2 s and compares. It keeps its filters (in its address), its scroll and the search being typed.
+# Where no browser can show the page (a cloud session, SSH, no display), it prints a text board instead of opening.
 #
 # Repos: the names in .claude/ground-truth.conf. An item's repos are its `repos:` line, else its section's first word
 # when that names a repo; with one repo configured, every item is in it.
@@ -17,33 +24,54 @@
 # commits of every repo in ground-truth.conf that name an id, and every commit hash quoted in an item, a handoff, a
 # commit message or a PR, looked up in those repos. PRs: one `gh pr list` per GitHub repo when the page is built
 # (the page itself needs no network); a PR names an item by its id (title, description, branch), an item names a PR
-# by `#<number>`. When gh cannot answer, the page says the PRs were not read, never that there are none.
+# by `#<number>`. When gh cannot answer, the page says the PRs were not read, never that there are none. The PRs
+# read are kept next to the page (<page>-prs.tsv), and an --offline build shows them with the time they were read.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
-# Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [--offline] [<project dir>]
+# Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [--offline] [--text] [<project dir>]
+#        bash .claude/skills/session-start/board.sh --hook      (the PostToolUse hook: the tool call as JSON on stdin)
 #   <project dir>  default: the project this script is installed in
 #   --out          where to write the page. Default: <temp folder>/<project>-board.html, the same file at each run
 #   --no-open      only print the page's path
-#   --offline      do not ask GitHub for the PRs
+#   --offline      do not ask GitHub for the PRs: show the ones last read
+#   --text         also print the open items as text (what it does instead of opening, where no browser can)
+#   --hook         rebuild, offline, if the tool call on stdin touched the trackers or git; silent, always exit 0
+#   --queue <online|offline>  what --hook runs: one rebuild at a time, the last change always in the page
 # Exit 0 = the page is written (problems in the trackers are shown on it). 2 = no page (UNKNOWN). 1 = usage error.
 
 set -uo pipefail
 
-usage() { echo "usage: $0 [--out <file>] [--no-open] [--offline] [<project dir>]" >&2; exit 1; }
+usage() { echo "usage: $0 [--out <file>] [--no-open] [--offline] [--text] [--hook] [<project dir>]" >&2; exit 1; }
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SH=${BASH:-bash}
-out="" open=1 offline=0 dir=""
+out="" open=1 offline=0 text=0 hook=0 queue="" dir=""
 while [ $# -gt 0 ]; do
   case $1 in
     --out) [ $# -ge 2 ] || usage; out=$2; shift 2 ;;
     --no-open) open=0; shift ;;
     --offline) offline=1; shift ;;
+    --text) text=1; shift ;;
+    --hook) hook=1; shift ;;
+    --queue) [ $# -ge 2 ] || usage; queue=$2; shift 2 ;;
     -*) usage ;;
     *) [ -z "$dir" ] || usage; dir=$1; shift ;;
   esac
 done
 [ -n "$out" ] && case $out in /*) ;; *) out="$(pwd)/$out" ;; esac
+
+# The hook: Claude Code passes the tool call as JSON. A path or a command that names a tracker, a lesson or a handoff,
+# or a git command that moves a branch, rebuilds the page; a push or a `gh pr` also reads the PRs again. A false
+# match costs one rebuild. Quiet, and never an error: a hook that fails would show in every session.
+if [ "$hook" = 1 ]; then
+  input=$(cat)
+  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
+    exit 0
+  want=offline
+  printf '%s' "$input" | grep -Eq 'git [^|;&]{0,80}push|gh pr ' && want=online
+  "$SH" "${BASH_SOURCE[0]}" --queue "$want" ${out:+--out "$out"} ${dir:+"$dir"} >/dev/null 2>&1
+  exit 0
+fi
 cd "${dir:-$HERE/../../..}" 2>/dev/null || { echo "UNKNOWN: cannot reach the project folder ${dir:-}"; exit 2; }
 
 trackers=() # what items.sh reads now: the trackers, the lessons, the handoffs and their README
@@ -60,6 +88,25 @@ trap 'rm -rf "$T"' EXIT
 project=$(sed -n '1s/^# *\(.*\) — .*/\1/p' "${trackers[0]}" | tr -d '\r')
 [ -n "$project" ] || project=$(basename "$(pwd)")
 [ -n "$out" ] || out="${TMPDIR:-/tmp}/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
+cache="${out%.html}-prs.tsv" # the PRs last read, for an --offline build
+
+# One rebuild at a time (--queue, from the hook): a call that finds one running leaves its mark, and the running one
+# builds again, so the last change is always in the page.
+if [ -n "$queue" ]; then
+  mark="${out%.html}.dirty" lock="${out%.html}.lock"
+  echo "$queue" >>"$mark"
+  [ -d "$lock" ] && find "$lock" -maxdepth 0 -mmin +2 -exec rmdir {} \; 2>/dev/null # left by a killed run
+  while [ -e "$mark" ] && mkdir "$lock" 2>/dev/null; do
+    while [ -e "$mark" ]; do
+      args=(--no-open --offline)
+      grep -q online "$mark" 2>/dev/null && args=(--no-open)
+      rm -f "$mark"
+      "$SH" "$HERE/board.sh" "${args[@]}" --out "$out" "$(pwd)" >/dev/null 2>&1
+    done
+    rmdir "$lock"
+  done
+  exit 0
+fi
 
 repos=""
 if [ -f .claude/ground-truth.conf ]; then
@@ -176,12 +223,19 @@ if [ -n "$self" ] && [ -z "$self_name" ]; then
   printf '%s\t%s\t%s\n' "$self_name" . "${gh_repo%.git}" >>"$T/repos"
 fi
 
-# The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does.
-: >"$T/prs" && : >"$T/prs-read"
+# The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does. Those
+# read are kept for the next --offline build, with the time they were read.
+: >"$T/prs" && : >"$T/prs-read" && : >"$T/read-now"
 cut -f3 "$T/repos" | grep -v '^$' | awk '!seen[$0]++' >"$T/ghs"
 while IFS= read -r gh_repo; do
   names=$(awk -F '\t' -v g="$gh_repo" '$3 == g { printf "%s%s", (n++ ? ", " : ""), $1 }' "$T/repos")
-  if [ "$offline" = 1 ]; then st="not read: --offline"
+  if [ "$offline" = 1 ]; then
+    st="not read: --offline"
+    read_at=$(awk -F '\t' -v g="$gh_repo" '$1 == g { print $2; exit }' "$cache.read" 2>/dev/null)
+    if [ -n "$read_at" ]; then
+      st="ok: as read $read_at"
+      awk -F '\t' -v r="$names" -v g="$gh_repo" 'BEGIN { OFS = "\t" } $2 == g { $1 = r; print }' "$cache" >>"$T/prs"
+    fi
   elif ! command -v gh >/dev/null 2>&1; then st="not read: gh is not installed"
   elif with_timeout 30 gh pr list -R "$gh_repo" --state all --limit 500 \
     --json number,title,state,headRefName,baseRefName,createdAt,mergedAt,closedAt,url,author,mergeCommit,body \
@@ -191,12 +245,20 @@ while IFS= read -r gh_repo; do
     st="ok"
     [ "$(wc -l <"$T/pr" | tr -d ' ')" -ge 500 ] && st="ok: the 500 latest only"
     awk -v r="$names" -v g="$gh_repo" '{ print r "\t" g "\t" $0 }' "$T/pr" >>"$T/prs"
+    printf '%s\t%s\n' "$gh_repo" "$(date '+%Y-%m-%d %H:%M')" >>"$T/read-now"
   else
     st="UNKNOWN: gh pr list failed: $(head -1 "$T/pr.err" | tr '\t' ' ')"
     [ -s "$T/pr.err" ] || st="UNKNOWN: gh pr list failed or timed out"
   fi
   printf '%s\t%s\t%s\n' "$names" "$gh_repo" "$st" >>"$T/prs-read"
 done <"$T/ghs"
+if [ -s "$T/read-now" ]; then # keep what was read now, and what an earlier build read of the other repos
+  { awk -F '\t' 'NR == FNR { now[$1] = 1; next } !($2 in now)' "$T/read-now" "$cache" 2>/dev/null
+    awk -F '\t' 'NR == FNR { now[$1] = 1; next } $2 in now' "$T/read-now" "$T/prs"; } >"$T/cache"
+  { cat "$T/read-now"; awk -F '\t' 'NR == FNR { now[$1] = 1; next } !($1 in now)' "$T/read-now" "$cache.read" 2>/dev/null; } \
+    >"$T/cache.read"
+  mv -f "$T/cache" "$cache" && mv -f "$T/cache.read" "$cache.read"
+fi
 
 # The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
 # described once, in the first repo that has it.
@@ -243,7 +305,7 @@ function swap(s, a, b,   out, i) {
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
   return out s
 }
-function je(s) { return "\"" swap(swap(s, "\"", "\\\""), "</", "<\\/") "\"" }
+function je(s) { return "\"" swap(swap(swap(s, "\"", "\\\""), "</", "<\\/"), "*/", "*\\/") "\"" }
 function js(s) { return je(swap(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n"), "\r", "\\r")) }
 function ev(id, n, what) {
   hist[id] = hist[id] (hist[id] == "" ? "" : ",") "[" js(vday[n]) "," js(vsha[n]) "," js(vsubj[n]) "," js(what) "]"
@@ -320,7 +382,7 @@ function swap(s, a, b,   out, i) {
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
   return out s
 }
-function je(s) { return "\"" swap(swap(s, "\"", "\\\""), "</", "<\\/") "\"" }
+function je(s) { return "\"" swap(swap(swap(s, "\"", "\\\""), "</", "<\\/"), "*/", "*\\/") "\"" }
 function js(s) { return je(swap(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n"), "\r", "\\r")) }
 function trim(s) { sub(/^\n+/, "", s); sub(/\n+$/, "", s); return s }
 BEGIN {
@@ -348,10 +410,19 @@ BEGIN {
   printf "]}\n"
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
+# The build's stamp: the data without the time it was built, so a rebuild that changes nothing leaves an open page
+# alone. In the data, "*/" is written "*\/" (as "</" is "<\/"): read as a script, the page is a comment up to its last
+# line, the only "*/" in it.
+stamp=$(sed 's/"generated":"[^"]*"//' "$T/data.json" | cksum | awk '{ print $1 }')
+
 {
+  printf '%s\n' '<!-- An open board loads this file as a script to see whether it was rebuilt: then this line is a comment,' \
+    "window.boardStamp = \"$stamp\"; /*" '-->'
   cat <<'PAGE'
 <!doctype html>
-<html lang="en">
+PAGE
+  printf '<html lang="en" data-stamp="%s">\n' "$stamp"
+  cat <<'PAGE'
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -433,6 +504,7 @@ footer { padding: 8px 16px 20px; color: var(--muted); font-size: 12px; }
 <header>
   <h1 id="title">Board</h1>
   <span class="muted" id="meta"></span>
+  <span class="muted" id="live"></span>
 </header>
 <div class="bar" id="repos"></div>
 <nav class="tabs" id="tabs"></nav>
@@ -578,7 +650,7 @@ function save() {
   if (S.repos.length) h.set("repos", S.repos.join(","));
   Object.keys(KINDS).forEach(function (k) { h.set("st" + k, S.st[k].join(",")); });
   ["dk", "from", "to", "q", "sort", "sel", "back"].forEach(function (k) { if (S[k]) h.set(k, S[k]); });
-  try { history.replaceState(null, "", "#" + h.toString()); } catch (e) { /* a browser that refuses it on file: */ }
+  try { history.replaceState(null, "", "#" + h.toString()); } catch (e) {} // a browser that refuses it on file:
 }
 
 function inRepos(it) {
@@ -608,7 +680,7 @@ function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; });
 }
 function fmt(s) { // the little markdown the trackers use: `code`, **bold**; ids, commit hashes and #PRs as links
-  return esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+  return esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/[*][*]([^*\n]+)[*][*]/g, "<b>$1</b>")
     .replace(/\b[0-9a-f]{7,40}\b/g, function (m) {
       var c = commitOf(m);
       return c ? "<a href=\"#\" data-commit=\"" + c + "\">" + m + "</a>" : m;
@@ -699,9 +771,12 @@ function render() {
     }).join("") + "</details>";
 
   var unread = D.prsRead.filter(function (r) { return r.status.indexOf("ok") !== 0; });
-  document.getElementById("prnote").innerHTML = !unread.length ? (D.prsRead.length ? "" :
+  var asRead = D.prsRead.filter(function (r) { return r.status.indexOf("ok: as read ") === 0; });
+  document.getElementById("prnote").innerHTML = (!unread.length ? (D.prsRead.length ? "" :
     "<div class=\"note muted\">No GitHub repo in .claude/ground-truth.conf: no PRs.</div>") : unread.map(function (r) {
       return "<div class=\"note\">PRs of " + esc(r.repo) + " (" + esc(r.gh) + ") " + esc(r.status) + ": an item may have PRs not shown.</div>";
+    }).join("")) + asRead.map(function (r) {
+      return "<div class=\"note muted\">PRs of " + esc(r.repo) + " " + esc(r.status.slice(4)) + ".</div>";
     }).join("");
   var rows = tabItems.filter(function (it) { return shown(it); });
   rows.sort(function (a, b) {
@@ -829,18 +904,114 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape" && S.
 document.getElementById("q").addEventListener("input", function (e) { S.q = e.target.value; render(); });
 load();
 render();
+
+// Live: each change rebuilds this file (the hook). Every 2 s, while the tab is shown, the page loads its own file as
+// a script: its first lines set window.boardStamp. A new stamp reloads the page, never while a key was pressed in
+// the last 4 s. The filters are in the address; the scroll, the focus and the caret are kept across the reload.
+var STAMP = document.documentElement.getAttribute("data-stamp"), typed = 0, probes = 0;
+document.addEventListener("keydown", function () { typed = Date.now(); }, true);
+function live(on) {
+  var m = document.getElementById("live");
+  m.textContent = on ? "· updates itself" : "· reload to see changes";
+  m.title = on ? "This tab reloads itself when the board is rebuilt." : "This browser does not let the page read its own file.";
+}
+function probe() {
+  if (document.hidden) return;
+  window.boardStamp = undefined;
+  var s = document.createElement("script");
+  s.src = location.href.split(/[?#]/)[0] + "?stamp=" + (++probes);
+  s.onerror = function () { s.remove(); live(false); };
+  s.onload = function () {
+    s.remove();
+    if (typeof window.boardStamp !== "string") { live(false); return; }
+    live(true);
+    if (window.boardStamp === STAMP || Date.now() - typed < 4000) return;
+    try {
+      var a = document.activeElement, keep = { x: window.scrollX, y: window.scrollY,
+        panel: document.getElementById("panel").scrollTop, list: document.getElementById("list").scrollLeft,
+        focus: a && a.id ? a.id : "", caret: null };
+      try { keep.caret = a.selectionStart; } catch (e) {}
+      sessionStorage.setItem("board-keep", JSON.stringify(keep));
+    } catch (e) {}
+    location.reload();
+  };
+  document.head.appendChild(s);
+}
+try {
+  var keep = JSON.parse(sessionStorage.getItem("board-keep") || "null");
+  sessionStorage.removeItem("board-keep");
+  if (keep) {
+    window.scrollTo(keep.x, keep.y);
+    document.getElementById("panel").scrollTop = keep.panel;
+    document.getElementById("list").scrollLeft = keep.list;
+    var f = keep.focus && document.getElementById(keep.focus);
+    if (f) { f.focus(); if (keep.caret != null && f.setSelectionRange) f.setSelectionRange(keep.caret, keep.caret); }
+  }
+} catch (e) {}
+setInterval(probe, 2000);
+document.addEventListener("visibilitychange", probe);
+probe();
 </script>
 </body>
 </html>
+<!-- */ -->
 PAGE
 } >"$T/page.html" && mv -f "$T/page.html" "$out" || { echo "UNKNOWN: cannot write $out"; exit 2; }
 
 echo "Board: $out"
-if [ "$open" = 1 ]; then
+
+# Where no browser can show the page, nothing opens: the open items are printed instead. Under Remote Control the
+# page opens on this machine and the text is printed too, for the owner who follows from another device.
+away=""
+if [ "${CLAUDE_CODE_REMOTE:-}" = true ]; then away="a cloud session"
+elif [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]; then away="a session over SSH"
+else
+  case $(uname -s) in
+    Darwin | MINGW* | MSYS* | CYGWIN*) ;;
+    *) if [ -z "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]; then away="a machine with no display"
+       elif ! command -v xdg-open >/dev/null 2>&1; then away="a machine with no xdg-open"; fi ;;
+  esac
+fi
+[ "$open" = 1 ] && { [ -n "$away" ] || [ -n "${CLAUDE_CODE_BRIDGE_SESSION_ID:-}" ]; } && text=1
+
+if [ "$text" = 1 ]; then
+  echo
+  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" '
+function unesc(s) { gsub(/\\n/, " · ", s); gsub(/\\t/, " ", s); gsub(/\\\\/, "\\", s); return s }
+function mark(st) {
+  if (st == "open") return "🔲"; if (st == "waiting") return "⏸️"; if (st == "question") return "💬"; return st
+}
+$1 == "P" || $1 == "U" { problems++; next }
+$1 != "I" { next }
+{ k = substr($4, 1, 1) }
+k == "B" {
+  nb++; sec = $7
+  if (!(sec in seen)) { seen[sec] = 1; order[++ns] = sec }
+  line = "    " mark($5) " " ($6 == 1 ? "⚠ " : "") $4 "  " $8
+  if ($9 != "") line = line "  (" unesc($9) ")"
+  items[sec] = items[sec] line "\n"; next
+}
+k == "Q" { if ($5 == "ruling") rulings++; else { nq++; qs = qs "  " mark($5) " " $4 "  " $8 "\n" }; next }
+k == "L" { nl++; next }
+k == "H" { nh++; hs = hs (nh > 1 ? ", " : "") $4 " " $8 }
+END {
+  printf "%s: the open items, %s\n\nBACKLOG: %d open\n", project, built, nb
+  for (i = 1; i <= ns; i++) printf "  %s\n%s", order[i], items[order[i]]
+  printf "\nquestions.md: %d open, %d rulings\n%s", nq, rulings, qs
+  printf "\nLessons: %d. Live handoffs: %s\n", nl, (nh ? hs : "none")
+  if (problems) printf "\n%d problem(s) in the trackers: bash .claude/skills/session-start/items.sh check\n", problems
+}' "$T/now"
+  if [ -n "$away" ] && [ "$open" = 1 ]; then
+    echo
+    echo "The page (filters, closed items, the history of each item) cannot open in $away. On a machine with a"
+    echo "browser: git pull, then /board (or bash .claude/skills/session-start/board.sh)."
+  fi
+fi
+if [ "$open" = 1 ] && [ -z "$away" ]; then
   case $(uname -s) in
     Darwin) open "$out" ;;
     MINGW* | MSYS* | CYGWIN*) start "" "$out" ;;
-    *) if command -v xdg-open >/dev/null 2>&1; then xdg-open "$out" >/dev/null 2>&1 & fi ;;
+    *) xdg-open "$out" >/dev/null 2>&1 & ;;
   esac
 fi
 exit 0

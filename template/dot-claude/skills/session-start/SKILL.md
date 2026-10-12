@@ -21,6 +21,7 @@ open that already shipped, "done" items whose code changed since).
    handoffs (`notes/item-format.md`, `notes/handoff-format.md`). Exit 2
    lists each item that breaks it, with its line (a hand edit, or a merge that gave one id twice): that goes in the
    brief, and an id given twice is fixed before any work cites it.
+   Then `bash .claude/skills/session-start/board.sh --no-open`: the board rebuilt, with the PRs, never a new tab.
 2. **Read the handoffs**, one per live session in `notes/handoff/<session>.md` (`notes/handoff-format.md`): this
    session's own first (`<session>`: the worktree's folder name unless the owner names it), in full; then each
    other one's Next, Running and Unfinished, a line each: another session's work, never taken without the owner.
@@ -54,6 +55,7 @@ open that already shipped, "done" items whose code changed since).
      marked ⚠ cross-repo runs alone, in its order (producer first, then each consumer).
    - **Waiting for you:** the `questions.md` §1 items that block today's work, each with a recommendation, named by
      what the user sees (a screen's title, a command), not by a code name. These are never self-serve.
+   - The board's path in one line: `Board: <path> (/board opens it; an open board updates itself)`.
    - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
      CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
 5. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,

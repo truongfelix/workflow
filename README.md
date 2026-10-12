@@ -7,13 +7,16 @@ end of the day and reads the next morning. It works until the notes are wrong: a
 reached the remote, a job "still running" that died at 1 a.m., a to-do that shipped last week. The next session
 believes them and builds on them.
 
-This template keeps a project going across sessions, machines and weeks with two skills and a script:
+This template keeps a project going across sessions, machines and weeks with three skills and a script:
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
   worktree against its remote, open PRs and their CI, background jobs. Then it reads the last handoff, reports
   where the two disagree, proposes the day's task, and waits for you (or starts it, if you told it to).
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
   decisions, lessons learned), and commits.
+- **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history. A hook
+  rebuilds it after each change, and an open tab updates itself. Where no browser can show it (a cloud session,
+  SSH), it prints the open items instead.
 
 The handoff is a claim; the script is the fact. Both skills run the same script, so the session that writes the
 note and the session that reads it look at the same picture.
@@ -90,7 +93,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item) and `/handoff` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
+| `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
 its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
@@ -140,6 +144,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo,
      in the same shape. Then `bash .claude/skills/session-start/items.sh check` until it exits 0.
    - The skills' FILL item (project-specific checks, what is expected and not news).
+   - `.claude/settings.json`, when the project had one (`adopt.sh` lists it as skipped): add the template's
+     `PostToolUse` hook to it, which rebuilds the board after each change.
 5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
    and push as the table allows.
@@ -182,8 +188,10 @@ template/                     copied into a project's root by bin/adopt.sh
   notes/handoff-format.md     the shape of a handoff
   dot-claude/                 installed as .claude/
     ground-truth.conf         what the ground truth looks at: the project's repos
+    settings.json             the hook that rebuilds the board after each change
     skills/session-start/{SKILL.md,ground-truth.sh,items.sh,board.sh}
     skills/handoff/SKILL.md
+    skills/board/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it

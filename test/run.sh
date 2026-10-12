@@ -239,7 +239,7 @@ printf '%s\n' 'REPOS=("api|api|origin||" "web|web|origin||")' >.claude/ground-tr
 backlog() { # <B-2 state> <B-2 field>, then the items to add after it
   printf '%s\n' '# Demo — Backlog' '' "next id: B-4 (last given to claude@test)" '' '## api' ''
   [ "$1" = closed ] || printf '%s\n' '### 🔲 B-1 First' 'Done when: done.' ''
-  printf '%s\n' '## web' '' "### $2 B-2 Second" "$3" 'Says "hi" \o/ and </script> to the page.' 'Done when: done.' "${@:4}"
+  printf '%s\n' '## web' '' "### $2 B-2 Second" "$3" 'Says "hi" \o/, </script> and */ to the page.' 'Done when: done.' "${@:4}"
 }
 backlog open 🔲 "" >BACKLOG.md
 printf '%s\n' '# Demo — questions' '' 'next id: Q-2 (last given to claude@test)' '' '# 1. Open decisions' '' \
@@ -268,7 +268,7 @@ if command -v node >/dev/null 2>&1; then
   node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
     var d = JSON.parse(h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0]);
     var b = d.items.filter(function (i) { return i.id === "B-2"; })[0];
-    process.exit(d.items.length === 4 && b.body.indexOf("Says \"hi\" \\o/ and </script>") === 0 ? 0 : 1);' "$T/board.html"
+    process.exit(d.items.length === 4 && b.body.indexOf("Says \"hi\" \\o/, </script> and */ to the page.") === 0 ? 0 : 1);' "$T/board.html"
   check "board: the data parses as JSON, the text intact" [ $? = 0 ]
 fi
 mkdir "$T/nogit" && cp "$WF/example/BACKLOG.md" "$WF/example/questions.md" "$T/nogit/"
@@ -361,6 +361,93 @@ if command -v node >/dev/null 2>&1; then
     process.exit(d.prs.length === 1 && d.prs[0].body === "Fixes B-1.\nA pinch of salt keeps 1 g." && d.commits.length >= 4 ? 0 : 1);' \
     "$T/board3.html"
   check "board, commits and PRs: the data parses as JSON, the text intact" [ $? = 0 ]
+fi
+PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --offline --out "$T/board3.html" "$T/board2" >/dev/null 2>&1
+check "board --offline: the PRs last read, from the same page's cache" has "$T/board3.html" '"number":41,"title":"Round to 1 g"'
+check "board --offline: says when they were read" has "$T/board3.html" '"gh":"demo/api","status":"ok: as read 20'
+check "board --offline: a repo never read is still not read" has "$T/board3.html" '"gh":"demo/docs","status":"not read: --offline"'
+
+# Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
+# line), so an open page loads its own file to see whether it was rebuilt. The stamp ignores the build time.
+stamp() { sed -n '2s/^window.boardStamp = "\([0-9]*\)"; \/\*$/\1/p' "$1"; } # <page>
+check "board, live: the first lines set the stamp, the rest is a comment" \
+  [ "$(sed -n 1p "$T/board.html" | cut -c1-4)" = "<!--" -a -n "$(stamp "$T/board.html")" -a "$(sed -n 3p "$T/board.html")" = "-->" ]
+check "board, live: then the page, in standards mode" [ "$(sed -n 4p "$T/board.html")" = "<!doctype html>" ]
+check "board, live: the comment ends on the last line, the only */ in the page" \
+  [ "$(tail -n 1 "$T/board.html")" = "<!-- */ -->" -a "$(grep -c '\*/' "$T/board.html")" = 1 ]
+check "board, live: a */ in an item is escaped" has "$T/board.html" '<\/script> and *\/ to the page.'
+check "board, live: the page knows its own stamp" has "$T/board.html" "<html lang=\"en\" data-stamp=\"$(stamp "$T/board.html")\">"
+if command -v node >/dev/null 2>&1; then
+  node -e 'var c = { window: {} }; require("vm").runInNewContext(require("fs").readFileSync(process.argv[1], "utf8"), c);
+    process.exit(c.window.boardStamp === process.argv[2] ? 0 : 1);' "$T/board.html" "$(stamp "$T/board.html")"
+  check "board, live: as JavaScript, the page sets its stamp and nothing else" [ $? = 0 ]
+fi
+s1=$(stamp "$T/board.html")
+sleep 1 # another minute in "built" would not change the stamp; this only spaces the builds
+"$SH" "$BD" --no-open --out "$T/board.html" "$T/board" >/dev/null 2>&1
+check "board, live: a rebuild with no change keeps the stamp" [ "$(stamp "$T/board.html")" = "$s1" ]
+cp "$T/board/BACKLOG.md" "$T/backlog.bak"
+printf '%s\n' '' '### 🔲 B-4 Fourth' 'Done when: done.' >>"$T/board/BACKLOG.md"
+"$SH" "$BD" --no-open --out "$T/board.html" "$T/board" >/dev/null 2>&1
+check "board, live: a change gives a new stamp" [ "$(stamp "$T/board.html")" != "$s1" ]
+cp "$T/backlog.bak" "$T/board/BACKLOG.md"
+
+# The text board, and where nothing opens: a cloud session or SSH prints it instead; a display opens the page.
+"$SH" "$BD" --no-open --text --out "$T/board.html" "$T/board" >"$T/text.txt" 2>&1
+check "board --text: exits 0" [ $? = 0 ]
+check "board --text: the open items, by section" has "$T/text.txt" "BACKLOG: 2 open"
+check "board --text: a waiting item, with its field" has "$T/text.txt" "    ⏸️ B-2  Second  (waits: the API)"
+check "board --text: an open item" has "$T/text.txt" "    🔲 B-3  Third"
+check "board --text: the open questions" has "$T/text.txt" "  💬 Q-1  Which one?"
+check "board --text: a closed item is not there" lacks "$T/text.txt" "B-1 "
+mkdir -p "$T/openers"
+for o in xdg-open open start; do printf '#!/usr/bin/env bash\necho "$*" >"%s/opened"\n' "$T" >"$T/openers/$o"; done
+chmod +x "$T/openers/"*
+nobody() { env -u SSH_CONNECTION -u SSH_TTY -u CLAUDE_CODE_REMOTE -u CLAUDE_CODE_BRIDGE_SESSION_ID "$@"; }
+rm -f "$T/opened"
+nobody CLAUDE_CODE_REMOTE=true PATH="$T/openers:$PATH" "$SH" "$BD" --out "$T/board.html" "$T/board" >"$T/away.txt" 2>&1
+check "board, in a cloud session: exits 0" [ $? = 0 ]
+check "board, in a cloud session: the text board instead" has "$T/away.txt" "BACKLOG: 2 open"
+check "board, in a cloud session: says why, and how to open the page" has "$T/away.txt" "cannot open in a cloud session"
+nobody SSH_CONNECTION="1.2.3.4 5 6.7.8.9 22" PATH="$T/openers:$PATH" "$SH" "$BD" --out "$T/board.html" "$T/board" \
+  >"$T/away.txt" 2>&1
+check "board, over SSH: the text board instead" has "$T/away.txt" "cannot open in a session over SSH"
+sleep 1
+check "board, in a cloud session or over SSH: nothing opens" [ ! -e "$T/opened" ]
+nobody DISPLAY=:99 PATH="$T/openers:$PATH" "$SH" "$BD" --out "$T/board.html" "$T/board" >"$T/here.txt" 2>&1
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$T/opened" ] && break; sleep 0.2; done
+check "board, with a display: the page opens" has "$T/opened" "$T/board.html"
+check "board, with a display: no text board" lacks "$T/here.txt" "BACKLOG:"
+
+# The hook (.claude/settings.json, PostToolUse): the tool call as JSON on stdin. It rebuilds when the call names a
+# tracker or moves git, stays quiet and exits 0 whatever happens, and leaves no lock behind.
+hook() { printf '%s' "$1" | "$SH" "$BD" --hook --out "$T/hook.html" "${2:-$T/board}" >"$T/hook.txt" 2>&1; } # <json>
+rm -f "$T/hook.html"
+hook '{"tool_name":"Edit","tool_input":{"file_path":"/p/README.md"}}'
+check "hook: an edit of another file exits 0" [ $? = 0 ]
+check "hook: an edit of another file builds nothing" [ ! -e "$T/hook.html" ]
+hook '{"tool_name":"Edit","tool_input":{"file_path":"/p/BACKLOG.md"}}'
+check "hook: an edit of BACKLOG.md exits 0, silently" [ $? = 0 -a ! -s "$T/hook.txt" ]
+check "hook: an edit of BACKLOG.md builds the page" has "$T/hook.html" '"id":"B-3",'
+printf '%s\n' '' '### 🔲 B-4 Fourth' 'Done when: done.' >>"$T/board/BACKLOG.md"
+hook '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}'
+check "hook: a command that touches neither builds nothing" lacks "$T/hook.html" '"id":"B-4",'
+hook '{"tool_name":"Bash","tool_input":{"command":"git add BACKLOG.md && git commit -q -m \"B-4 added\""}}'
+check "hook: a git commit rebuilds the page" has "$T/hook.html" '"id":"B-4",'
+for _ in 1 2 3 4; do hook '{"tool_name":"Write","tool_input":{"file_path":"/p/notes/lessons.md"}}' & done
+wait
+check "hook: calls at once leave no lock and no mark" [ ! -e "$T/hook.lock" -a ! -e "$T/hook.dirty" ]
+cp "$T/backlog.bak" "$T/board/BACKLOG.md"
+mkdir -p "$T/empty"
+hook '{"tool_name":"Edit","tool_input":{"file_path":"/p/BACKLOG.md"}}' "$T/empty"
+check "hook: a folder with no tracker still exits 0, silently" [ $? = 0 -a ! -s "$T/hook.txt" ]
+check "adopt.sh installs the hook" has "$T/ws/.claude/settings.json" '/.claude/skills/session-start/board.sh\" --hook'
+check "adopt.sh installs /board" [ -f "$T/ws/.claude/skills/board/SKILL.md" ]
+if command -v node >/dev/null 2>&1; then
+  node -e 'var h = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).hooks.PostToolUse[0];
+    process.exit(/Edit/.test(h.matcher) && /Write/.test(h.matcher) && /Bash/.test(h.matcher) && h.hooks[0].async ? 0 : 1);' \
+    "$T/ws/.claude/settings.json"
+  check "the hook: valid JSON, after Edit, Write and Bash, in the background" [ $? = 0 ]
 fi
 
 # Two sessions give an id at once (notes/item-format.md, "Two sessions, same number"). The `next id` line names who
