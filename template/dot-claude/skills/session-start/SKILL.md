@@ -81,7 +81,8 @@ open that already shipped, "done" items whose code changed since).
 6. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
    release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
    day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
-   **The rules** the checks section lists hold too: a repo with a gate is checked with
+   **The rules** the checks section lists hold too, each repo's own where its line says "its own rules", else the
+   project's: a repo with a gate is checked with
    `bash .claude/skills/session-start/gate.sh run <repo>`, which keeps its receipt; with "regression", a bug fix lands
    with a check that fails without the fix (seen red once, then green with it); with "merge", the default branch is
    checked again after a merge (its gate run on it, its CI green).

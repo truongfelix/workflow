@@ -68,7 +68,8 @@ find out what happened and why.
      named under "Unfinished", for the next session to take over (`claim.sh --from`); otherwise delete the `claimed:`
      line, and the docs push (step 7) frees the item. A
      ⚠ STALE, GONE or NOT HERE claim of another session goes under "Waiting for the user": only the owner releases it.
-   - **The rule "regression"**, when the ground truth's checks section lists it: each bug fix that landed this
+   - **The rule "regression"**, when the ground truth's checks section lists it (for a repo with rules of its own, on its
+     line): each bug fix that landed this
      session names, in its Done line, the check it added and that the check failed without the fix. A fix that
      landed without one goes under "Waiting for the user", with a BACKLOG item for its check.
    - **Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`: the file is longer than

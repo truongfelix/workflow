@@ -110,7 +110,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep, for the project or for one repo |
 | `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `attach.sh`, which adds a code repo to the list and writes its pointer; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers, the settings or the git history |
 
@@ -253,6 +253,10 @@ counts (none when the line is missing). Merge the comments above `GATES` from th
 
 `/autonomy`, `/checks` and the setup ask the owner as the rule "A question to the owner" in `CLAUDE.md` says: copy
 that bullet from the template's Rules. The skill scripts share `session-start/lib.sh`: upgrade them together.
+
+Each repo can keep its own rules (`REPO_RULES` in `ground-truth.conf`), replacing `GATE_RULES` for that repo alone; a
+project without the line behaves as before. The upgrade is the comment above `GATE_RULES` in the template and the
+scripts, merged together; `/checks` asks about a repo's own rules once a project has several.
 
 Code repos listed in `REPOS` got pointers (`attach.sh`, "A session opened in a code repo"): `adopt.sh` installs the
 script, and `ground-truth.sh` says `NO POINTER` for each listed repo that has none; run

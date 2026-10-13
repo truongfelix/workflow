@@ -129,14 +129,16 @@ if [ -n "$queue" ]; then
   exit 0
 fi
 
-# The config: each entry of REPOS, GATES ("<repo>|<command>"), GATE_PASS and GITHUB_CI, a line each, and GATE_RULES.
-: >"$T/conf" && : >"$T/gate-cmds" && : >"$T/pass" && : >"$T/cis" && : >"$T/rules"
+# The config: each entry of REPOS, GATES ("<repo>|<command>"), GATE_PASS and GITHUB_CI, a line each, GATE_RULES, and
+# each entry of REPO_RULES ("<repo>|<rules>": the rules of one repo, else GATE_RULES holds).
+: >"$T/conf" && : >"$T/gate-cmds" && : >"$T/pass" && : >"$T/cis" && : >"$T/rules" && : >"$T/repo-rules"
 if [ -f .claude/ground-truth.conf ]; then
-  (REPOS=(); GATES=(); GATE_PASS=(); GITHUB_CI=(); GATE_RULES=""; . ./.claude/ground-truth.conf >/dev/null 2>&1
+  (REPOS=(); GATES=(); GATE_PASS=(); GITHUB_CI=(); GATE_RULES=""; REPO_RULES=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
     for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done >"$T/conf"
     for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "$g"; done >"$T/gate-cmds"
     for g in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do printf '%s\n' "$g"; done >"$T/pass"
     for c in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do printf '%s\n' "$c"; done >"$T/cis"
+    for g in ${REPO_RULES[@]+"${REPO_RULES[@]}"}; do printf '%s\n' "$g"; done >"$T/repo-rules"
     echo $GATE_RULES >"$T/rules")
 fi
 cut -d '|' -f1 "$T/gate-cmds" >"$T/gates" # the repos that have a gate
@@ -231,7 +233,8 @@ fi
 # The settings: what Claude does alone, as autonomy.sh reads the table in CLAUDE.md ("A\t<step>\t<answer>", its preset
 # "AP", the project's own rows "AO", or why it could not be read "AE"), and how the code is checked before a merge:
 # each repo with its gate, the line its gate passes on and its GitHub CI ("G"), each rule, kept or not, in plain words
-# ("R"), their preset ("RP") and the words of GATE_RULES that are no rule ("RX"). One record per line in $T/settings.
+# ("R"), their preset ("RP") and the words of GATE_RULES that are no rule ("RX"); a repo with rules of its own
+# ("RO\t<repo>\t<its rules>\t<their preset>"). One record per line in $T/settings.
 au="$HERE/../autonomy/autonomy.sh"
 {
   if [ ! -f CLAUDE.md ]; then printf 'AE\tno CLAUDE.md in %s\n' "$(pwd)"
@@ -259,6 +262,10 @@ au="$HERE/../autonomy/autonomy.sh"
   done
   for w in $kept; do [ -n "$(rule_text "$w")" ] || no_rule="$no_rule${no_rule:+ }$w"; done
   printf 'RP\t%s\n' "$(rules_preset "$kept")"
+  while IFS= read -r g; do
+    [ -n "$g" ] || continue
+    printf 'RO\t%s\t%s\t%s\n' "${g%%|*}" "$(echo ${g#*|})" "$(rules_preset "${g#*|}")"
+  done <"$T/repo-rules"
   [ -z "$no_rule" ] || printf 'RX\t%s\n' "$no_rule"
 } >"$T/settings"
 
@@ -574,7 +581,7 @@ BEGIN {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
-  steps = ""; checks = ""; rules = ""; ap = ""; ao = ""; ae = ""; rp = ""; rx = ""
+  steps = ""; checks = ""; rules = ""; ap = ""; ao = ""; ae = ""; rp = ""; rx = ""; ro = ""
   while ((getline rec < sfile) > 0) {
     split(rec, F, "\t")
     if (F[1] == "A") steps = steps (steps == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "]"
@@ -585,11 +592,12 @@ BEGIN {
     else if (F[1] == "R") rules = rules (rules == "" ? "" : ",") "[" js(F[2]) "," (F[3] == 1 ? "true" : "false") "," js(F[4]) "]"
     else if (F[1] == "RP") rp = F[2]
     else if (F[1] == "RX") rx = F[2]
+    else if (F[1] == "RO") ro = ro (ro == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "," js(F[4]) "]"
   }
   printf "},\n\"gated\":%s,\n\"settings\":{\"steps\":[%s],\"autoPreset\":%s,\"autoOwn\":%s,\"autoError\":%s,", \
     gated, steps, js(ap), js(ao), js(ae)
-  printf "\"repos\":[%s],\"rules\":[%s],\"rulesPreset\":%s,\"rulesUnknown\":%s},\n\"machine\":%s}\n", \
-    checks, rules, js(rp), js(rx), js(machine)
+  printf "\"repos\":[%s],\"rules\":[%s],\"rulesPreset\":%s,\"rulesUnknown\":%s,\"repoRules\":[%s]},\n\"machine\":%s}\n", \
+    checks, rules, js(rp), js(rx), ro, js(machine)
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
 # The build's stamp: the data without the time it was built, so a rebuild that changes nothing leaves an open page
@@ -1062,8 +1070,16 @@ function settingsView() { // what Claude does alone, and how the code is checked
     }).join("") + "</ul>";
     if (kept.length && !checked.length) h += "<div class=\"note\">The rules kept need a gate or GitHub CI.</div>";
   }
+  (st.repoRules || []).forEach(function (o) { // a repo with rules of its own: the same list, for that repo
+    var own = " " + o[1] + " ";
+    h += "<h3>Rules kept in " + esc(o[0]) + " (its own): " + esc(o[2] || "no preset") + "</h3><ul class=\"rules\">" +
+      st.rules.map(function (r) {
+        var k = own.indexOf(" " + r[0] + " ") >= 0;
+        return "<li" + (k ? "" : " class=\"muted\"") + ">" + (k ? "✓ " : "✗ ") + esc(r[2]) + "</li>";
+      }).join("") + "</ul>";
+  });
   if (st.rulesUnknown) h += "<div class=\"note\">Not a rule, in GATE_RULES: " + esc(st.rulesUnknown) + "</div>";
-  return h + "<div class=\"muted\">Changed with /checks.</div></div>";
+  return h + "<div class=\"muted\">Changed with /checks. The rules above hold for every repo without rules of its own.</div></div>";
 }
 function backLink() {
   var b = byId[S.back] ? S.back : "";

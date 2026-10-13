@@ -629,7 +629,7 @@ check "board, settings: a repo that nothing checks" has "$T/board8.html" '["docs
 check "board, settings: each rule in plain words, kept or not" \
   has "$T/board8.html" '["regression",false,"Each bug fix comes with a check that fails without the fix"]'
 check "board, settings: the rules make no preset, and a word that is no rule" \
-  has "$T/board8.html" '"rulesPreset":"","rulesUnknown":"recipt"}'
+  has "$T/board8.html" '"rulesPreset":"","rulesUnknown":"recipt","repoRules":[]}'
 # The page's own script, run in node on a stand-in for the browser's document: page.js <page> <expression> prints
 # what the expression gives once the page has loaded. What the Settings tab shows, and an id's title on hover.
 cat >"$T/page.js" <<'JSEOF'
@@ -1258,6 +1258,49 @@ check "attach: ground truth accepts a CLAUDE.local.md pointer" lacks "$T/at-gt3.
 "$SH" "$AT" nope "$T/nowhere" >"$T/at5.txt" 2>&1
 check "attach: a path that is not a git checkout is UNKNOWN (exit 2), REPOS unchanged" \
   eval '[ $? = 2 ] && has "$T/at5.txt" "UNKNOWN: " && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 2 ]'
+cd "$T" || exit 1
+
+# Rules of one repo (REPO_RULES): the project keeps receipt, regression and merge (GATE_RULES), web keeps none of
+# them. Each reader looks at the rules of the repo it is looking at: the hook, the checks section, the board.
+cd "$T" || exit 1
+git_q init --bare remote-rr-api.git && git_q init --bare remote-rr-web.git && git_q init --bare remote-rr-docs.git
+mkdir rr && cd rr || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main && git remote add origin "$T/remote-rr-docs.git"
+for n in api web; do
+  git_q clone "$T/remote-rr-$n.git" $n && (cd $n && git symbolic-ref HEAD refs/heads/main && git_q commit --allow-empty -m first &&
+    git_q push -u origin main && git remote set-head origin main)
+done
+"$SH" "$WF/bin/adopt.sh" "$T/rr" --workspace >/dev/null 2>&1
+printf '%s\n' 'REPOS=("api|api|origin|main|" "web|web|origin|main|")' 'UNITS=0' 'GATES=("api|true" "web|true")' \
+  'GATE_RULES="receipt regression merge"' 'REPO_RULES=("web|")' >.claude/ground-truth.conf
+git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
+RR=.claude/skills/session-start
+"$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt.txt" 2>&1
+sed 's/^/      | /' "$T/rr-gt.txt" | sed -n '/== checks/,/^      | $/p'
+check "rules per repo: the checks section names the project's rules" has "$T/rr-gt.txt" \
+  "== checks (rules kept: receipt regression merge = Production)"
+check "rules per repo: the repo with rules of its own says so" \
+  eval 'grep "^  web (" "$T/rr-gt.txt" | grep -qF "[its own rules: none = Prototype]"'
+check "rules per repo: a repo without an entry follows the project's rules" \
+  eval 'grep "^  api (" "$T/rr-gt.txt" | grep -qF "⚠ NO RECEIPT" && grep "^  api (" "$T/rr-gt.txt" | grep -qF "⚠ NO HOOK" && 
+    ! grep "^  api (" "$T/rr-gt.txt" | grep -qF "its own rules"'
+check "rules per repo: a repo that keeps no rule is not flagged for its receipt or its hook" \
+  eval '! grep "^  web (" "$T/rr-gt.txt" | grep -qF "⚠"'
+"$SH" $RR/gate.sh hook api >/dev/null 2>&1 && "$SH" $RR/gate.sh hook web >/dev/null 2>&1
+check "rules per repo: gate.sh hook installs the hook in both" eval '[ -x api/.git/hooks/pre-push ] && [ -x web/.git/hooks/pre-push ]'
+(cd api && git tag -a v1.0.0 -m one && git push origin v1.0.0) >"$T/rr-push-api.txt" 2>&1
+check "rules per repo: a release tag with no receipt is refused where the rule receipt holds" \
+  eval '[ $? != 0 ] && has "$T/rr-push-api.txt" "REFUSED: v1.0.0 is on " && [ -z "$(git -C api ls-remote --tags origin v1.0.0)" ]'
+(cd web && git tag -a v1.0.0 -m one && git push origin v1.0.0) >"$T/rr-push-web.txt" 2>&1
+check "rules per repo: the same tag goes where the repo keeps no rule" \
+  eval '[ $? = 0 ] && [ -n "$(git -C web ls-remote --tags origin v1.0.0)" ]'
+"$SH" $RR/board.sh --no-open --offline --out "$T/rr-board.html" "$T/rr" >/dev/null 2>&1
+check "rules per repo: the board has the rules of that repo, with its preset" has "$T/rr-board.html" '"repoRules":[["web","","Prototype"]]'
+printf '%s\n' 'REPO_RULES+=("ghost|merge" "api|recipt")' >>.claude/ground-truth.conf
+"$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt2.txt" 2>&1
+check "rules per repo: a repo REPOS does not name, and a word that is no rule, are flagged" \
+  eval 'has "$T/rr-gt2.txt" "  ⚠ ghost (REPO_RULES): not a repo of REPOS" &&
+    has "$T/rr-gt2.txt" "  ⚠ unknown rule(s) in REPO_RULES for api: recipt"'
 cd "$T" || exit 1
 
 echo

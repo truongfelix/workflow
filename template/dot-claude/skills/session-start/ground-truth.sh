@@ -36,6 +36,7 @@ GATES=()
 GATE_PASS=()
 GITHUB_CI=()
 GATE_RULES=""
+REPO_RULES=()
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
 
@@ -361,14 +362,15 @@ if [ -n "$CT" ]; then
 fi
 
 # How the code is checked before a merge (/checks): each repo of GATES (its command, GATE_PASS) and of GITHUB_CI, and
-# the rules the project keeps (GATE_RULES), with the preset they make. A receipt is a commit that passed the gate on
+# the rules the project keeps (GATE_RULES, the default), with the preset they make; a repo with an entry in REPO_RULES
+# keeps its own, said on its line. A receipt is a commit that passed the gate on
 # this machine, with nothing uncommitted; the CI is read on GitHub (gate.sh ci). The rule "merge": the last commit of
 # each default branch on its remote needs a receipt and green CI, since a merge makes a commit that no check has
 # seen. The rule "receipt": each of those repos needs the pre-push hook that refuses a release tag without them.
 echo
-r=0 m=0 bad=""
+bad=""
 for w in $GATE_RULES; do
-  case $w in receipt) r=1 ;; regression) ;; merge) m=1 ;; *) bad="$bad $w" ;; esac
+  case $w in receipt | regression | merge) ;; *) bad="$bad $w" ;; esac
 done
 preset=$(rules_preset "$GATE_RULES")
 preset=${preset:+ = $preset}
@@ -376,12 +378,26 @@ preset=${preset:-, no preset}
 rules=$(echo $GATE_RULES)
 echo "== checks (rules kept: ${rules:-none}$preset)"
 [ -n "$bad" ] && echo "  ⚠ unknown rule(s) in GATE_RULES:$bad (the rules: receipt, regression, merge)"
+anyrules=$rules # the rules of any repo, for "nothing checks the code"
+for e in ${REPO_RULES[@]+"${REPO_RULES[@]}"}; do
+  en=${e%%|*} ew=${e#*|}
+  found=0
+  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$en" ] && found=1; done
+  [ "$found" = 1 ] || echo "  ⚠ $en (REPO_RULES): not a repo of REPOS, or not a git checkout (above)"
+  ebad=""
+  for w in $ew; do
+    case $w in receipt | regression | merge) ;; *) ebad="$ebad $w" ;; esac
+  done
+  [ -n "$ebad" ] && echo "  ⚠ unknown rule(s) in REPO_RULES for $en:$ebad (the rules: receipt, regression, merge)"
+  anyrules="$anyrules $ew"
+done
+anyrules=$(echo $anyrules)
 named=" "
 for n in ${GATES[@]+"${GATES[@]%%|*}"} ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do
   case $named in *" $n "*) ;; *) named="$named$n " ;; esac
 done
 if [ "$named" = " " ]; then
-  if [ -n "$rules" ]; then echo "  ⚠ nothing checks the code: the rules kept need a gate or GitHub CI (/checks)"
+  if [ -n "$anyrules" ]; then echo "  ⚠ nothing checks the code: the rules kept need a gate or GitHub CI (/checks)"
   else echo "  nothing checks the code before a merge yet (/checks)"; fi
 fi
 for w in $named; do
@@ -395,6 +411,18 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
   for gp in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${gp%%|*}" = "$gname" ] && gpat=${gp#*|}; done
   for n in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do [ "$n" = "$gname" ] && ci=1; done
   [ -n "$gcmd" ] || [ "$ci" = 1 ] || continue
+  # This repo's rules: its own entry in REPO_RULES, else the project's.
+  grules=$(repo_rules "$gname")
+  r=0 m=0
+  for w in $grules; do case $w in receipt) r=1 ;; merge) m=1 ;; esac; done
+  own=""
+  for e in ${REPO_RULES[@]+"${REPO_RULES[@]}"}; do
+    if [ "${e%%|*}" = "$gname" ]; then
+      rtxt=$(echo $grules)
+      rpre=$(rules_preset "$grules")
+      own=" [its own rules: ${rtxt:-none}${rpre:+ = $rpre}]"
+    fi
+  done
   what=""
   [ -n "$gcmd" ] && what="gate: $gcmd${gpat:+, passes on a line matching: $gpat}"
   [ "$ci" = 1 ] && what="$what${what:+; }CI: ${R_GH[$i]:-no GitHub repo}"
@@ -435,7 +463,7 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
     grep -qF "gate.sh\" pre-push" "$ghooks/pre-push" 2>/dev/null ||
       st="$st, ⚠ NO HOOK: a release tag would go out unchecked (gate.sh hook $gname)"
   fi
-  echo "  $gname ($what): $st"
+  echo "  $gname ($what): $st$own"
 done
 
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than

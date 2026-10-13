@@ -9,7 +9,7 @@
 # board shows; a later pass on that commit removes it, and a failure never removes a receipt.
 #
 # How the code is checked before a merge (.claude/ground-truth.conf, set by /checks): by a gate (GATES, each repo's
-# command), by GitHub CI (GITHUB_CI), both, or nothing yet. The rules the project keeps (GATE_RULES) read the receipts
+# command), by GitHub CI (GITHUB_CI), both, or nothing yet. The rules the project keeps (GATE_RULES, or a repo's own in REPO_RULES) read the receipts
 # and the CI: with "receipt", the pre-push hook refuses a release tag (v*) whose commit has no receipt, or no green
 # CI, and refuses it too when GitHub cannot be read; with "merge", the ground truth reports a default branch whose
 # last commit has none.
@@ -32,7 +32,7 @@
 #             (CI green, CI red, CI running, no CI, not on GitHub), on the GitHub repo of REPOS, else of its remote
 #   hook      install the pre-push hook that holds the rule "receipt" in a repo of GATES or GITHUB_CI; never over
 #             another hook
-#   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): while GATE_RULES keeps
+#   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): while the repo's rules keep
 #             "receipt", refuses a v* tag whose commit has no receipt (a repo of GATES) or no green CI (GITHUB_CI)
 #   <repo> can be left out when the current directory is in a repo the command takes, or when it takes only one.
 # Exit: run 0 = passed, receipt written; 1 = the gate failed, or the checkout changed while it ran: no receipt.
@@ -54,6 +54,7 @@ GATES=()
 GATE_PASS=()
 GITHUB_CI=()
 GATE_RULES=""
+REPO_RULES=()
 # shellcheck source=/dev/null
 [ -f "$ROOT/.claude/ground-truth.conf" ] && . "$ROOT/.claude/ground-truth.conf"
 
@@ -113,13 +114,17 @@ ci_of() { # <GitHub owner/repo> <commit>: its CI on GitHub in a few words (GitHu
 
 # The hook runs inside the repo being pushed: the rule, then what checks this repo (its entry in REPOS).
 if [ "$cmd" = pre-push ]; then
-  case " $GATE_RULES " in *" receipt "*) ;; *) cat >/dev/null; exit 0 ;; esac
-  here=$(git_common_dir .) ||
-    { cat >/dev/null; echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1; }
+  here=$(git_common_dir .) || {
+    cat >/dev/null
+    case " $GATE_RULES " in *" receipt "*) echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1 ;; esac
+    exit 0
+  }
   name="" gh=""
   for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
     [ "$(git_common_dir "${R_DIR[$i]}")" = "$here" ] && name=${R_NAME[$i]} gh=${R_GH[$i]}
   done
+  # The rule is the repo's own (REPO_RULES), else the project's (GATE_RULES); a repo REPOS does not name has the latter.
+  case " $(repo_rules "$name") " in *" receipt "*) ;; *) cat >/dev/null; exit 0 ;; esac
   if [ -z "$name" ]; then
     cat >/dev/null
     echo "REFUSED: this repo is not in REPOS of $ROOT/.claude/ground-truth.conf, so what checks a release tag is" \

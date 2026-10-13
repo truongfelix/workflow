@@ -68,6 +68,13 @@ rule_text() { # <rule>: the rule in plain words; nothing for a word that is not 
     merge) echo "After a merge, the checks run again on the main branch" ;;
   esac
 }
+repo_rules() { # <repo>: the rules kept for that repo: its entry in REPO_RULES ("<repo>|<rules>"), else GATE_RULES
+  local e
+  for e in ${REPO_RULES[@]+"${REPO_RULES[@]}"}; do
+    if [ "${e%%|*}" = "$1" ]; then echo "${e#*|}"; return; fi
+  done
+  echo "$GATE_RULES"
+}
 rules_preset() { # <rules, space-separated>: Production, Steady or Prototype; nothing when they make no preset
   local r=0 g=0 m=0 w
   for w in $1; do case $w in receipt) r=1 ;; regression) g=1 ;; merge) m=1 ;; esac; done
