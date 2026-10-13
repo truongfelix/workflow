@@ -347,17 +347,17 @@ while IFS="$tab" read -r id sec f; do
   pr=$(awk -F '\t' -v b="$b" -v r="$rname" '$6 == b && (r == "" || index(", " $1 ", ", ", " r ", ")) {
       nm = $1; if ($5 == "OPEN") { o = $3; ci = $15 } else if ($5 == "MERGED") mg = $3 }
     END { print o "|" ci "|" mg "|" nm }' "$T/prs") # not a tab: read merges empty fields split by one
-  IFS='|' read -r open ci merged nm <<<"$pr"
+  IFS='|' read -r pr_open pr_ci pr_merged nm <<<"$pr" # never "open": it holds --no-open
   # When those PRs were read: now, earlier (an --offline build, such as the hook's, shows the PRs last read, which a
   # PR opened or merged since does not change: say when), or never.
   pr_repo=${rname:-${nm%%, *}} asof=""
   st=$(awk -F '\t' -v r="$pr_repo" 'r != "" && index(", " $1 ", ", ", " r ", ") { print $3; exit }' "$T/prs-read")
   case $st in "ok: as read "*) asof=${st#ok: as read } ;; esac
-  if [ -n "$open" ]; then
-    w="PR #$open open"
-    grep -qxF "$pr_repo" "$T/cis" && w="$w, ${ci:-CI not read}"
+  if [ -n "$pr_open" ]; then
+    w="PR #$pr_open open"
+    grep -qxF "$pr_repo" "$T/cis" && w="$w, ${pr_ci:-CI not read}"
     w="$w${asof:+, as read $asof}"
-  elif [ -n "$merged" ]; then w="merged (PR #$merged): the item can be deleted"
+  elif [ -n "$pr_merged" ]; then w="merged (PR #$pr_merged): the item can be deleted"
   elif [ "$rmt" = 1 ]; then
     w="pushed"
     if [ "$own" = 0 ]; then w="$w, no commit beyond $def yet"

@@ -715,6 +715,14 @@ check "board, in a cloud session or over SSH: nothing opens" [ ! -e "$T/opened" 
 nobody DISPLAY=:99 PATH="$T/openers:$PATH" "$SH" "$BD" --out "$T/board.html" "$T/board" >"$T/here.txt" 2>&1
 for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$T/opened" ] && break; sleep 0.2; done
 check "board, with a display: the page opens" has "$T/opened" "$T/board.html"
+# A claimed item: its "Where" is read from the PRs, which once overwrote the switch that opens the page.
+rm -f "$T/opened" && cp "$T/board/BACKLOG.md" "$T/backlog.claim"
+awk '{ print } index($0, "B-3 Third") { print "claimed: claude@s1 on feat/three at laptop" }' "$T/backlog.claim" \
+  >"$T/board/BACKLOG.md"
+nobody DISPLAY=:99 PATH="$T/openers:$PATH" "$SH" "$BD" --out "$T/board.html" "$T/board" >/dev/null 2>&1
+for _ in 1 2 3 4 5 6 7 8 9 10; do [ -e "$T/opened" ] && break; sleep 0.2; done
+check "board, with a display and a claimed item: the page opens" has "$T/opened" "$T/board.html"
+cp "$T/backlog.claim" "$T/board/BACKLOG.md"
 check "board, with a display: no text board" lacks "$T/here.txt" "BACKLOG:"
 
 # Before the setup fills the title in, the page is named after the folder, not after the FILL marker.
