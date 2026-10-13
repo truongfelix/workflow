@@ -79,7 +79,8 @@ Then open Claude Code in your project and ask:
 Claude first asks what it may do without asking you (commit, push, open a PR, merge, …: a preset, then any change),
 then fills in the blanks (what the project is, its repos, its rules), runs the ground truth until it comes back
 clean, and runs `/handoff` once to write the first handoff. You change any of those answers whenever you want: "from
-now on, push the docs without asking". From then on: `/session-start` when you sit down, `/handoff` before you stop.
+now on, push the docs without asking". From then on: `/session-start` when you sit down, `/handoff` before you stop,
+`/board` whenever you want to see the work at a glance.
 
 ## What you get
 
@@ -182,8 +183,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
    and push as the table allows.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
-   ground truth. The next
-   session starts with `/session-start`.
+   ground truth. Then end the setup with one sentence for each skill, when to use it and what it is for:
+   `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's
+   task), `/handoff` before you stop or switch machines (it records where things stand, so the next session picks
+   up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the
+   handoffs as one page).
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
