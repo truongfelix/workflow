@@ -215,7 +215,8 @@ A session finds the project's rules in the `CLAUDE.md` of the folder it is opene
 repo inside the docs repo's folder is covered by the docs' `CLAUDE.md` above it; a repo elsewhere on the disk, or any
 repo whose own `CLAUDE.md` loads alone, is not. So `attach.sh` writes a **pointer** in each attached repo: a short
 `CLAUDE.md` (or `CLAUDE.local.md`, when the repo has a `CLAUDE.md` of its own, which is left alone) that says where the
-docs are, to start the session there, and imports the docs' `CLAUDE.md` so its rules load too. It is kept out of the
+docs are, to start the session there, and, for a repo outside the docs repo's folder, imports the docs' `CLAUDE.md` so its
+rules load too (inside the folder they load already). It is kept out of the
 repo's commits (`.git/info/exclude`), since it names a path on this machine, and `ground-truth.sh` reports an attached repo
 that has none (`NO POINTER`).
 

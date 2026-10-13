@@ -121,15 +121,19 @@ if [ -e "$repo/CLAUDE.md" ] && ! grep -qF -- "$MARK" "$repo/CLAUDE.md"; then fil
 if [ -e "$repo/$file" ] && ! grep -qF -- "$MARK" "$repo/$file"; then
   fail "$repo/$file exists and is not a pointer: move it, then run this again (the repo is in REPOS)"
 fi
+# Inside the root, Claude Code loads the root's CLAUDE.md above the session's folder already: no import there (it
+# would load twice). Elsewhere the import is what brings the rules.
+import="@$ROOT/CLAUDE.md"
+case $repo in "$ROOT"/*) import="(Inside the docs repo's folder: its CLAUDE.md loads above this one.)" ;; esac
 cat >"$repo/$file" <<PTEOF
 $MARK
 # $name: code repo of a project whose docs are elsewhere
 
 The trackers (BACKLOG.md, questions.md), the handoffs, the lessons and the rules for working on this project are in
 the docs repo, \`$ROOT\`. Work started here follows them. Start the session there, or run \`/session-start\` from
-there, before changing anything; this file only makes the rules load here too.
+there, before changing anything.
 
-@$ROOT/CLAUDE.md
+$import
 PTEOF
 exclude=$(git -C "$repo" rev-parse --git-path info/exclude)
 case $exclude in /*) ;; *) exclude="$repo/$exclude" ;; esac
