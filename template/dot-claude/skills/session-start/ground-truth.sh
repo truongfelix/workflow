@@ -28,6 +28,7 @@ REPOS=("$(basename "$ROOT")|.|origin||")
 KEEP_LOCAL=""
 UNITS=1
 CLAIM_STALE_DAYS=3
+QUESTIONS_TRIM_LINES=150
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
 
@@ -348,6 +349,25 @@ if [ -n "$CT" ]; then
     done
     [ "$found" = 0 ] && echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
   done <"$CT/all"
+fi
+
+# questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than
+# QUESTIONS_TRIM_LINES, it is flagged, and /handoff proposes a trim pass of its rulings (keep, shorten, move to its
+# doc, delete). Git keeps a deleted ruling, and the board shows it as archived.
+echo
+if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null; then echo "== questions.md (trim above $QUESTIONS_TRIM_LINES lines)"
+else echo "== questions.md (no trim: QUESTIONS_TRIM_LINES=0)"; fi
+if [ ! -f "$ROOT/questions.md" ]; then
+  echo "  none"
+else
+  qlines=$(wc -l <"$ROOT/questions.md" | tr -d ' ')
+  rulings=$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/questions.md" 2>/dev/null | cut -f1,5 |
+    grep -c "^I$(printf '\t')ruling$")
+  if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$qlines" -gt "$QUESTIONS_TRIM_LINES" ]; then
+    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: /handoff proposes a trim pass"
+  else
+    echo "  $qlines lines, $rulings ruling(s) in §2"
+  fi
 fi
 
 # Background work started with `systemd-run --user` is a TRANSIENT unit; keep the ones whose working directory or

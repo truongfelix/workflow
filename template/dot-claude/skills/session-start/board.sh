@@ -2,8 +2,8 @@
 #
 # board.sh — BACKLOG.md, questions.md, notes/lessons.md and the handoffs in notes/handoff/ as one read-only page:
 # every item, filtered by repo, state, date and text, the closed ones included (from git), each with its history.
-# A lesson that is deleted shows as dropped, a handoff that is replaced or deleted as replaced. Handoffs written
-# before they had ids (one notes/handoff.md, workflow 1.x) are shown too, by their date.
+# A lesson that is deleted shows as dropped, a ruling as archived, a handoff that is replaced or deleted as replaced.
+# Handoffs written before they had ids (one notes/handoff.md, workflow 1.x) are shown too, by their date.
 #
 # The page is rebuilt from the markdown at each run, by items.sh (the parser of the format check) and git. It never
 # writes to the trackers, which stay the only source. One self-contained HTML file: plain JavaScript, no server, no
@@ -574,12 +574,13 @@ var KINDS = { B: "Backlog", Q: "Questions", L: "Lessons", H: "Handoffs" };
 var FILES = { B: "BACKLOG.md", Q: "questions.md", L: "notes/lessons.md", H: "notes/handoff" };
 var STATES = {
   B: [["open", "🔲", "open"], ["waiting", "⏸️", "waiting"], ["closed", "✓", "closed"]],
-  Q: [["question", "💬", "open question"], ["waiting", "⏸️", "deferred"], ["ruling", "🟢", "ruling"], ["closed", "✓", "closed"]],
+  Q: [["question", "💬", "open question"], ["waiting", "⏸️", "deferred"], ["ruling", "🟢", "ruling"],
+    ["archived", "🗄️", "archived"], ["closed", "✓", "closed"]],
   L: [["lesson", "📘", "holds"], ["closed", "✗", "dropped"]],
   H: [["handoff", "📍", "live"], ["closed", "↩", "replaced"]]
 };
 var DATES = { B: [["added", "added"], ["changed", "last changed"], ["closed", "closed"]],
-  Q: [["added", "added"], ["changed", "last changed"], ["ruled", "ruled"], ["closed", "closed"]],
+  Q: [["added", "added"], ["changed", "last changed"], ["ruled", "ruled"], ["closed", "closed or archived"]],
   L: [["added", "added"], ["changed", "last changed"], ["closed", "dropped"]],
   H: [["added", "written"], ["closed", "replaced"]] };
 var IDS = /\b([BQLH]-[1-9][0-9]*)\b/g;
@@ -593,7 +594,8 @@ D.items.forEach(function (it) {
     var i = l.indexOf(":");
     if (i > 0) it.f[l.slice(0, i)] = l.slice(i + 1).trim();
   });
-  it.status = it.closed ? "closed" : it.state;
+  // A deleted ruling is archived (the trim in /handoff): its reason stays in git. A deleted question is closed.
+  it.status = !it.closed ? it.state : it.kind === "Q" && it.state === "ruling" ? "archived" : "closed";
   // Claimed is not a state: a claimed item is still open. Its column names who works on it, or None.
   it.claimedBy = it.kind === "B" && !it.closed && it.f.claimed ? it.f.claimed.split(" on ")[0] : "";
   it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
@@ -890,7 +892,8 @@ function panel() {
   p.hidden = !(it || c || pr);
   if (c || pr) { p.innerHTML = c ? commitView(c) : prView(pr); return; }
   if (!it) return;
-  var where = it.closed ? "closed on " + it.closed + "; last in " + it.file : it.file + ":" + it.line;
+  var gone = STATES[it.kind].filter(function (x) { return x[0] === it.status; })[0];
+  var where = it.closed ? gone[2] + " on " + it.closed + "; last in " + it.file : it.file + ":" + it.line;
   var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + idOf(it) + " " + fmt(it.title) + "</h2>" +
     "<div class=\"muted\">" + esc(stateOf(it)) + " · " + esc(where) + "</div>" +
     (it.twice ? "<div class=\"note\">⚠ " + esc(it.id) + " is given twice in git: " + esc(it.twice) + "</div>" : "") + "<dl>" +

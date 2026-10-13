@@ -27,7 +27,8 @@
 #     P <file> <line> <problem>         what check would report
 # Exit 0 = every item follows the format. Exit 2 = a problem was found, or a file could not be read (UNKNOWN, never
 # a pass). Exit 1 on a usage error only.
-#   show prints the item: its text (live, or its last version in git and the commit that closed it), its history
+#   show prints the item: its text (live, or its last version in git and the commit that closed it, or archived it
+#   for a ruling), its history
 #   (each commit that added, changed, closed or reopened it), and the handoffs that name it, live or replaced. Exit 0
 #   = shown; 1 = no item has this id, in the files or in git, or a usage error; 2 = UNKNOWN: a shallow clone or no git
 #   holds only part of the past (what is there is shown first).
@@ -85,6 +86,7 @@ show() { # <id>
     f="$T/v/$v/notes/handoff.md"
     [ -s "$f" ] && grep -Eq "$idre" "$f" && sed -n '1s/^# *Handoff *(\(.*\))[[:space:]]*$/\1/p' "$f"
   done | awk '$0 != "" && !seen[$0]++ { print "a 1.x handoff of " $0 " (before handoffs had ids)" }' >"$T/old"
+  # A deleted ruling is archived, a deleted question closed: the awk program tells them apart by the last state.
   case ${id%%-*} in L) gone=dropped ;; H) gone=replaced ;; *) gone=closed ;; esac # not in $( ): bash 3.2 misreads it
   awk -F '\t' -v id="$id" -v gone="$gone" -v idre="$idre" -v vdir="$T/v" -v oldf="$T/old" -v shallow="$shallow" -v git_ok="$git_ok" '
 function swap(s, a, b,   out, i) {
@@ -137,7 +139,10 @@ END {
         seen = 1
       } else if (rec[p] != rec[n]) event(n, how(rec[p], rec[n]))
       lastn = n; lasttitle = title[n]
-    } else if (p && (p in rec)) { event(n, gone); closedn = n }
+    } else if (p && (p in rec)) {
+      split(rec[p], P, "\t"); closedas = (P[1] == "ruling") ? "archived" : gone
+      event(n, closedas); closedn = n
+    }
     prev[f] = n
   }
   if (!seen) {
@@ -149,7 +154,7 @@ END {
   f = vfile[lastn]; split(rec[lastn], R, "\t")
   print id " " title[lastn]
   if (lastn == disk[f]) print "  " R[1] (R[2] == 1 ? " ⚠ cross-repo" : "") ", " f ":" line[lastn]
-  else print "  " gone " on " vday[closedn] " by " short(closedn) " " vsubj[closedn] "; its last version, " f " in " short(lastn) ":"
+  else print "  " closedas " on " vday[closedn] " by " short(closedn) " " vsubj[closedn] "; its last version, " f " in " short(lastn) ":"
   if (twice) print "  ⚠ " id " is given twice in git: " twice
   print ""; print text(lastn, line[lastn], f); print ""
   print "History (" f ", first parent):"

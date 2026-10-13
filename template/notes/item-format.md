@@ -168,12 +168,11 @@ quoted anywhere (an item, a handoff, a commit message, a PR) links to that commi
 `.claude/ground-truth.conf` holds it, and so do the commits that name an item by its id. PRs come from GitHub, read by
 `gh` when the page is built: a PR that names an item (title, description, branch) and a PR an item names (`#41`) show
 with the item, with their description and merge commit. Without `gh`, or with `--offline`, the page says the PRs were
-not read. Closed items come back from git: a deleted item as "closed", a deleted lesson as "dropped", a replaced handoff
-as "replaced". Handoffs written before they had ids (one `notes/handoff.md`) are shown by their date. An id that
-git shows given twice is a problem, and its row has a ⚠; a shallow clone says from which date the history is
-known. The page is
-read-only and rebuilt at each run (no server, nothing to install): run the script again to refresh it. An item the
-parser cannot read shows in the problems box as written, never dropped.
+not read. Closed items come back from git: a deleted item as "closed", a deleted ruling as "archived", a deleted
+lesson as "dropped", a replaced handoff as "replaced". Handoffs written before they had ids (one `notes/handoff.md`)
+are shown by their date. An id that git shows given twice is a problem, and its row has a ⚠; a shallow clone says from
+which date the history is known. The page is read-only and rebuilt at each run (no server, nothing to install): run
+the script again to refresh it. An item the parser cannot read shows in the problems box as written, never dropped.
 
 ## Moving a project to it
 

@@ -30,6 +30,9 @@ GROUND TRUTH — 2026-10-12 09:14 CEST
   B-12 Shopping list works offline: claude@pantry-12 on feat/offline-list
       web: last commit 10-09 19:20, ahead 2 / behind 0 of origin/feat/offline-list
 
+== questions.md (trim above 150 lines)
+  42 lines, 2 ruling(s) in §2
+
 == background (transient user units of this project)
   pantry-backfill.service: failed, since Sat 2026-10-10 01:12:44 CEST
 

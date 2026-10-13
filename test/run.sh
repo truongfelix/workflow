@@ -144,6 +144,33 @@ check "ground truth, claims: a claim not pushed" has "$T/gt-claims.txt" \
   "  B-14 Mine: claude@ws on spike, ⚠ NOT PUSHED: no other session sees it"
 cp "$T/ws-backlog.bak" BACKLOG.md && git add BACKLOG.md && git_q commit -m "no claims" && git_q push origin main
 
+# questions.md: its size and its rulings; longer than QUESTIONS_TRIM_LINES (150 when unset), flagged for the trim pass
+# of /handoff; 0 turns the flag off.
+check "ground truth, questions.md: its size, under the default threshold" \
+  eval 'grep -A1 "^== questions.md (trim above 150 lines)$" "$T/gt.txt" | grep -q "^  [0-9]* lines, 0 ruling(s) in §2$"'
+cp questions.md "$T/ws-questions.bak" && cp .claude/ground-truth.conf "$T/ws-conf.bak"
+printf '%s\n' '# Demo — questions' '' 'next id: Q-4 (last given to claude@ws)' '' '# 1. Open decisions' '' \
+  '### 💬 Q-3 Which one?' 'The question.' '' '# 2. Rulings' '' '### 🟢 Q-1 Never X' 'ruled: 2026-01-02' \
+  'Owner: "no X".' '' '### 🟢 Q-2 Always Y' 'ruled: 2026-01-03' 'Owner: "always Y".' >questions.md
+qn=$(wc -l <questions.md | tr -d ' ')
+echo "QUESTIONS_TRIM_LINES=$((qn - 1))" >>.claude/ground-truth.conf
+"$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
+check "ground truth, questions.md: above the threshold, flagged for a trim, its rulings counted" has "$T/gt-trim.txt" \
+  "  ⚠ TRIM: $qn lines, 2 ruling(s) in §2: /handoff proposes a trim pass"
+echo "QUESTIONS_TRIM_LINES=$qn" >>.claude/ground-truth.conf
+"$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
+check "ground truth, questions.md: at the threshold, not flagged" \
+  eval 'has "$T/gt-trim.txt" "  $qn lines, 2 ruling(s) in §2" && lacks "$T/gt-trim.txt" TRIM:'
+echo "QUESTIONS_TRIM_LINES=0" >>.claude/ground-truth.conf
+"$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
+check "ground truth, questions.md: 0 turns the trim off" \
+  eval 'has "$T/gt-trim.txt" "== questions.md (no trim: QUESTIONS_TRIM_LINES=0)" && lacks "$T/gt-trim.txt" TRIM:'
+cp "$T/ws-questions.bak" questions.md && cp "$T/ws-conf.bak" .claude/ground-truth.conf
+check "/handoff runs the trim pass on the flag of the ground truth" \
+  has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`'
+check "the template's ground-truth.conf sets the trim threshold" \
+  grep -qx 'QUESTIONS_TRIM_LINES=150' "$WF/template/dot-claude/ground-truth.conf"
+
 # A probe that fails is UNKNOWN, never clean.
 git -C api remote set-url origin "$T/nowhere.git"
 "$SH" "$GT" >"$T/gt-broken.txt" 2>&1
@@ -539,7 +566,7 @@ check "the control: the format check exits 2" [ $? = 2 ]
 check "the control: the format check names the id given twice" has "$T/it-dup.txt" "B-4 is given twice"
 
 # items.sh show, and what git cannot vouch for: B-2 is closed (H-1 names it), B-3 is closed then given again to
-# another item; a shallow clone holds only the last commit.
+# another item; the ruling Q-1 is archived, the question Q-2 closed; a shallow clone holds only the last commit.
 mkdir -p "$T/show/notes/handoff" "$T/show/.claude/skills/session-start" && cd "$T/show" || exit 1
 cp "$ITS" .claude/skills/session-start/
 git_q init && git symbolic-ref HEAD refs/heads/main
@@ -551,14 +578,17 @@ show_handoff() { # <id> <the item it names> <continues line or "">
 }
 show_backlog '### 🔲 B-1 First' 'Done when: done.' '' '### 🔲 B-2 Second' 'The second one.' 'Done when: done.' '' \
   '### 🔲 B-3 Third' 'Done when: done.' >BACKLOG.md
-printf '%s\n' '# Demo — questions' '' 'next id: Q-1 (none given yet)' >questions.md
+show_questions() { printf '%s\n' '# Demo — questions' '' 'next id: Q-3 (last given to claude@s1)' '' "$@"; }
+show_questions '### 💬 Q-2 Which one?' 'The question.' '' '### 🟢 Q-1 Never X' 'ruled: 2026-01-02' 'Owner: "no X".' \
+  >questions.md
 printf '%s\n' '# Handoffs' '' 'next id: H-2 (last given to claude@s1)' >notes/handoff/README.md
 show_handoff H-1 "B-2 Second" >notes/handoff/s1.md
 git add BACKLOG.md questions.md notes && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m "three items"
 show_backlog '### 🔲 B-1 First' 'Done when: done.' >BACKLOG.md
 printf '%s\n' '# Handoffs' '' 'next id: H-3 (last given to claude@s1)' >notes/handoff/README.md
 show_handoff H-2 "B-1 First" "continues: H-1" >notes/handoff/s1.md
-GIT_COMMITTER_DATE=2026-02-03T10:00:00 git_q commit -am "B-2 done, B-3 dropped"
+show_questions >questions.md
+GIT_COMMITTER_DATE=2026-02-03T10:00:00 git_q commit -am "B-2 done, B-3 dropped, Q-1 archived, Q-2 answered"
 show_backlog '### 🔲 B-1 First' 'Done when: done.' '' '### 🔲 B-3 Not the third' 'Done when: done.' >BACKLOG.md
 GIT_COMMITTER_DATE=2026-03-04T10:00:00 git_q commit -am "B-3 added again"
 "$SH" "$IT" show B-2 >"$T/show-b2.txt" 2>&1
@@ -577,6 +607,10 @@ check "items.sh show: an id given twice in git is flagged" has "$T/show-b3.txt" 
 "$SH" "$IT" show H-1 >"$T/show-h1.txt" 2>&1
 check "items.sh show: a replaced handoff, in full" \
   eval 'has "$T/show-h1.txt" "  replaced on 2026-02-03 by " && has "$T/show-h1.txt" "1. B-2 Second: go on."'
+"$SH" "$IT" show Q-1 >"$T/show-q1.txt" 2>&1
+check "items.sh show: a deleted ruling is archived" has "$T/show-q1.txt" "  archived on 2026-02-03 by "
+"$SH" "$IT" show Q-2 >"$T/show-q2.txt" 2>&1
+check "items.sh show: a deleted question is closed" has "$T/show-q2.txt" "  closed on 2026-02-03 by "
 "$SH" "$IT" show B-9 >"$T/show-none.txt" 2>&1
 check "items.sh show: an id nobody gave exits 1" [ $? = 1 ]
 "$SH" "$BD" --no-open --offline --out "$T/show.html" "$T/show" >/dev/null 2>&1
@@ -584,6 +618,10 @@ check "board: an id given twice in git is a problem" has "$T/show.html" \
   '"text":"B-3 is given twice in git: closed as \"Third\", given again in '
 check "board: and on the item, added when the id was given again" \
   eval 'grep -F "\"id\":\"B-3\"," "$T/show.html" | grep -F "\"added\":\"2026-03-04\"," | grep -qF "\"twice\":\"closed as"'
+check "board: a deleted ruling, as a ruling, with the date it went" \
+  eval 'grep -F "\"id\":\"Q-1\"," "$T/show.html" | grep -F "\"state\":\"ruling\"," | grep -qF "\"closed\":\"2026-02-03\""'
+check "board: a deleted ruling shows as archived, a deleted question as closed" eval \
+  'has "$T/show.html" "[\"archived\", \"🗄️\", \"archived\"]" && has "$T/show.html" "it.kind === \"Q\" && it.state === \"ruling\" ? \"archived\" : \"closed\""'
 git_q clone --depth 1 "file://$T/show" "$T/shallow"
 mkdir -p "$T/shallow/.claude/skills/session-start" && cp "$ITS" "$T/shallow/.claude/skills/session-start/"
 (cd "$T/shallow" && "$SH" "$IT" show B-2) >"$T/show-shallow.txt" 2>&1

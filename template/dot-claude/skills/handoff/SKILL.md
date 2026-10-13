@@ -68,6 +68,17 @@ session can find out what happened and why.
      named under "Unfinished", for the next session to take over (`claim.sh --from`); otherwise delete the `claimed:`
      line, and the docs push (step 7) frees the item. A
      ⚠ STALE or GONE claim of another session goes under "Waiting for the user": only the owner releases it.
+   - **Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`: the file is longer than
+     `QUESTIONS_TRIM_LINES` in `.claude/ground-truth.conf`, a size the owner sets, and every session reads it. Go
+     through the rulings in §2 with the owner, four at a time (one question each, in one AskUserQuestion), each with
+     its id, title, what it guards and why, and four choices, your recommendation first: **keep**; **keep and
+     shorten** (the same rule in fewer words); **move to its doc** (the rule goes where it acts: a README, a topic
+     note, `CLAUDE.md`, a comment in the code); **delete** (it guards nothing any more: what it forbade is now simply
+     how the code works). A ruling moved or deleted leaves `questions.md`, and the commit says where it went
+     (`Q-3 archived: <why>`, `Q-4 moved to README.md`): git keeps its words and its reason, `items.sh show` prints
+     it, and the board shows it as archived. Still above the threshold after the pass: propose a new one (the size
+     now plus a quarter), so the next handoff does not ask again. A handoff in a hurry skips the pass: the ground
+     truth flags it again next time.
    - Then `bash .claude/skills/session-start/items.sh check`: it lists each item (lessons and handoffs included)
      that departs from its format, with its line. Fix them until it exits 0, before committing (step 7); write the
      handoff (step 2) before running it.

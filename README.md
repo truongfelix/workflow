@@ -15,7 +15,8 @@ This template keeps a project going across sessions, machines and weeks with thr
   waits for you (or starts it, if you told it to). When an agent starts working on the task, it claims
   it: `claim.sh` pushes a `claimed:` line that names the agent, so two sessions in parallel never take the same item.
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
-  decisions, lessons learned), and commits.
+  decisions, lessons learned), and commits. When `questions.md` grows past a size you set, it goes through the
+  rulings with you: keep, shorten, move to its doc, or delete (git keeps it).
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history. A hook
   rebuilds it after each change, and an open tab updates itself. Where no browser can show it (a cloud session,
   SSH), it prints the open items instead.
@@ -96,7 +97,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim |
 | `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
@@ -177,6 +178,9 @@ From 1.x: the trackers' items and the lessons moved from bullets cited by title 
 handoff rule became the table "What Claude does alone": copy it from the template, every row "ask first", then set
 what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs" and "Push the docs"; everything:
 "Commit code" and "Push a work branch" too), and ask the owner about the other rows.
+
+`/handoff` gained a trim pass of `questions.md` (step 3), set by `QUESTIONS_TRIM_LINES` in `ground-truth.conf` (150
+lines when the line is missing): merge the skill by hand, and add the line to set another size.
 
 ## Improve the workflow
 

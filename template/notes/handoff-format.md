@@ -64,9 +64,9 @@ There is no archive file. A replaced handoff, a finished item, a ruling that no 
 that no longer holds are deleted from their live file, and git keeps each one word for word.
 `bash .claude/skills/session-start/items.sh show <id>` prints any of them (B-, Q-, L- or H-), live or deleted: its
 text, the commits that added, changed and closed it, and the handoffs that name it. The board shows them all: past
-handoffs, closed items, dropped lessons. Both say when git cannot vouch for the past: in a shallow clone the history
-before its oldest commit is UNKNOWN (`git fetch --unshallow`), never "none"; and an id that git shows given twice
-(back under another title after it was closed, or held by two items at once) is flagged.
+handoffs, closed items, archived rulings, dropped lessons. Both say when git cannot vouch for the past: in a shallow
+clone the history before its oldest commit is UNKNOWN (`git fetch --unshallow`), never "none"; and an id that git
+shows given twice (back under another title after it was closed, or held by two items at once) is flagged.
 
 ## The check
 
