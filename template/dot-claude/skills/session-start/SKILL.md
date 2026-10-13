@@ -55,14 +55,14 @@ open that already shipped, "done" items whose code changed since).
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
 4. **Brief the user** in under about 20 lines:
    - **Since last session:** what finished or changed (jobs, CI, merged PRs), contradictions first.
-   - **Today:** at most 3 items, time-sensitive first. Each with its repo or area, its verified current state, one
-     line on why now, and what "done" looks like. Default order when the user has no preference: work in flight,
-     bugs users hit, decided-but-not-done (🟢), then deferred work.
+   - **Today:** at most 3 items, time-sensitive first. Each with its id and title, its repo or area, its verified
+     current state, one line on why now, and what "done" looks like. Default order when the user has no
+     preference: work in flight, bugs users hit, decided-but-not-done (🟢), then deferred work.
      Items in different repos or `BACKLOG.md` sections can run side by side (one session or worktree each). An item
      marked ⚠ cross-repo runs alone, in its order (producer first, then each consumer). An item another session
      claimed is not on the list.
    - **Waiting for you:** the `questions.md` §1 items that block today's work, each with a recommendation, named by
-     what the user sees (a screen's title, a command), not by a code name. These are never self-serve.
+     its id and by what the user sees (a screen's title, a command). These are never self-serve.
    - The board's path in one line: `Board: <path> (/board opens it; an open board updates itself)`.
    - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
      CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
@@ -80,7 +80,8 @@ open that already shipped, "done" items whose code changed since).
 
 ## Notes
 
-- The brief is for a person: plain sentences, no internal IDs unless they help (PR numbers, paths, unit names do).
+- The brief is for a person: plain sentences. Every item, question, lesson or handoff it mentions is named by its id
+  and title (`B-10 Questions trim pass`), here and in every later answer, so the user can follow it on the board.
 - If the ground truth contradicts the handoff (a job that failed, a branch never pushed), put it first and fix the
   handoff's claim when the session ends.
 - Work started after the brief is recorded at the end of the session with `/handoff`.
