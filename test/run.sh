@@ -112,7 +112,7 @@ check "autonomy: a row answered neither way is UNKNOWN (exit 2), nothing written
   eval '[ $? = 2 ] && has "$T/au3.txt" "UNKNOWN: the row \"Commit code\" answers \"maybe\"" && cmp -s "$T/au3.md" "$T/au3.bak"'
 "$SH" "$AU" show -f "$T/nowhere.md" >/dev/null 2>&1
 check "autonomy: no CLAUDE.md is UNKNOWN (exit 2)" [ $? = 2 ]
-awk '{ printf "%s\r\n", $0 }' "$CT" >"$T/au4.md"
+tr -d '\r' <"$CT" | awk '{ printf "%s\r\n", $0 }' >"$T/au4.md" # a Windows checkout may hold CRLF already
 "$SH" "$AU" preset balanced -f "$T/au4.md" >/dev/null 2>&1
 check "autonomy: a CRLF file keeps CRLF" [ "$(tr -cd '\r' <"$T/au4.md" | wc -c | tr -d ' ')" = "$(wc -l <"$T/au4.md" | tr -d ' ')" ]
 
