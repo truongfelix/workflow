@@ -42,7 +42,8 @@
 # Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [--offline] [--text] [<project dir>]
 #        bash .claude/skills/session-start/board.sh --hook      (the PostToolUse hook: the tool call as JSON on stdin)
 #   <project dir>  default: the project this script is installed in
-#   --out          where to write the page. Default: <temp folder>/<project>-board.html, the same file at each run
+#   --out          where to write the page. Default: <project>-board.html, the same file at each run, in the temp
+#                  folder, or in the default browser's own folder when it is a snap (it cannot read the temp folder)
 #   --no-open      only print the page's path
 #   --offline      do not ask GitHub for the PRs: show the ones last read
 #   --text         also print the open items as text (what it does instead of opening, where no browser can)
@@ -102,7 +103,12 @@ trap 'rm -rf "$T"' EXIT
 project=$(sed -n '1s/^# *\(.*\) — .*/\1/p' "${trackers[0]}" | tr -d '\r')
 case $project in *FILL*) project="" ;; esac
 [ -n "$project" ] || project=$(basename "$(pwd)")
-[ -n "$out" ] || out="${TMPDIR:-/tmp}/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
+# A snap browser (Ubuntu's Firefox) reads neither /tmp nor the hidden folders of the home: the page goes to its own
+# folder in ~/snap then, so it opens by its path, and so does a link to it.
+pagedir=${TMPDIR:-/tmp}
+browser=$(xdg-mime query default text/html 2>/dev/null) # a snap's: "<snap>_<app>.desktop"
+case $browser in *_*.desktop) [ -d "$HOME/snap/${browser%%_*}/common" ] && pagedir="$HOME/snap/${browser%%_*}/common" ;; esac
+[ -n "$out" ] || out="$pagedir/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
 cache="${out%.html}-prs.tsv" # the PRs last read, for an --offline build
 
 # One rebuild at a time (--queue, from the hook): a call that finds one running leaves its mark, and the running one

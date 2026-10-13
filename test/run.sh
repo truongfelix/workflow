@@ -500,6 +500,17 @@ if command -v node >/dev/null 2>&1; then
     process.exit(d.items.length === 6 ? 0 : 1);' "$T/board2.html"
   check "board, lessons and handoffs: the data parses as JSON, every item in it" [ $? = 0 ]
 fi
+# With no --out, the page goes to the temp folder, or to the default browser's own folder when it is a snap: a snap
+# browser reads neither /tmp nor the hidden folders of the home, so the page would not open, nor a link to it.
+mkdir -p "$T/fakebin4" "$T/home/snap/firefox/common" "$T/tmp4"
+printf '%s\n' '#!/bin/sh' 'echo "$BROWSER_DESKTOP"' >"$T/fakebin4/xdg-mime" && chmod +x "$T/fakebin4/xdg-mime"
+BROWSER_DESKTOP=firefox_firefox.desktop HOME="$T/home" TMPDIR="$T/tmp4" PATH="$T/fakebin4:$PATH" \
+  "$SH" "$BD" --no-open --offline "$T/board2" >"$T/board-snap.txt" 2>&1
+check "board, a snap browser: the page in its own folder, which it can read" \
+  eval 'has "$T/board-snap.txt" "Board: $T/home/snap/firefox/common/" && [ -n "$(ls "$T/home/snap/firefox/common/")" ]'
+BROWSER_DESKTOP=firefox.desktop HOME="$T/home" TMPDIR="$T/tmp4" PATH="$T/fakebin4:$PATH" \
+  "$SH" "$BD" --no-open --offline "$T/board2" >"$T/board-tmp.txt" 2>&1
+check "board, any other browser: the page in the temp folder" has "$T/board-tmp.txt" "Board: $T/tmp4/"
 mkdir -p .claude && printf 'REPOS=("docs|.|origin||" "api|%s|origin||")\n' "$T/board2-api" >.claude/ground-truth.conf
 PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --out "$T/board3.html" "$T/board2" >"$T/board3.txt" 2>&1
 check "board, commits and PRs: exits 0" [ $? = 0 ]
@@ -708,7 +719,8 @@ check "board, with a display: no text board" lacks "$T/here.txt" "BACKLOG:"
 
 # Before the setup fills the title in, the page is named after the folder, not after the FILL marker.
 mkdir -p "$T/unfilled" "$T/tmpdir" && cp "$WF/template/BACKLOG.md" "$WF/template/questions.md" "$T/unfilled/"
-TMPDIR="$T/tmpdir" "$SH" "$BD" --no-open --offline "$T/unfilled" >/dev/null 2>&1
+BROWSER_DESKTOP=firefox.desktop PATH="$T/fakebin4:$PATH" TMPDIR="$T/tmpdir" \
+  "$SH" "$BD" --no-open --offline "$T/unfilled" >/dev/null 2>&1
 check "board, before the setup: the page is named after the folder" [ -f "$T/tmpdir/unfilled-board.html" ]
 
 # The hook (.claude/settings.json, PostToolUse): the tool call as JSON on stdin. It rebuilds when the call names a
