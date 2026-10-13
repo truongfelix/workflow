@@ -156,12 +156,14 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The gate, in `.claude/ground-truth.conf`: `GATES`, each repo's gate command (the one whose exit code says
-     "ready": a test script, `make check`, what CI runs; none is fine). If a repo has one, ask the owner for a preset
-     of gate rules as a multiple-choice question: **Production** (a release tag needs a receipt of the gate, every
-     bug fix lands with a check, the default branch is gated again after a merge: code others clone, install or
-     deploy), **Steady** (the last two: a project in daily use, released informally) or **Prototype** (no rule: fast
-     iteration on something nobody depends on yet). Then show the three rules with that preset and ask which to turn
-     on or off. Set `GATE_RULES`; with the rule `receipt`, run `bash .claude/skills/session-start/gate.sh hook
+     "ready": a test script, `make check`, what CI runs). Look for it in the repo, then ask the owner about it in a
+     question of its own: "Is `<command>` the check that says the code is ready?" A project with no such check yet
+     (a new one) has no gate: say so and skip the rest of this bullet; this step runs again when the project has
+     one. With a gate, ask which rules to keep, as one question where the owner picks any, each rule a plain
+     sentence: "A release needs this check to have passed on its exact commit" (`receipt`), "Each bug fix comes with
+     a check that fails without the fix" (`regression`), "After a merge, the check runs again on the main branch"
+     (`merge`). Name no preset: Production, Steady and Prototype are what the ground truth calls the result, not
+     options to explain. Set `GATE_RULES`; with `receipt`, run `bash .claude/skills/session-start/gate.sh hook
      <repo>` for each repo with a gate.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
