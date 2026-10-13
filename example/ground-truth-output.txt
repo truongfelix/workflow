@@ -30,9 +30,9 @@ GROUND TRUTH — 2026-10-12 09:14 CEST
   B-12 Shopping list works offline: claude@pantry-12 on feat/offline-list
       web: last commit 10-09 19:20, ahead 2 / behind 0 of origin/feat/offline-list
 
-== gate (rules kept: receipt regression merge = Production)
-  api (bin/gate): origin/main at 3365cea, receipt of 2026-10-09 16:09 CEST
-  web (bin/gate): origin/main at 44a421b, receipt of 2026-10-07 11:41 CEST
+== checks (rules kept: receipt regression merge = Production)
+  api (gate: bin/gate; CI: example-org/pantry-api): origin/main at 3365cea, receipt of 2026-10-09 16:09 CEST, CI green
+  web (gate: bin/gate; CI: example-org/pantry-web): origin/main at 44a421b, receipt of 2026-10-07 11:41 CEST, CI green
 
 == questions.md (trim above 150 lines)
   42 lines, 2 ruling(s) in §2

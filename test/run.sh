@@ -423,7 +423,7 @@ check "board: a closed item keeps its last text" item_has B-1 '"title":"First"'
 check "board: an item not committed yet" item_has B-3 '"not committed yet","added"]'
 check "board: a question's repos" item_has Q-1 '"fields":"repos: api, web"'
 check "board: claimed is a column of the backlog, not a state" \
-  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th><th>Where</th><th title=" && has "$T/board.html" ">Gate</th>\" : \"\")" &&
+  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th><th>Where</th>\" + (D.gated ? \"<th title=" &&
     lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
 check "board: text cannot end the page's script early" [ "$(grep -c '</script>' "$T/board.html")" = 2 ]
 if command -v node >/dev/null 2>&1; then
@@ -547,7 +547,7 @@ echo "passed: now" >".git/gate-receipts/$(git rev-parse feat/two)"
 echo "failed: now" >".git/gate-failures/$(git rev-parse spike)"
 echo "passed: then" >".git/gate-receipts/$(git rev-parse main)"
 cd "$T/board5" || exit 1
-echo 'GATES=("api|true")' >>.claude/ground-truth.conf
+printf '%s\n' 'GATES=("api|true")' 'GITHUB_CI=("api")' >>.claude/ground-truth.conf
 printf '%s\n' '# Demo — Backlog' '' 'next id: B-6 (last given to claude@s1)' '' '## api' '' '### 🔲 B-1 First' \
   'claimed: claude@s1 on fix/B-1-rounding at laptop' 'Done when: done.' '' '### 🔲 B-2 Second' \
   'claimed: claude@s1 on feat/two at laptop' 'Done when: done.' '' '### 🔲 B-3 Third' \
@@ -575,7 +575,7 @@ for w in '"B-1":"fix/B-1-rounding: merged (PR #41): the item can be deleted"' \
   check "board, where: $w" has "$T/board5.html" "$w"
 done
 check "board, where: the CI of an open PR" has "$T/board5.html" '"number":42,"title":"Two","state":"OPEN"'
-check "board, where: the CI is read with the PRs" has "$T/board5.html" '"ci":"CI green","body":"B-2."}'
+check "board, gate: the column shows, the project has a gate" has "$T/board5.html" '"gated":true,'
 check "board, where: this machine, as claims name it" has "$T/board5.html" '"machine":"laptop"}'
 check "board --text, where: under the item" has "$T/board5.txt" "        where: spike: only on laptop, not pushed"
 gate_of() { grep -qF "\"$1\":\"$2\"" "$T/board5.html"; } # <id> <text>: in the data's gate map
@@ -594,9 +594,18 @@ check "board --offline, where: an open PR read earlier says when" \
   has "$T/board5.html" '"B-2":"feat/two: PR #42 open, CI green, as read 20'
 check "board --offline, where: no PR when they were last read, not \"no PR yet\"" \
   has "$T/board5.html" '"B-5":"feat/pushed: pushed, no PR as read 20'
-grep -v '^GATES=' .claude/ground-truth.conf >"$T/conf5" && cat "$T/conf5" >.claude/ground-truth.conf
-CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --out "$T/board6.html" "$T/board5" >/dev/null 2>&1
+# What checks the code (/checks) decides what shows: no CI word for a repo whose GitHub CI does not count, "no gate"
+# for a repo with no gate, and no Gate column at all for a project with none.
+grep -v -e '^GATES=' -e '^GITHUB_CI=' .claude/ground-truth.conf >"$T/conf5" && cat "$T/conf5" >.claude/ground-truth.conf
+echo 'GATES=("web|true")' >>.claude/ground-truth.conf
+CLAIM_MACHINE=laptop PATH="$T/fakebin2:$PATH" "$SH" "$BD" --no-open --out "$T/board6.html" "$T/board5" >/dev/null 2>&1
 check "board, gate: no gate for a repo that GATES does not name" grep -qF '"B-2":"no gate"' "$T/board6.html"
+check "board, where: no CI word for a repo GITHUB_CI does not name" \
+  has "$T/board6.html" '"B-2":"feat/two: PR #42 open, 1 commit not pushed"'
+cat "$T/conf5" >.claude/ground-truth.conf
+CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --text --out "$T/board7.html" "$T/board5" >"$T/board7.txt" 2>&1
+check "board, gate: no column and no gate text in a project with no gate" \
+  eval 'has "$T/board7.html" "\"gated\":false," && grep -q "^\"gate\":{}," "$T/board7.html" && lacks "$T/board7.txt" "gate:"'
 cd "$T/board2" || exit 1
 
 # Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
@@ -880,7 +889,7 @@ check "adopt.sh installs claim.sh, executable" [ -x "$T/ws/$CL" ]
 check "adopt.sh installs /autonomy, its script executable" \
   [ -f "$T/ws/.claude/skills/autonomy/SKILL.md" -a -x "$T/ws/.claude/skills/autonomy/autonomy.sh" ]
 
-# gate.sh: a repo's gate, and a receipt for each commit that passed it on a clean tree. The gate rules a project keeps
+# gate.sh: a repo's gate, and a receipt for each commit that passed it on a clean tree. The rules a project keeps
 # (GATE_RULES) and what holds each: "receipt" the pre-push hook, "merge" the ground truth, "regression" /handoff.
 GA=.claude/skills/session-start/gate.sh
 mkdir "$T/gate" && cd "$T/gate" || exit 1
@@ -889,9 +898,13 @@ git_q clone remote.git p && cd p || exit 1
 git symbolic-ref HEAD refs/heads/main
 "$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1
 check "adopt.sh installs gate.sh, executable" [ -x "$GA" ]
-check "adopt.sh lists the gate preset as left to FILL" eval '"$SH" "$WF/bin/adopt.sh" . 2>&1 | grep -q "then GATES and the preset of GATE_RULES"'
-check "the template's ground-truth.conf keeps no gate rule until the setup" \
-  eval 'grep -qx "GATE_RULES=\"\"" .claude/ground-truth.conf && grep -qx "GATES=()" .claude/ground-truth.conf'
+check "adopt.sh installs /checks" [ -f .claude/skills/checks/SKILL.md ]
+check "adopt.sh lists how the code is checked as left to FILL" \
+  eval '"$SH" "$WF/bin/adopt.sh" . 2>&1 | grep -q "then how its code is checked with the /checks skill"'
+check "the setup follows /checks for how the code is checked" has "$WF/README.md" '`/checks` skill (`.claude/skills/checks/SKILL.md`)'
+check "the template's ground-truth.conf checks nothing and keeps no rule until the setup" \
+  eval 'grep -qx "GATE_RULES=\"\"" .claude/ground-truth.conf && grep -qx "GATES=()" .claude/ground-truth.conf &&
+    grep -qx "GITHUB_CI=()" .claude/ground-truth.conf'
 # The gate passes on "pass", fails otherwise, and edits a tracked file on "edit". grep, not ==: a Windows checkout
 # can hold CRLF.
 mkdir bin && printf '%s\n' '#!/bin/sh' 'if grep -q edit state.txt; then echo edited >>state.txt; exit 0; fi' \
@@ -907,13 +920,13 @@ short=$(git rev-parse --short HEAD) head=$(git rev-parse HEAD)
 check "gate check: a commit never gated has no receipt (exit 1)" \
   eval '[ $? = 1 ] && has "$T/gate-check0.txt" "NO RECEIPT: $short has not passed the gate of project here"'
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt0.txt" 2>&1
-sed 's/^/      | /' "$T/gate-gt0.txt" | sed -n '/== gate/,/^      | $/p'
+sed 's/^/      | /' "$T/gate-gt0.txt" | sed -n '/== checks/,/^      | $/p'
 check "ground truth, gate: the rules kept and their preset" has "$T/gate-gt0.txt" \
-  "== gate (rules kept: receipt regression merge = Production)"
+  "== checks (rules kept: receipt regression merge = Production)"
 check "ground truth, gate: the rule merge flags a default branch with no receipt" has "$T/gate-gt0.txt" \
-  "  project (sh bin/gate): origin/main at ${head:0:7}, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run project, on it)"
+  "  project (gate: sh bin/gate): origin/main at ${head:0:7}, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run project, on it)"
 check "ground truth, gate: the rule receipt flags a repo with no hook" has "$T/gate-gt0.txt" \
-  ", ⚠ NO HOOK: a release tag would go out without a receipt (gate.sh hook project)"
+  ", ⚠ NO HOOK: a release tag would go out unchecked (gate.sh hook project)"
 echo fail >state.txt
 "$SH" "$GA" run >"$T/gate-dirty.txt" 2>&1
 check "gate run: not run on uncommitted changes (exit 2)" \
@@ -929,7 +942,7 @@ check "gate run: the receipt is in the git directory, not in the tree" \
 check "gate check: the receipt (exit 0)" eval '[ $? = 0 ] && has "$T/gate-check1.txt" "RECEIPT: $short passed the gate of project on "'
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt1.txt" 2>&1
 check "ground truth, gate: a default branch gated since it last changed" \
-  eval 'has "$T/gate-gt1.txt" "  project (sh bin/gate): origin/main at ${head:0:7}, receipt of " && lacks "$T/gate-gt1.txt" "NO RECEIPT"'
+  eval 'has "$T/gate-gt1.txt" "  project (gate: sh bin/gate): origin/main at ${head:0:7}, receipt of " && lacks "$T/gate-gt1.txt" "NO RECEIPT"'
 # A worktree of the repo: its commit is gated there, and the receipt is shared with the main checkout.
 git_q worktree add ../p-feat -b feat
 (cd ../p-feat && git_q commit --allow-empty -m feat && "$SH" "$T/gate/p/$GA" run) >"$T/gate-wt.txt" 2>&1
@@ -968,7 +981,7 @@ git push origin v1.0.0 >"$T/gate-push1.txt" 2>&1
 check "gate hook: a release tag on a commit with a receipt goes" \
   eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.0)" ]'
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt2.txt" 2>&1
-gate_section() { sed -n '/^== gate/,/^$/p' "$1"; } # <ground truth output>
+gate_section() { sed -n '/^== checks/,/^$/p' "$1"; } # <ground truth output>
 check "ground truth, gate: no flag once gated and hooked" eval '[ -z "$(gate_section "$T/gate-gt2.txt" | grep "⚠")" ]'
 cp .claude/ground-truth.conf "$T/gate-conf.bak"
 git_q commit --allow-empty -m "not gated" && git tag v1.0.1
@@ -978,18 +991,18 @@ check "gate hook: without the rule receipt (Steady), a release tag goes" \
   eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.1)" ]'
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt3.txt" 2>&1
 check "ground truth, gate: the preset Steady, and no hook needed" \
-  eval 'has "$T/gate-gt3.txt" "== gate (rules kept: regression merge = Steady)" && lacks "$T/gate-gt3.txt" "NO HOOK"'
+  eval 'has "$T/gate-gt3.txt" "== checks (rules kept: regression merge = Steady)" && lacks "$T/gate-gt3.txt" "NO HOOK"'
 git_q push origin main
 echo 'GATE_RULES=""' >>.claude/ground-truth.conf
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt4.txt" 2>&1
 check "ground truth, gate: the preset Prototype, a missing receipt is no flag" \
-  eval 'has "$T/gate-gt4.txt" "== gate (rules kept: none = Prototype)" && has "$T/gate-gt4.txt" ", no receipt" &&
+  eval 'has "$T/gate-gt4.txt" "== checks (rules kept: none = Prototype)" && has "$T/gate-gt4.txt" ", no receipt" &&
   [ -z "$(gate_section "$T/gate-gt4.txt" | grep "⚠")" ]'
 printf '%s\n' 'GATE_RULES="merge recipt"' 'GATES=()' >>.claude/ground-truth.conf
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt5.txt" 2>&1
 check "ground truth, gate: an unknown rule, and rules with no gate" \
-  eval 'has "$T/gate-gt5.txt" "== gate (rules kept: merge recipt, no preset)" && has "$T/gate-gt5.txt" "  ⚠ unknown rule(s) in GATE_RULES: recipt" &&
-  has "$T/gate-gt5.txt" "  ⚠ no gate set (GATES in .claude/ground-truth.conf): the rules kept need one"'
+  eval 'has "$T/gate-gt5.txt" "== checks (rules kept: merge recipt, no preset)" && has "$T/gate-gt5.txt" "  ⚠ unknown rule(s) in GATE_RULES: recipt" &&
+  has "$T/gate-gt5.txt" "  ⚠ nothing checks the code: the rules kept need a gate or GitHub CI (/checks)"'
 cp "$T/gate-conf.bak" .claude/ground-truth.conf
 # Another pre-push hook is kept: the script says what to add to it.
 mv .git/hooks/pre-push "$T/gate-ours" && printf '%s\n' '#!/bin/sh' 'exit 0' >.git/hooks/pre-push
@@ -998,8 +1011,8 @@ check "gate hook: never over another hook (exit 1), says what to add" \
   eval '[ $? = 1 ] && has "$T/gate-hook3.txt" "NOT INSTALLED: " && [ "$(sed -n 2p .git/hooks/pre-push)" = "exit 0" ]'
 "$SH" "$GA" check nowhere HEAD >/dev/null 2>&1
 check "gate: a repo with no gate is UNKNOWN (exit 2)" [ $? = 2 ]
-check "/handoff names the gate check of each bug fix under the rule regression" \
-  has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**The gate rule "regression"**, when the ground truth'"'"'s gate section lists it'
+check "/handoff names the check of each bug fix under the rule regression" \
+  has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**The rule "regression"**, when the ground truth'"'"'s checks section lists it'
 # A gate whose exit code is not its verdict (GATE_PASS): a script that exits 0 once it has run, also with a stage
 # skipped, says it passed in a line it prints, in colour. It passes only when it exits 0 and that line is there.
 mkdir "$T/gate-line" && cd "$T/gate-line" || exit 1
@@ -1023,7 +1036,89 @@ check "gate run, GATE_PASS: exit 0 and the line, in colour, is a pass" \
   eval '[ $? = 0 ] && [ -f ".git/gate-receipts/$(git rev-parse HEAD)" ]'
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-line-gt.txt" 2>&1
 check "ground truth, gate: names the line the gate passes on" \
-  has "$T/gate-line-gt.txt" "  project (sh bin/ci, passes on a line matching: ^Local CI green\.): "
+  has "$T/gate-line-gt.txt" "  project (gate: sh bin/ci, passes on a line matching: ^Local CI green\.): "
+# GitHub CI as the check (GITHUB_CI): GitHub's rollup of every check on a commit, read with gh, holds the rules as a
+# gate does: a release tag needs it green, and so does a default branch with "merge"; a tag is refused while GitHub
+# cannot be read. A repo checked by both needs both; with nothing to check, no rule holds.
+mkdir "$T/gate-ci" "$T/fakebin3" && cd "$T/gate-ci" || exit 1
+git_q init --bare remote.git && git -C remote.git symbolic-ref HEAD refs/heads/main
+git_q clone remote.git p && cd p || exit 1
+git symbolic-ref HEAD refs/heads/main
+"$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1
+printf '%s\n' 'REPOS=("project|.|origin||demo/project")' 'GITHUB_CI=("project")' 'GATE_RULES="receipt regression merge"' \
+  >>.claude/ground-truth.conf
+git add -A && git_q commit -m first && git_q push origin main && git remote set-head origin main
+head=$(git rev-parse HEAD) short=$(git rev-parse --short HEAD)
+# The fake gh: `gh api graphql` answers the rollup that $T/gh-ci holds (SUCCESS, FAILURE, none: no check ran, down:
+# GitHub cannot be read), and keeps the call; any other call finds nothing.
+{ echo '#!/usr/bin/env bash'
+  echo "state=\$(cat '$T/gh-ci')"
+  cat <<'EOF'
+[ "$1 $2" = "api graphql" ] || exit 0
+printf '%s\n' "$*" >>"$(dirname "$0")/calls"
+[ "$state" = down ] && { echo "error connecting to api.github.com" >&2; exit 1; }
+echo "$state"
+EOF
+} >"$T/fakebin3/gh" && chmod +x "$T/fakebin3/gh"
+ci_is() { echo "$1" >"$T/gh-ci"; } # <state>: what GitHub answers from now on
+GP="$T/fakebin3:$PATH"
+ci_is SUCCESS
+PATH=$GP "$SH" "$GA" ci >"$T/ci1.txt" 2>&1
+check "gate ci: green (exit 0), on the GitHub repo of REPOS" eval '[ $? = 0 ] && has "$T/ci1.txt" "CI green: $short on demo/project"'
+check "gate ci: asks GitHub about that commit of that repo" grep -qF -- "-f owner=demo -f name=project -f oid=$head " "$T/fakebin3/calls"
+PATH=$GP "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/ci-gt1.txt" 2>&1
+check "ground truth, CI: the default branch's last commit, green; the hook missing" has "$T/ci-gt1.txt" \
+  "  project (CI: demo/project): origin/main at ${head:0:7}, CI green, ⚠ NO HOOK: a release tag would go out unchecked (gate.sh hook project)"
+"$SH" "$GA" hook >/dev/null 2>&1
+check "gate hook: installed in a repo that GitHub CI alone checks" eval '[ $? = 0 ] && [ -x .git/hooks/pre-push ]'
+ci_is FAILURE
+PATH=$GP "$SH" "$GA" ci >"$T/ci2.txt" 2>&1
+check "gate ci: red (exit 1)" eval '[ $? = 1 ] && has "$T/ci2.txt" "CI red: $short on demo/project"'
+PATH=$GP "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/ci-gt2.txt" 2>&1
+check "ground truth, CI: the rule merge flags a default branch whose CI is red" has "$T/ci-gt2.txt" \
+  "  project (CI: demo/project): origin/main at ${head:0:7}, ⚠ CI red: the default branch is not green"
+git tag v1.0.0
+PATH=$GP git push origin v1.0.0 >"$T/ci-push1.txt" 2>&1
+check "gate hook, CI: a release tag whose commit's CI is red is refused" \
+  eval '[ $? != 0 ] && has "$T/ci-push1.txt" "REFUSED: v1.0.0 is on $short, whose CI on demo/project is not green: CI red" &&
+    [ -z "$(git ls-remote --tags origin v1.0.0)" ]'
+ci_is down
+PATH=$GP git push origin v1.0.0 >"$T/ci-push2.txt" 2>&1
+check "gate hook, CI: a release tag is refused while GitHub cannot be read, with the reason" \
+  eval '[ $? != 0 ] && has "$T/ci-push2.txt" "could not be read (gh api failed: error connecting to api.github.com)"'
+PATH=$GP "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/ci-gt3.txt" 2>&1
+check "ground truth, CI: GitHub that cannot be read is UNKNOWN (exit 2)" eval '[ $? = 2 ] &&
+  has "$T/ci-gt3.txt" "UNKNOWN: project: its CI not read: the CI of $short on demo/project could not be read: gh api failed"'
+ci_is none
+PATH=$GP "$SH" "$GA" ci >"$T/ci3.txt" 2>&1
+check "gate ci: no check ran on the commit (exit 1)" eval '[ $? = 1 ] && has "$T/ci3.txt" "no CI: $short on demo/project"'
+ci_is SUCCESS
+PATH=$GP git push origin v1.0.0 >"$T/ci-push3.txt" 2>&1
+check "gate hook, CI: a release tag whose commit's CI is green goes" \
+  eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.0)" ]'
+echo 'GATES=("project|true")' >>.claude/ground-truth.conf && git_q commit -am both && git tag v1.0.1
+PATH=$GP git push origin v1.0.1 >"$T/ci-push4.txt" 2>&1
+check "gate hook, both: CI green and no receipt is refused" \
+  eval '[ $? != 0 ] && has "$T/ci-push4.txt" "REFUSED: v1.0.1 is on $(git rev-parse --short HEAD), which has not passed the gate here"'
+"$SH" "$GA" run >/dev/null 2>&1
+PATH=$GP git push origin v1.0.1 >"$T/ci-push5.txt" 2>&1
+check "gate hook, both: a receipt and CI green, the tag goes" eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.1)" ]'
+git_q push origin main
+PATH=$GP "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/ci-gt4.txt" 2>&1
+check "ground truth, both: the gate and CI of a repo on one line" has "$T/ci-gt4.txt" \
+  "  project (gate: true; CI: demo/project): origin/main at $(git rev-parse --short=7 HEAD), receipt of "
+printf '%s\n' 'GATES=()' 'GITHUB_CI=()' 'GATE_RULES=""' >>.claude/ground-truth.conf && git_q commit -am "nothing yet"
+git tag v1.0.2
+PATH=$GP git push origin v1.0.2 >/dev/null 2>&1
+check "gate hook, nothing yet: no rule holds, the tag goes" eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.2)" ]'
+PATH=$GP "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/ci-gt5.txt" 2>&1
+check "ground truth, nothing yet: said, with no flag" eval 'has "$T/ci-gt5.txt" "  nothing checks the code before a merge yet (/checks)" &&
+  [ -z "$(gate_section "$T/ci-gt5.txt" | grep "⚠")" ]'
+printf '%s\n' 'REPOS=("other|elsewhere|origin||")' 'GATE_RULES="receipt"' >>.claude/ground-truth.conf &&
+  git_q commit -am "not a repo of REPOS" && git tag v1.0.3
+PATH=$GP git push origin v1.0.3 >"$T/ci-push6.txt" 2>&1
+check "gate hook: a repo REPOS does not name is refused a release tag, with the reason" \
+  eval '[ $? != 0 ] && has "$T/ci-push6.txt" "REFUSED: this repo is not in REPOS of "'
 cd "$T" || exit 1
 
 echo

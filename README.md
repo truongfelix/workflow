@@ -7,7 +7,7 @@ end of the day and reads the next morning. It works until the notes are wrong: a
 reached the remote, a job "still running" that died at 1 a.m., a to-do that shipped last week. The next session
 believes them and builds on them.
 
-This template keeps a project going across sessions, machines and weeks with four skills and a script:
+This template keeps a project going across sessions, machines and weeks with five skills and a script:
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
   worktree against its remote (or the branch it tracks on another one), open PRs and their CI, the items other
@@ -20,10 +20,12 @@ This template keeps a project going across sessions, machines and weeks with fou
   rulings with you: keep, shorten, move to its doc, or delete (git keeps it).
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history, and for
   each claimed item where its work is (on which machine, pushed or not, in an open PR with its CI, or merged) and
-  whether it passed the project's own gate on this machine. A hook rebuilds it after each change, and an open tab
+  whether it passed the project's own check on this machine. A hook rebuilds it after each change, and an open tab
   updates itself. Where no browser can show it (a cloud session, SSH), it prints the open items instead.
 - **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
   release, …), and changes it: a preset, or the steps you pick from a list.
+- **`/checks`** shows how the code is checked before a merge (its own check, such as its tests; GitHub CI; both; or
+  nothing yet) and the rules kept, such as "a release needs a pass on its exact commit", and changes them.
 
 The handoff is a claim; the script is the fact. Both skills run the same script, so the session that writes the
 note and the session that reads it look at the same picture.
@@ -81,11 +83,11 @@ Then open Claude Code in your project and ask:
 > Set up the workflow: follow "Adopt in a new project" in /path/to/workflow/README.md
 
 Claude first asks for your project's git remote, then what it may do without asking you (commit, push, open a PR,
-merge, …: a preset, then any change), then fills in the blanks (what the project is, its repos, its rules), runs
-the ground truth until it comes back clean, and runs `/handoff` once to write the first handoff. You change any of
-those answers whenever you want, in words ("from now on, push the docs without asking") or with `/autonomy`. From
-then on: `/session-start` when you sit down, `/handoff` before you stop, `/board` whenever you want to see the work
-at a glance.
+merge, …: a preset, then any change), then fills in the blanks (what the project is, its repos, how its code is
+checked, its rules), runs the ground truth until it comes back clean, and runs `/handoff` once to write the first
+handoff. You change any of those answers whenever you want, in words ("from now on, push the docs without asking")
+or with `/autonomy` and `/checks`. From then on: `/session-start` when you sit down, `/handoff` before you stop,
+`/board` whenever you want to see the work at a glance.
 
 ## What you get
 
@@ -104,8 +106,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, each repo's gate (the command that says the code is ready, such as its tests) and the gate rules you keep |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate and keeps a receipt of each commit that passed it; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is), `/handoff` and `/board` |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
@@ -154,32 +156,20 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    prints the ones it skipped with a diff command, and lists the FILL markers.
 4. **Fill**, in this order. The owner has not read these files: all the setup says or writes for the owner (its
    questions, its summary at the end, the items it adds) is in plain words, with no file, table, setting or preset
-   name, and a question says what each choice does. The gate is "the check that says the code is ready" (its tests),
-   never a bare "gate". Free text (what the project is, its rules) is asked in the chat, as an open question: never an
-   option that only says "I'll type it", which returns no text when picked. A question that fails, or a free-text one
-   left unanswered, is asked again in the chat: never write an answer the owner did not give (a folder's name is not
-   what the project is). A question where the owner can pick several has an option "None of these": with nothing
-   picked, it returns no answer at all, which reads as a skip.
+   name, and a question says what each choice does. Free text (what the project is, its rules) is asked in the chat,
+   as an open question: never an option that only says "I'll type it", which returns no text when picked. A question
+   that fails, or a free-text one left unanswered, is asked again in the chat: never write an answer the owner did
+   not give (a folder's name is not what the project is). A question where the owner can pick several has an option
+   "None of these": with nothing picked, it returns no answer at all, which reads as a skip.
    - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Follow the `/autonomy` skill
      (`.claude/skills/autonomy/SKILL.md`): the owner picks a preset, with each step listed in plain words, then keeps
      it or picks the steps to switch. Its script sets the rows and deletes the FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
-   - The gate, in `.claude/ground-truth.conf`: `GATES`, each repo's gate command (the one whose exit code says
-     "ready": a test script, `make check`, what CI runs). Look for it in the repo, then ask the owner about it in a
-     question of its own: "Is `<command>` the check that says the code is ready?" A local CI script the project
-     already has (one that runs its checks, maybe keeping its own record of passes) is that command: from then on it
-     runs through `gate.sh run`, never beside it, so one run gives both records, and the workflow never reads the
-     script's own. A script that exits 0 once it has run, green or not (stages skipped, a partial run), says it passed
-     in a line it prints: ask "How do I know it passed: its exit code, or a line it prints?", and set that line in
-     `GATE_PASS`. A project with no such check yet (a new one) has no gate: say so and skip the rest of this bullet;
-     this step runs again when the project has one. With a gate, ask which rules to keep, as one question where the
-     owner picks any or "None of these", each rule a plain sentence: "A release needs this check to have passed on its
-     exact commit" (`receipt`), "Each bug fix comes with a check that fails without the fix" (`regression`), "After a
-     merge, the check runs again on the main branch" (`merge`). Name no preset: Production, Steady and Prototype are
-     what the ground truth calls the result, not options to explain. Set `GATE_RULES`; with `receipt`, run
-     `bash .claude/skills/session-start/gate.sh hook <repo>` for each repo with a gate.
+   - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
+     project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
+     their lines in `.claude/ground-truth.conf` and installs the hook that holds the release rule.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
@@ -203,7 +193,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    task), `/handoff` before you stop or switch machines (it records where things stand, so the next session picks
    up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the
    handoffs as one page), `/autonomy` whenever you want Claude to ask you more or less often (it shows each step
-   and what Claude does there, and changes the ones you pick).
+   and what Claude does there, and changes the ones you pick), `/checks` when the way the code is checked changes (a
+   first test command, GitHub CI added, a rule kept or dropped).
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
@@ -226,6 +217,10 @@ what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs
 `/handoff` gained a trim pass of `questions.md` (step 3), set by `QUESTIONS_TRIM_LINES` in `ground-truth.conf` (150
 lines when the line is missing): merge the skill by hand, and add the line to set another size.
 
+The gate became one way among others to check the code before a merge, beside GitHub CI (`/checks`): the ground
+truth's section `== gate` is `== checks`, and `ground-truth.conf` gained `GITHUB_CI`, the repos whose GitHub CI
+counts (none when the line is missing). Merge the comments above `GATES` from the template, then run `/checks`.
+
 ## Improve the workflow
 
 When a project's session improves a generic piece (a skill step, a ground-truth check, a principle learned the hard
@@ -242,12 +237,13 @@ template/                     copied into a project's root by bin/adopt.sh
   notes/item-format.md        the shape of a tracker item and its id
   notes/handoff-format.md     the shape of a handoff
   dot-claude/                 installed as .claude/
-    ground-truth.conf         what the ground truth looks at: the project's repos, gates and gate rules
+    ground-truth.conf         what the ground truth looks at: the project's repos, and how their code is checked
     settings.json             the hook that rebuilds the board after each change
     skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,gate.sh,board.sh}
     skills/handoff/SKILL.md
     skills/board/SKILL.md
     skills/autonomy/{SKILL.md,autonomy.sh}
+    skills/checks/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it

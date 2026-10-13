@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# gate.sh — run a repo's gate, and keep a receipt of each commit that passed it.
+# gate.sh — run a repo's gate, keep a receipt of each commit that passed it, and read a commit's CI on GitHub.
 #
 # A receipt says that a commit, with nothing uncommitted, passed the gate on this machine. It is a file in the
 # clone's git directory (gate-receipts/<commit>), shared by its worktrees, never tracked and never pushed: another
@@ -8,9 +8,11 @@
 # working files into the tree. A failed run leaves a record beside the receipts (gate-failures/<commit>), which the
 # board shows; a later pass on that commit removes it, and a failure never removes a receipt.
 #
-# The gate rules a project keeps (GATE_RULES in .claude/ground-truth.conf, chosen at setup) decide what reads the
-# receipts: with "receipt", the pre-push hook refuses a release tag (v*) whose commit has none; with "merge", the
-# ground truth reports a default branch whose last commit has none. Each repo's gate command: GATES, there too.
+# How the code is checked before a merge (.claude/ground-truth.conf, set by /checks): by a gate (GATES, each repo's
+# command), by GitHub CI (GITHUB_CI), both, or nothing yet. The rules the project keeps (GATE_RULES) read the receipts
+# and the CI: with "receipt", the pre-push hook refuses a release tag (v*) whose commit has no receipt, or no green
+# CI, and refuses it too when GitHub cannot be read; with "merge", the ground truth reports a default branch whose
+# last commit has none.
 #
 # The gate passes when its command exits 0. A command whose exit code is not its verdict (a script that exits 0
 # once it has run, green or not, with stages skipped) names the line it prints when it passed: GATE_PASS, an
@@ -21,27 +23,34 @@
 #
 # Usage: bash .claude/skills/session-start/gate.sh run [<repo>]
 #        bash .claude/skills/session-start/gate.sh check [<repo>] [<rev>]
+#        bash .claude/skills/session-start/gate.sh ci [<repo>] [<rev>]
 #        bash .claude/skills/session-start/gate.sh hook [<repo>]
 #   run       run the gate of <repo> (a name in GATES) on the commit checked out, and write its receipt if it
 #             passes: in the current directory when it is a worktree of that repo, else in the repo's folder (REPOS)
 #   check     is there a receipt for <rev> (default: the commit checked out, as for run)?
-#   hook      install the pre-push hook that holds the rule "receipt" in that repo; never over another hook
-#   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): refuses a v* tag whose
-#             commit has no receipt, while GATE_RULES keeps "receipt"
-#   <repo> can be left out when the current directory is in a repo of GATES, or when GATES has one entry.
+#   ci        the CI of <rev> (default as for check) on GitHub, for a repo of GITHUB_CI: one line, its verdict first
+#             (CI green, CI red, CI running, no CI, not on GitHub), on the GitHub repo of REPOS, else of its remote
+#   hook      install the pre-push hook that holds the rule "receipt" in a repo of GATES or GITHUB_CI; never over
+#             another hook
+#   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): while GATE_RULES keeps
+#             "receipt", refuses a v* tag whose commit has no receipt (a repo of GATES) or no green CI (GITHUB_CI)
+#   <repo> can be left out when the current directory is in a repo the command takes, or when it takes only one.
 # Exit: run 0 = passed, receipt written; 1 = the gate failed, or the checkout changed while it ran: no receipt.
-#   check 0 = a receipt; 1 = none. hook 0 = installed, or already there; 1 = another hook is there (add the lines
-#   printed). pre-push 0 = the push goes; 1 = refused. Any: 2 = a usage error, or nothing could be read (UNKNOWN).
+#   check 0 = a receipt; 1 = none. ci 0 = CI green; 1 = any other verdict. hook 0 = installed, or already there;
+#   1 = another hook is there (add the lines printed). pre-push 0 = the push goes; 1 = refused. Any: 2 = a usage
+#   error, or nothing could be read (UNKNOWN).
 
 set -uo pipefail
 
-usage() { echo "usage: $0 run [<repo>] | check [<repo>] [<rev>] | hook [<repo>]" >&2; exit 2; }
+usage() { echo "usage: $0 run [<repo>] | check [<repo>] [<rev>] | ci [<repo>] [<rev>] | hook [<repo>]" >&2; exit 2; }
 fail() { echo "UNKNOWN: $*"; exit 2; }
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SELF="$DIR/gate.sh"
 ROOT=$(cd "$DIR/../../.." && pwd)
 REPOS=("$(basename "$ROOT")|.|origin||")
 GATES=()
+GATE_PASS=()
+GITHUB_CI=()
 GATE_RULES=""
 # shellcheck source=/dev/null
 [ -f "$ROOT/.claude/ground-truth.conf" ] && . "$ROOT/.claude/ground-truth.conf"
@@ -53,77 +62,165 @@ common_dir() { # <dir>: the git directory that the worktrees of its repo share, 
   case $d in /* | [A-Za-z]:*) ;; *) d="$top/$d" ;; esac
   (cd "$d" && pwd -P)
 }
+in_list() { # <name> <name>...: 0 when the first is one of the others
+  local n=$1 x
+  shift
+  for x in "$@"; do [ "$x" = "$n" ] && return 0; done
+  return 1
+}
 
 [ $# -ge 1 ] || usage
 cmd=$1
 shift
 
-# The hook runs inside the repo being pushed, so it needs no GATES entry: only the rule, and the receipts there.
+# Each repo of REPOS: its name, folder, and GitHub repo (as set there, else from its remote's URL).
+R_NAME=() R_DIR=() R_GH=()
+for r in ${REPOS[@]+"${REPOS[@]}"}; do
+  IFS='|' read -r n d rem _ gh <<<"$r"
+  case $d in /*) ;; *) d="$ROOT/$d" ;; esac
+  if [ -z "$gh" ]; then
+    gh=$(git -C "$d" remote get-url "${rem:-origin}" 2>/dev/null |
+      sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
+    gh=${gh%.git}
+  fi
+  R_NAME+=("$n") R_DIR+=("$d") R_GH+=("$gh")
+done
+repo_of() { # <name>: sets ri, its index in REPOS; 1 when REPOS has none of that name
+  local i
+  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$1" ] && { ri=$i; return 0; }; done
+  return 1
+}
+# The repos of GATES (with their command) and of GITHUB_CI, each one of REPOS.
+G_NAME=() G_CMD=() C_NAME=()
+for spec in ${GATES[@]+"${GATES[@]}"}; do
+  repo_of "${spec%%|*}" || fail "GATES names ${spec%%|*}, which is not a repo of REPOS in .claude/ground-truth.conf"
+  G_NAME+=("${spec%%|*}") G_CMD+=("${spec#*|}")
+done
+for n in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do
+  repo_of "$n" || fail "GITHUB_CI names $n, which is not a repo of REPOS in .claude/ground-truth.conf"
+  C_NAME+=("$n")
+done
+
+ci_of() { # <GitHub owner/repo> <commit>: its CI on GitHub in a few words (GitHub's rollup of every check on it);
+  # exit 2, with the reason, when GitHub cannot be read
+  local out
+  command -v gh >/dev/null 2>&1 || { echo "gh is not installed"; return 2; }
+  out=$(gh api graphql -f owner="${1%%/*}" -f name="${1#*/}" -f oid="$2" -f query='query($owner: String!,
+    $name: String!, $oid: GitObjectID!) { repository(owner: $owner, name: $name) { object(oid: $oid) {
+    ... on Commit { statusCheckRollup { state } } } } }' \
+    --jq '.data.repository.object | if . == null then "absent" else (.statusCheckRollup.state // "none") end' 2>&1) ||
+    { echo "gh api failed: $(printf '%s\n' "$out" | head -n 1)"; return 2; }
+  case $out in
+    SUCCESS) echo "CI green" ;;
+    FAILURE | ERROR) echo "CI red" ;;
+    PENDING | EXPECTED) echo "CI running" ;;
+    none) echo "no CI" ;;
+    absent) echo "not on GitHub" ;;
+    *) echo "an answer gate.sh does not know: $out"; return 2 ;;
+  esac
+}
+
+# The hook runs inside the repo being pushed: the rule, then what checks this repo (its entry in REPOS).
 if [ "$cmd" = pre-push ]; then
   case " $GATE_RULES " in *" receipt "*) ;; *) cat >/dev/null; exit 0 ;; esac
-  receipts="$(common_dir .)/gate-receipts" ||
-    { echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1; }
+  here=$(common_dir .) || { cat >/dev/null; echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1; }
+  name="" gh=""
+  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
+    [ "$(common_dir "${R_DIR[$i]}")" = "$here" ] && name=${R_NAME[$i]} gh=${R_GH[$i]}
+  done
+  if [ -z "$name" ]; then
+    cat >/dev/null
+    echo "REFUSED: this repo is not in REPOS of $ROOT/.claude/ground-truth.conf, so what checks a release tag is" \
+      "unknown (the gate rule \"receipt\")" >&2
+    exit 1
+  fi
+  gated=0 cid=0
+  in_list "$name" ${G_NAME[@]+"${G_NAME[@]}"} && gated=1
+  in_list "$name" ${C_NAME[@]+"${C_NAME[@]}"} && cid=1
   refused=0
   while read -r _ lsha rref _; do
     case $rref in refs/tags/v*) ;; *) continue ;; esac
     case $lsha in *[!0]*) ;; *) continue ;; esac # all zeros: the tag is deleted
     c=$(git rev-parse -q --verify "$lsha^{commit}") || continue
-    [ -f "$receipts/$c" ] && continue
-    echo "REFUSED: ${rref#refs/tags/} is on $(git rev-parse --short "$c"), which has not passed the gate here" \
-      "(the gate rule \"receipt\"): check it out, run gate.sh run, then push again" >&2
-    refused=1
+    tag=${rref#refs/tags/} short=$(git rev-parse --short "$c")
+    if [ "$gated" = 1 ] && [ ! -f "$here/gate-receipts/$c" ]; then
+      echo "REFUSED: $tag is on $short, which has not passed the gate here (the gate rule \"receipt\"): check it" \
+        "out, run gate.sh run, then push again" >&2
+      refused=1
+    fi
+    [ "$cid" = 1 ] || continue
+    if [ -z "$gh" ]; then
+      echo "REFUSED: $tag: $name has no GitHub repo (REPOS, or its remote's URL), so its CI cannot be read" >&2
+      refused=1
+    elif ! v=$(ci_of "$gh" "$c"); then
+      echo "REFUSED: $tag: the CI of $short on $gh could not be read ($v), and a tag is never pushed unchecked" >&2
+      refused=1
+    elif [ "$v" != "CI green" ]; then
+      echo "REFUSED: $tag is on $short, whose CI on $gh is not green: $v (the gate rule \"receipt\"): push its" \
+        "branch, wait for its CI to pass, then push the tag" >&2
+      refused=1
+    fi
   done
   exit $refused
 fi
-
-# The repos that have a gate: their name, folder and command.
-G_NAME=() G_DIR=() G_CMD=() names=""
-for spec in ${GATES[@]+"${GATES[@]}"}; do
-  name=${spec%%|*} gcmd=${spec#*|} gdir=""
-  for r in ${REPOS[@]+"${REPOS[@]}"}; do
-    IFS='|' read -r n d _ <<<"$r"
-    [ "$n" = "$name" ] || continue
-    case $d in /*) gdir=$d ;; *) gdir="$ROOT/$d" ;; esac
-  done
-  [ -n "$gdir" ] || fail "GATES names $name, which is not a repo of REPOS in .claude/ground-truth.conf"
-  G_NAME+=("$name") G_DIR+=("$gdir") G_CMD+=("$gcmd") names="$names${names:+, }$name"
-done
-[ -n "$names" ] || fail "no gate set: GATES in .claude/ground-truth.conf names none"
 
 pass_of() { # <name>: the pattern its output must match to pass (GATE_PASS), or nothing
   local p
   for p in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${p%%|*}" = "$1" ] && echo "${p#*|}"; done
 }
 here=$(common_dir "$PWD" || true)
-is_gated() { # <name>: true when GATES has it
-  local k
-  for k in "${!G_NAME[@]}"; do [ "${G_NAME[$k]}" = "$1" ] && return 0; done
-  return 1
-}
-pick() { # [<name>]: sets g, the index of the repo in GATES (named, else the one holding the current directory)
-  local k
+pick() { # <gate|ci|any> [<name>]: sets g, the index in REPOS of a repo of GATES, of GITHUB_CI, or of either: the one
+  # named, else the one holding the current directory, else the only one
+  local kind=$1 n list=GATES none="no gate set"
+  local -a names
+  shift
+  case $kind in
+    ci) list=GITHUB_CI none="no GitHub CI set" ;;
+    any) list="GATES or GITHUB_CI" none="nothing checks the code" ;;
+  esac
+  names=()
+  [ "$kind" = ci ] || names=(${G_NAME[@]+"${G_NAME[@]}"})
+  if [ "$kind" != gate ]; then
+    for n in ${C_NAME[@]+"${C_NAME[@]}"}; do in_list "$n" ${names[@]+"${names[@]}"} || names+=("$n"); done
+  fi
+  [ ${#names[@]} -gt 0 ] || fail "$none: $list in .claude/ground-truth.conf names no repo (/checks sets it)"
   g=""
-  for k in "${!G_NAME[@]}"; do
+  for n in "${names[@]}"; do
+    repo_of "$n"
     if [ -n "${1:-}" ]; then
-      [ "${G_NAME[$k]}" = "$1" ] && g=$k
-    elif [ -n "$here" ] && [ "$(common_dir "${G_DIR[$k]}")" = "$here" ]; then
-      g=$k
+      [ "$n" = "$1" ] && g=$ri
+    elif [ -n "$here" ] && [ "$(common_dir "${R_DIR[$ri]}")" = "$here" ]; then
+      g=$ri
     fi
   done
   [ -n "$g" ] && return
-  [ -n "${1:-}" ] && fail "no gate for $1: GATES in .claude/ground-truth.conf names $names"
-  [ ${#G_NAME[@]} = 1 ] && { g=0; return; }
-  fail "which repo? name one of GATES: $names"
+  [ -n "${1:-}" ] && fail "$1 is not in $list in .claude/ground-truth.conf: ${names[*]}"
+  [ ${#names[@]} = 1 ] && { repo_of "${names[0]}"; g=$ri; return; }
+  fail "which repo? name one of $list: ${names[*]}"
 }
 worktree() { # the worktree of repo g to work in: the current one when it belongs to that repo, else its folder
-  if [ -n "$here" ] && [ "$(common_dir "${G_DIR[$g]}")" = "$here" ]; then git rev-parse --show-toplevel
-  else echo "${G_DIR[$g]}"; fi
+  if [ -n "$here" ] && [ "$(common_dir "${R_DIR[$g]}")" = "$here" ]; then git rev-parse --show-toplevel
+  else echo "${R_DIR[$g]}"; fi
+}
+rev_args() { # <gate|ci> [<repo>] [<rev>]: picks the repo, and sets rev (empty: the commit checked out)
+  local kind=$1 named=1
+  shift
+  rev=""
+  if [ $# = 1 ]; then
+    if [ "$kind" = gate ]; then in_list "$1" ${G_NAME[@]+"${G_NAME[@]}"} || named=0
+    else in_list "$1" ${C_NAME[@]+"${C_NAME[@]}"} || named=0; fi
+  fi
+  if [ $# = 2 ]; then pick "$kind" "$1"; rev=$2
+  elif [ $# = 1 ] && [ "$named" = 1 ]; then pick "$kind" "$1"
+  else pick "$kind" ""; rev=${1:-}; fi
 }
 
 case $cmd in
   run)
     [ $# -le 1 ] || usage
-    pick "${1:-}"
+    pick gate "${1:-}"
+    name=${R_NAME[$g]} gcmd=""
+    for k in "${!G_NAME[@]}"; do [ "${G_NAME[$k]}" = "$name" ] && gcmd=${G_CMD[$k]}; done
     wt=$(worktree)
     cd "$wt" 2>/dev/null && git rev-parse --git-dir >/dev/null 2>&1 || fail "$wt is not a git checkout"
     sha=$(git rev-parse -q --verify HEAD) || fail "$wt has no commit yet: a receipt is for a commit"
@@ -134,14 +231,14 @@ case $cmd in
       printf '%s\n' "$changed" | sed 's/^/  /'
       exit 2
     fi
-    pat=$(pass_of "${G_NAME[$g]}")
-    echo "GATE: ${G_NAME[$g]} at $short, in $wt: ${G_CMD[$g]}${pat:+ (passes on a line matching: $pat)}"
+    pat=$(pass_of "$name")
+    echo "GATE: $name at $short, in $wt: $gcmd${pat:+ (passes on a line matching: $pat)}"
     if [ -z "$pat" ]; then
-      "${BASH:-bash}" -c "${G_CMD[$g]}"
+      "${BASH:-bash}" -c "$gcmd"
       rc=$?
     else # shown as it runs, and kept to look for the line
       log=$(mktemp "${TMPDIR:-/tmp}/gate.XXXXXX") || fail "mktemp failed: the gate's output cannot be kept"
-      "${BASH:-bash}" -c "${G_CMD[$g]}" 2>&1 | tee "$log"
+      "${BASH:-bash}" -c "$gcmd" 2>&1 | tee "$log"
       rc=${PIPESTATUS[0]}
     fi
     why=""
@@ -156,11 +253,11 @@ case $cmd in
     if [ -n "$why" ]; then
       failures="$(common_dir .)/gate-failures"
       { mkdir -p "$failures" &&
-        printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nwhy: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" \
-          "${G_CMD[$g]}" "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$why" "$(hostname 2>/dev/null || uname -n)" \
+        printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nwhy: %s\nhost: %s\n' "$sha" "$name" \
+          "$gcmd" "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$why" "$(hostname 2>/dev/null || uname -n)" \
           >"$failures/$sha"; } 2>/dev/null ||
         echo "  (the failure could not be recorded in $failures)"
-      echo "FAILED: the gate of ${G_NAME[$g]} $why: no receipt for $short"
+      echo "FAILED: the gate of $name $why: no receipt for $short"
       exit 1
     fi
     if [ "$(git rev-parse -q --verify HEAD)" != "$sha" ] ||
@@ -171,32 +268,41 @@ case $cmd in
     fi
     receipts="$(common_dir .)/gate-receipts"
     mkdir -p "$receipts" || fail "cannot write $receipts"
-    printf 'commit: %s\nrepo: %s\ngate: %s\npassed: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" "${G_CMD[$g]}" \
+    printf 'commit: %s\nrepo: %s\ngate: %s\npassed: %s\nhost: %s\n' "$sha" "$name" "$gcmd" \
       "$(date '+%Y-%m-%d %H:%M %Z')" "$(hostname 2>/dev/null || uname -n)" >"$receipts/$sha" ||
       fail "cannot write $receipts/$sha"
     rm -f "$(common_dir .)/gate-failures/$sha"
-    echo "RECEIPT: $short passed the gate of ${G_NAME[$g]}"
+    echo "RECEIPT: $short passed the gate of $name"
     ;;
   check)
     [ $# -le 2 ] || usage
-    rev=""
-    if [ $# = 2 ]; then pick "$1"; rev=$2
-    elif [ $# = 1 ] && is_gated "$1"; then pick "$1"
-    else pick ""; rev=${1:-}; fi
+    rev_args gate "$@"
     wt=$(worktree)
     sha=$(git -C "$wt" rev-parse -q --verify "${rev:-HEAD}^{commit}") || fail "no commit ${rev:-HEAD} in $wt"
     short=$(git -C "$wt" rev-parse --short "$sha")
     receipt="$(common_dir "$wt")/gate-receipts/$sha"
     if [ -f "$receipt" ]; then
-      echo "RECEIPT: $short passed the gate of ${G_NAME[$g]} on $(sed -n 's/^passed: //p' "$receipt")"
+      echo "RECEIPT: $short passed the gate of ${R_NAME[$g]} on $(sed -n 's/^passed: //p' "$receipt")"
       exit 0
     fi
-    echo "NO RECEIPT: $short has not passed the gate of ${G_NAME[$g]} here (gate.sh run ${G_NAME[$g]}, on it)"
+    echo "NO RECEIPT: $short has not passed the gate of ${R_NAME[$g]} here (gate.sh run ${R_NAME[$g]}, on it)"
     exit 1
+    ;;
+  ci)
+    [ $# -le 2 ] || usage
+    rev_args ci "$@"
+    wt=$(worktree)
+    sha=$(git -C "$wt" rev-parse -q --verify "${rev:-HEAD}^{commit}") || fail "no commit ${rev:-HEAD} in $wt"
+    short=$(git -C "$wt" rev-parse --short "$sha")
+    gh=${R_GH[$g]}
+    [ -n "$gh" ] || fail "${R_NAME[$g]} has no GitHub repo: set it in REPOS, or give it a GitHub remote"
+    v=$(ci_of "$gh" "$sha") || fail "the CI of $short on $gh could not be read: $v"
+    echo "$v: $short on $gh"
+    [ "$v" = "CI green" ]
     ;;
   hook)
     [ $# -le 1 ] || usage
-    pick "${1:-}"
+    pick any "${1:-}"
     wt=$(worktree)
     hooks=$(cd "$wt" 2>/dev/null && p=$(git rev-parse --git-path hooks) && mkdir -p "$p" && cd "$p" && pwd -P) ||
       fail "cannot reach the hooks of $wt"
@@ -212,7 +318,7 @@ case $cmd in
     fi
     printf '%s\n' '#!/bin/sh' \
       '# The gate rule "receipt" (.claude/ground-truth.conf): a release tag (v*) is pushed only when its commit' \
-      '# passed the gate here. Installed by gate.sh hook; delete this file to remove it.' \
+      '# passed its checks. Installed by gate.sh hook; delete this file to remove it.' \
       "exec bash \"$SELF\" pre-push \"\$@\"" >"$hooks/pre-push" && chmod +x "$hooks/pre-push" ||
       fail "cannot write $hooks/pre-push"
     echo "HOOK: installed in $hooks/pre-push"

@@ -30,6 +30,8 @@ UNITS=1
 CLAIM_STALE_DAYS=3
 QUESTIONS_TRIM_LINES=150
 GATES=()
+GATE_PASS=()
+GITHUB_CI=()
 GATE_RULES=""
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
@@ -79,7 +81,7 @@ echo "GROUND TRUTH — $(date '+%Y-%m-%d %H:%M %Z')"
 
 root_listed=0
 DOCS_BASE="" # where the claims are shared: the default branch of the docs repo on its remote
-R_NAME=() R_DIR=() R_REMOTE=() R_BASE=() R_DEF=()
+R_NAME=() R_DIR=() R_REMOTE=() R_BASE=() R_DEF=() R_GH=()
 for spec in "${REPOS[@]}"; do
   IFS='|' read -r name dir remote def gh_repo <<<"$spec"
   case $dir in /*) repo=$dir ;; *) repo="$ROOT/$dir" ;; esac
@@ -118,7 +120,7 @@ for spec in "${REPOS[@]}"; do
       gh_repo=${gh_repo%.git}
     fi
   fi
-  R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def")
+  R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def") R_GH+=("$gh_repo")
   [ "$repo" -ef "$ROOT" ] && DOCS_BASE=$base
 
   # A branch can track a branch on another remote: a private remote beside a public origin, a fork's own branches.
@@ -386,10 +388,11 @@ if [ -n "$CT" ]; then
   done <"$CT/all"
 fi
 
-# The gate (gate.sh): each repo's gate command (GATES) and the gate rules the project keeps (GATE_RULES), with the
-# preset they make. A receipt is a commit that passed the gate on this machine, with nothing uncommitted. The rule
-# "merge": the last commit of each default branch on its remote needs one, since a merge makes a commit that no gate
-# has seen. The rule "receipt": each repo with a gate needs the pre-push hook that refuses a release tag without one.
+# How the code is checked before a merge (/checks): each repo of GATES (its command, GATE_PASS) and of GITHUB_CI, and
+# the rules the project keeps (GATE_RULES), with the preset they make. A receipt is a commit that passed the gate on
+# this machine, with nothing uncommitted; the CI is read on GitHub (gate.sh ci). The rule "merge": the last commit of
+# each default branch on its remote needs a receipt and green CI, since a merge makes a commit that no check has
+# seen. The rule "receipt": each of those repos needs the pre-push hook that refuses a release tag without them.
 echo
 r=0 g=0 m=0 bad=""
 for w in $GATE_RULES; do
@@ -399,44 +402,69 @@ case "$r$g$m" in
   111) preset=" = Production" ;; 011) preset=" = Steady" ;; 000) preset=" = Prototype" ;; *) preset=", no preset" ;;
 esac
 rules=$(echo $GATE_RULES)
-echo "== gate (rules kept: ${rules:-none}$preset)"
+echo "== checks (rules kept: ${rules:-none}$preset)"
 [ -n "$bad" ] && echo "  ⚠ unknown rule(s) in GATE_RULES:$bad (the rules: receipt, regression, merge)"
-if [ -z "${GATES[*]+set}" ]; then
-  if [ -n "$rules" ]; then echo "  ⚠ no gate set (GATES in .claude/ground-truth.conf): the rules kept need one"
-  else echo "  no gate set (GATES in .claude/ground-truth.conf)"; fi
+named=" "
+for n in ${GATES[@]+"${GATES[@]%%|*}"} ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do
+  case $named in *" $n "*) ;; *) named="$named$n " ;; esac
+done
+if [ "$named" = " " ]; then
+  if [ -n "$rules" ]; then echo "  ⚠ nothing checks the code: the rules kept need a gate or GitHub CI (/checks)"
+  else echo "  nothing checks the code before a merge yet (/checks)"; fi
 fi
-for spec in ${GATES[@]+"${GATES[@]}"}; do
-  gname=${spec%%|*} gcmd=${spec#*|} gi=""
-  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$gname" ] && gi=$i; done
-  if [ -z "$gi" ]; then
-    echo "  ⚠ $gname ($gcmd): not a repo of REPOS, or not a git checkout (above)"
-    continue
-  fi
-  gdir=${R_DIR[$gi]} gbase=${R_BASE[$gi]}
+for w in $named; do
+  found=0
+  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$w" ] && found=1; done
+  [ "$found" = 1 ] || echo "  ⚠ $w (GATES or GITHUB_CI): not a repo of REPOS, or not a git checkout (above)"
+done
+for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
+  gname=${R_NAME[$i]} gcmd="" gpat="" ci=0
+  for spec in ${GATES[@]+"${GATES[@]}"}; do [ "${spec%%|*}" = "$gname" ] && gcmd=${spec#*|}; done
+  for gp in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${gp%%|*}" = "$gname" ] && gpat=${gp#*|}; done
+  for n in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do [ "$n" = "$gname" ] && ci=1; done
+  [ -n "$gcmd" ] || [ "$ci" = 1 ] || continue
+  what=""
+  [ -n "$gcmd" ] && what="gate: $gcmd${gpat:+, passes on a line matching: $gpat}"
+  [ "$ci" = 1 ] && what="$what${what:+; }CI: ${R_GH[$i]:-no GitHub repo}"
+  gdir=${R_DIR[$i]} gbase=${R_BASE[$i]}
   gtop=$(git -C "$gdir" rev-parse --show-toplevel 2>/dev/null)
-  gcommon=$(git -C "$gtop" rev-parse --git-common-dir 2>/dev/null)
-  case $gcommon in /* | [A-Za-z]:*) ;; *) gcommon="$gtop/$gcommon" ;; esac
   if [ -z "$gbase" ]; then
     st="no default branch on its remote"
   else
     gsha=$(git -C "$gdir" rev-parse "$gbase")
-    if [ -f "$gcommon/gate-receipts/$gsha" ]; then
-      st="$gbase at ${gsha:0:7}, receipt of $(sed -n 's/^passed: //p' "$gcommon/gate-receipts/$gsha")"
-    elif [ "$m" = 1 ]; then
-      st="$gbase at ${gsha:0:7}, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run $gname, on it)"
-    else
-      st="$gbase at ${gsha:0:7}, no receipt"
+    st="$gbase at ${gsha:0:7}"
+    if [ -n "$gcmd" ]; then
+      gcommon=$(git -C "$gtop" rev-parse --git-common-dir 2>/dev/null)
+      case $gcommon in /* | [A-Za-z]:*) ;; *) gcommon="$gtop/$gcommon" ;; esac
+      if [ -f "$gcommon/gate-receipts/$gsha" ]; then
+        st="$st, receipt of $(sed -n 's/^passed: //p' "$gcommon/gate-receipts/$gsha")"
+      elif [ "$m" = 1 ]; then
+        st="$st, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run $gname, on it)"
+      else
+        st="$st, no receipt"
+      fi
+    fi
+    if [ "$ci" = 1 ]; then
+      v=$(with_timeout 60 "${BASH:-bash}" "$HERE/gate.sh" ci "$gname" "$gsha" 2>&1)
+      if [ $? -gt 1 ]; then # 2: UNKNOWN, 124: timed out
+        v=${v#UNKNOWN: }
+        unknown "$gname: its CI not read: ${v:-gate.sh ci timed out}"
+        v="CI not read"
+      fi
+      v=${v%%: *}
+      case $v in
+        "CI green" | "CI running" | "CI not read") st="$st, $v" ;;
+        *) if [ "$m" = 1 ]; then st="$st, ⚠ $v: the default branch is not green"; else st="$st, $v"; fi ;;
+      esac
     fi
   fi
   if [ "$r" = 1 ]; then
     ghooks=$(cd "$gtop" 2>/dev/null && git rev-parse --git-path hooks 2>/dev/null)
     case $ghooks in /* | [A-Za-z]:*) ;; *) ghooks="$gtop/$ghooks" ;; esac
     grep -qF "gate.sh\" pre-push" "$ghooks/pre-push" 2>/dev/null ||
-      st="$st, ⚠ NO HOOK: a release tag would go out without a receipt (gate.sh hook $gname)"
+      st="$st, ⚠ NO HOOK: a release tag would go out unchecked (gate.sh hook $gname)"
   fi
-  gpat=""
-  for gp in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${gp%%|*}" = "$gname" ] && gpat=${gp#*|}; done
-  echo "  $gname ($gcmd${gpat:+, passes on a line matching: $gpat}): $st"
+  echo "  $gname ($what): $st"
 done
 
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than

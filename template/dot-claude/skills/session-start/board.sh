@@ -32,7 +32,8 @@
 # branch (open, with its CI, read with the PRs; merged: the item can be deleted), else the machine it was claimed on.
 # Gate: for each claimed item, the project's own check (gate.sh) on its branch, as run in this clone: passed or
 # failed on its last commit, not run on the last N commits (and the result before them), not run here, or no gate.
-# GitHub's CI and the gate are separate: a project may keep one, the other, or both.
+# Only what checks the project's code is shown (/checks): the Gate column when it has a gate (GATES), the CI of a PR
+# when GitHub CI checks its repo (GITHUB_CI).
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -118,11 +119,15 @@ if [ -n "$queue" ]; then
   exit 0
 fi
 
-repos=""
+# The config: each entry of REPOS, and the names of the repos a gate (GATES) or GitHub CI (GITHUB_CI) checks.
+: >"$T/conf" && : >"$T/gates" && : >"$T/cis"
 if [ -f .claude/ground-truth.conf ]; then
-  repos=$(REPOS=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
-    for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s ' "${r%%|*}"; done)
+  (REPOS=(); GATES=(); GITHUB_CI=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
+    for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done >"$T/conf"
+    for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "${g%%|*}"; done >"$T/gates"
+    for c in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do printf '%s\n' "$c"; done >"$T/cis")
 fi
+repos=$(cut -d '|' -f1 "$T/conf" | tr '\n' ' ')
 
 # Every version of each file in git, oldest first, then what is on disk when it differs from the last commit. A file
 # deleted from disk, or by a commit, gives an empty version: the items it held are closed there.
@@ -213,11 +218,7 @@ with_timeout() { # <seconds> <command...>: as in ground-truth.sh
   done
   wait "$pid"
 }
-: >"$T/conf" && : >"$T/repos"
-if [ -f .claude/ground-truth.conf ]; then
-  (REPOS=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
-    for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done) >"$T/conf"
-fi
+: >"$T/repos"
 self=$(git rev-parse --show-toplevel 2>/dev/null)
 self_name=""
 while IFS='|' read -r name path remote def gh_repo; do
@@ -298,10 +299,9 @@ MACHINE=${MACHINE//[[:space:]]/-}
 grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
 # The gate of each claimed item, as this clone ran it (gate.sh: a receipt per commit that passed, a record per commit
 # that failed, in the git directory its worktrees share): on its branch's last commit, else on the nearest older
-# one, else not run here; "no gate" for a repo GATES does not name. One "<id>\t<text>" line in $T/gate.
+# one, else not run here; "no gate" for a repo GATES does not name; nothing when the project has no gate. One
+# "<id>\t<text>" line in $T/gate.
 : >"$T/gate"
-{ [ -f .claude/ground-truth.conf ] && (GATES=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
-  for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "${g%%|*}"; done); } >"$T/gates"
 git_common() { # <dir>: the git directory its worktrees share, as a full path (as gate.sh finds it)
   local top d
   top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
@@ -345,7 +345,10 @@ while IFS="$tab" read -r id sec f; do
   pr_repo=${rname:-${nm%%, *}} asof=""
   st=$(awk -F '\t' -v r="$pr_repo" 'r != "" && index(", " $1 ", ", ", " r ", ") { print $3; exit }' "$T/prs-read")
   case $st in "ok: as read "*) asof=${st#ok: as read } ;; esac
-  if [ -n "$open" ]; then w="PR #$open open, ${ci:-CI not read}${asof:+, as read $asof}"
+  if [ -n "$open" ]; then
+    w="PR #$open open"
+    grep -qxF "$pr_repo" "$T/cis" && w="$w, ${ci:-CI not read}"
+    w="$w${asof:+, as read $asof}"
   elif [ -n "$merged" ]; then w="merged (PR #$merged): the item can be deleted"
   elif [ "$rmt" = 1 ]; then
     w="pushed"
@@ -361,7 +364,7 @@ while IFS="$tab" read -r id sec f; do
   [ "${ahead:-0}" -gt 1 ] && w="$w, $ahead commits not pushed"
   [ "${ahead:-0}" = 1 ] && w="$w, 1 commit not pushed"
   printf '%s\t%s: %s\n' "$id" "$b" "$w" >>"$T/where"
-  [ -n "$rname" ] || continue # no branch here: no gate to read
+  [ -n "$rname" ] && [ -s "$T/gates" ] || continue # no branch here, or no gate: no gate to read
   if ! grep -qxF "$rname" "$T/gates"; then printf '%s\tno gate\n' "$id" >>"$T/gate"; continue; fi
   gd=$(git_common "$rpath") || continue
   gt="not run here" k=0
@@ -518,8 +521,10 @@ END {
 
 # The commits, the PRs and whether each repo's PRs could be read, where the work of each claimed item is, and this
 # machine's name. A PR's text comes escaped by @tsv: quotes only.
+gated=false
+[ -s "$T/gates" ] && gated=true
 awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v gfile="$T/gate" \
-  -v machine="$MACHINE" '
+  -v gated="$gated" -v machine="$MACHINE" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
@@ -541,9 +546,9 @@ BEGIN {
     if (split(rec, F, "\t") < 14) continue
     printf "%s\n{\"repo\":%s,\"gh\":%s,\"number\":%d,\"title\":%s,\"state\":%s,\"branch\":%s,\"base\":%s,", sep, \
       je(F[1]), je(F[2]), F[3], je(F[4]), je(F[5]), je(F[6]), je(F[7])
-    printf "\"created\":%s,\"merged\":%s,\"closed\":%s,\"url\":%s,\"author\":%s,\"merge\":%s,\"ci\":%s,\"body\":%s}", \
+    printf "\"created\":%s,\"merged\":%s,\"closed\":%s,\"url\":%s,\"author\":%s,\"merge\":%s,\"body\":%s}", \
       je(substr(F[8], 1, 10)), je(substr(F[9], 1, 10)), je(substr(F[10], 1, 10)), je(F[11]), je(F[12]), je(F[13]), \
-      je(F[15]), je(F[14])
+      je(F[14])
     sep = ","
   }
   printf "],\n\"prsRead\":["; sep = ""
@@ -561,7 +566,7 @@ BEGIN {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
-  printf "},\n\"machine\":%s}\n", js(machine)
+  printf "},\n\"gated\":%s,\n\"machine\":%s}\n", gated, js(machine)
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
 # The build's stamp: the data without the time it was built, so a rebuild that changes nothing leaves an open page
@@ -958,12 +963,12 @@ function render() {
     return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
-    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th><th title=\"the project's own check, as run on this machine\">Gate</th>" : "") +
+    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th>" + (D.gated ? "<th title=\"the project's own check, as run on this machine\">Gate</th>" : "") : "") +
     "<th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) + gateCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) + (D.gated ? gateCell(it) : "") : "") + "<td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";

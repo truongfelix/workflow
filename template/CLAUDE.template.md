@@ -73,6 +73,6 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 <!-- FILL: install, run, test, and the gate (the script whose exit code says "ready"). If a check must hold, it
 belongs in that gate, not in this file: a document is not a gate. -->
 
-The gate runs with `bash .claude/skills/session-start/gate.sh run <repo>`, which keeps a receipt of each commit that
-passed it. Each repo's gate command and the gate rules this project keeps (a preset: Production, Steady or
-Prototype) are in `.claude/ground-truth.conf` (`GATES`, `GATE_RULES`).
+How the code is checked before a merge (the project's own gate, GitHub CI, both or nothing yet), each repo's gate
+command and the rules kept: `/checks` shows and changes them. A gate runs with
+`bash .claude/skills/session-start/gate.sh run <repo>`, which keeps a receipt of each commit that passed it.
