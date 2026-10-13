@@ -25,7 +25,7 @@ set -uo pipefail
 usage() { echo "usage: $0 <name> [<path>] [--remote <r>] [--branch <b>] [--github <o/r>]" >&2; exit 2; }
 fail() { echo "UNKNOWN: $*; nothing attached"; exit 2; }
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
-ROOT=$(cd "$DIR/../../.." && pwd)
+ROOT=$(cd "$DIR/../../.." && pwd -P)
 CONF="$ROOT/.claude/ground-truth.conf"
 MARK="<!-- workflow pointer: written by attach.sh -->"
 
@@ -66,7 +66,7 @@ else
 fi
 case $dir in /*) repo=$dir ;; *) repo="$ROOT/$dir" ;; esac
 [ -d "$repo" ] && git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || fail "$repo is not a git checkout"
-repo=$(cd "$repo" && pwd)
+repo=$(cd "$repo" && pwd -P)
 if [ "$repo" -ef "$ROOT" ]; then
   [ "$new" = 0 ] && { echo "$name is the project root, the docs repo: it needs no pointer"; exit 0; }
   fail "$repo is the project root: the docs repo is listed already, or list it by hand"

@@ -1204,6 +1204,7 @@ check "gate hook: a repo REPOS does not name is refused a release tag, with the 
 # One repo, then more (attach.sh): the docs belong to the first repo (the root, "." in REPOS) and a second repo is
 # attached later by one command: its line in REPOS, a pointer in the repo so a session opened there finds the docs.
 cd "$T" || exit 1
+TP=$(cd "$T" && pwd -P) # the folder as the scripts spell it (macOS: /private/var, not /var)
 git_q init --bare remote-one.git && git_q init --bare remote-svc.git
 git_q clone "$T/remote-one.git" one && cd one || exit 1
 git symbolic-ref HEAD refs/heads/main
@@ -1224,8 +1225,8 @@ check "attach: says the line it added" has "$T/at1.txt" "added to REPOS: svc|svc
 atrepos() { (REPOS=(); . ./.claude/ground-truth.conf; printf '%s\n' "${REPOS[@]}" | tr '\n' ' '); }
 check "attach: REPOS has both repos, the first one untouched" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| " ]
 check "attach: the pointer is in the repo and names the docs; inside the root it imports nothing (it loads twice)" \
-  eval 'has svc/CLAUDE.md "workflow pointer: written by attach.sh" && has svc/CLAUDE.md "\`$T/one\`" &&
-    lacks svc/CLAUDE.md "@$T/one/CLAUDE.md"'
+  eval 'has svc/CLAUDE.md "workflow pointer: written by attach.sh" && has svc/CLAUDE.md "\`$TP/one\`" &&
+    lacks svc/CLAUDE.md "@$TP/one/CLAUDE.md"'
 check "attach: the pointer is kept out of the repo's commits" eval '[ -z "$(git -C svc status --porcelain)" ]'
 check "attach: the repo inside the root is kept out of the docs repo" eval '! git status --porcelain | grep -q svc'
 "$SH" "$AT" svc svc >"$T/at2.txt" 2>&1
@@ -1237,7 +1238,7 @@ check "attach: ground truth exits 0 and lists the second repo, with its pointer"
 rm svc/CLAUDE.md
 "$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt2.txt" 2>&1
 check "attach: ground truth flags a repo with no pointer, with the command" \
-  has "$T/at-gt2.txt" "⚠ NO POINTER: a session opened in $T/one/svc does not find the docs (bash .claude/skills/session-start/attach.sh svc)"
+  has "$T/at-gt2.txt" "⚠ NO POINTER: a session opened in $TP/one/svc does not find the docs (bash .claude/skills/session-start/attach.sh svc)"
 "$SH" "$AT" svc >"$T/at3.txt" 2>&1
 check "attach: a name already in REPOS gets its pointer back, no path needed" \
   eval '[ $? = 0 ] && [ -f svc/CLAUDE.md ] && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 1 ]'
@@ -1251,7 +1252,7 @@ git_q clone "$T/remote-svc.git" "$T/far" && printf '%s\n' '# the repo own rules'
 "$SH" "$AT" far "$T/far" >"$T/at4.txt" 2>&1
 check "attach: a repo outside the root, with a CLAUDE.md of its own: that file untouched, the pointer beside it" \
   eval '[ $? = 0 ] && [ "$(cat "$T/far/CLAUDE.md")" = "# the repo own rules" ] &&
-    has "$T/far/CLAUDE.local.md" "workflow pointer: written by attach.sh" && has "$T/far/CLAUDE.local.md" "@$T/one/CLAUDE.md" && ! git -C "$T/far" status --porcelain | grep -q CLAUDE.local'
+    has "$T/far/CLAUDE.local.md" "workflow pointer: written by attach.sh" && has "$T/far/CLAUDE.local.md" "@$TP/one/CLAUDE.md" && ! git -C "$T/far" status --porcelain | grep -q CLAUDE.local'
 "$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt3.txt" 2>&1
 check "attach: ground truth accepts a CLAUDE.local.md pointer" lacks "$T/at-gt3.txt" "NO POINTER"
 "$SH" "$AT" nope "$T/nowhere" >"$T/at5.txt" 2>&1
