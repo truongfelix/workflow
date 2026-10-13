@@ -9,8 +9,8 @@
 # Generic (from the workflow repo): WHAT to look at lives in .claude/ground-truth.conf. Upgrade this file from the
 # workflow repo; never put project data in it.
 #
-# Read-only, apart from `git fetch` of the remotes named in the config (so "pushed" means pushed). --no-fetch skips
-# it. Exit 0 = every probe answered. Exit 2 = at least one probe failed: its section says UNKNOWN, never "clean".
+# Read-only, apart from `git fetch` of the remotes named in the config and of the remotes that local branches track
+# (so "pushed" means pushed). --no-fetch skips it. Exit 0 = every probe answered. Exit 2 = at least one probe failed: its section says UNKNOWN, never "clean".
 # A claim that is stale, gone or not pushed is a finding, not a failure.
 #
 # Usage: bash .claude/skills/session-start/ground-truth.sh [--no-fetch]
@@ -119,6 +119,21 @@ for spec in "${REPOS[@]}"; do
   R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def")
   [ "$repo" -ef "$ROOT" ] && DOCS_BASE=$base
 
+  # A branch can track a branch on another remote: a private remote beside a public origin, a fork's own branches.
+  # Fetch those remotes too, and compare such a branch with the branch it tracks.
+  if [ "$FETCH" = 1 ]; then
+    for r in $(git -C "$repo" for-each-ref --format='%(upstream:remotename)' refs/heads | sort -u); do
+      [ "$r" = "$remote" ] || [ "$r" = . ] && continue
+      with_timeout 60 git -C "$repo" fetch --quiet --prune "$r" 2>/dev/null ||
+        unknown "git fetch $r failed: the branches that track $r compare against a STALE $r"
+    done
+  fi
+  upstream() { # <branch>: the remote branch it tracks ("dev/v2"), when there is one; empty otherwise
+    local u
+    u=$(git -C "$repo" for-each-ref --format='%(upstream)' "refs/heads/$1")
+    case $u in refs/remotes/*) git -C "$repo" rev-parse -q --verify "$u" >/dev/null && echo "${u#refs/remotes/}" ;; esac
+  }
+
   # A commit our remote does not hold: is it at least on another remote, or only on this disk?
   elsewhere() {
     local other
@@ -128,7 +143,7 @@ for spec in "${REPOS[@]}"; do
 
   # Every worktree: where it stands against our remote, and whether it holds uncommitted work.
   wt_line() {
-    local path=$1 head=$2 branch=$3 rel state dirty label
+    local path=$1 head=$2 branch=$3 rel state dirty label up
     rel=$(relpath "$path")
     if [ ! -d "$path" ]; then
       echo "    $rel: MISSING (git worktree prune?)"
@@ -145,6 +160,9 @@ for spec in "${REPOS[@]}"; do
     elif [ -n "$branch" ] && git -C "$repo" rev-parse -q --verify "refs/remotes/$remote/$branch" >/dev/null; then
       state=$(git -C "$repo" rev-list --left-right --count "$branch...$remote/$branch" |
         awk '{ if ($1==0 && $2==0) print "= pushed"; else printf "ahead %d / behind %d of the pushed branch\n", $1, $2 }')
+    elif [ -n "$branch" ] && up=$(upstream "$branch") && [ -n "$up" ]; then
+      state=$(git -C "$repo" rev-list --left-right --count "$branch...$up" |
+        awk -v u="$up" '{ if ($1==0 && $2==0) print "= " u; else printf "ahead %d / behind %d of %s\n", $1, $2, u }')
     elif git -C "$repo" merge-base --is-ancestor "$head" "$base"; then
       state="merged into $base"
     elif [ -z "$branch" ] && [ -n "$(git -C "$repo" for-each-ref --count=1 --contains "$head" "refs/remotes/$remote")" ]; then
@@ -177,6 +195,10 @@ for spec in "${REPOS[@]}"; do
       ahead=$(git -C "$repo" rev-list --count "$remote/$b..$b")
       [ "$ahead" = 0 ] && continue
       s="$ahead commit(s) not pushed"
+    elif up=$(upstream "$b") && [ -n "$up" ]; then
+      ahead=$(git -C "$repo" rev-list --count "$up..$b")
+      [ "$ahead" = 0 ] && continue
+      s="$ahead commit(s) not pushed to $up"
     elif [ -n "$base" ] && git -C "$repo" merge-base --is-ancestor "$b" "$base"; then
       continue
     else

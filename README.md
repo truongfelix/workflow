@@ -10,10 +10,10 @@ believes them and builds on them.
 This template keeps a project going across sessions, machines and weeks with three skills and a script:
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
-  worktree against its remote, open PRs and their CI, the items other sessions claimed and their branches,
-  background jobs. Then it reads the last handoff, reports where the two disagree, proposes the day's task, and
-  waits for you (or starts it, if you told it to). When an agent starts working on the task, it claims
-  it: `claim.sh` pushes a `claimed:` line that names the agent, so two sessions in parallel never take the same item.
+  worktree against its remote (or the branch it tracks on another one), open PRs and their CI, the items other
+  sessions claimed and their branches, background jobs. Then it reads the last handoff, reports where the two
+  disagree, proposes the day's task, and waits for you (or starts it, if you told it to). When an agent starts working
+  on the task, it claims it: `claim.sh` pushes a `claimed:` line that names the agent, so two sessions in parallel never take the same item.
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
   decisions, lessons learned), and commits. When `questions.md` grows past a size you set, it goes through the
   rulings with you: keep, shorten, move to its doc, or delete (git keeps it).

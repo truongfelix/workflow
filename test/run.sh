@@ -63,7 +63,7 @@ done
 
 # The workspace: ws/ is the docs repo, ws/api a code repo, ws/api-feat its worktree.
 cd "$T" || exit 1
-git_q init --bare remote-api.git && git_q init --bare remote-docs.git
+git_q init --bare remote-api.git && git_q init --bare remote-docs.git && git_q init --bare remote-dev.git
 mkdir ws && cd ws || exit 1
 git_q init && git symbolic-ref HEAD refs/heads/main && git remote add origin "$T/remote-docs.git"
 git_q clone "$T/remote-api.git" api && cd api || exit 1
@@ -75,6 +75,16 @@ git_q worktree add ../api-feat -b feat
   git_q commit --allow-empty -m "feat, not pushed" && echo x >dirty.txt)
 git_q checkout -b spike && git_q commit --allow-empty -m spike && git_q checkout main
 git branch keepme
+# A second remote, as a private one beside a public origin: v2 (a worktree) and priv (none) track branches there;
+# another clone pushes to dev/v2, which only a fetch of dev shows.
+git remote add dev "$T/remote-dev.git"
+git_q worktree add ../api-v2 -b v2
+(cd ../api-v2 && git_q commit --allow-empty -m v2 && git_q push -u dev v2 && git_q commit --allow-empty -m "v2, not pushed")
+git_q branch priv && git_q push -u dev priv
+git update-ref refs/heads/priv "$(git commit-tree 'priv^{tree}' -p priv -m "priv, not pushed")"
+git_q branch pushed-to-dev && git_q push -u dev pushed-to-dev
+git_q clone --branch v2 "$T/remote-dev.git" "$T/dev-other" &&
+  (cd "$T/dev-other" && git_q commit --allow-empty -m "v2, from another machine" && git_q push origin v2)
 cd "$T/ws" || exit 1
 
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt.txt" 2>&1
@@ -134,6 +144,11 @@ check "ground truth: worktree path, unpushed commit, uncommitted file" \
   has "$T/gt.txt" "    api-feat [feat]: ahead 1 / behind 0 of the pushed branch, 1 uncommitted"
 check "ground truth: a branch on no remote" has "$T/gt.txt" "    spike: LOCAL ONLY: on no remote at all"
 check "ground truth: a branch kept local by rule" has "$T/gt.txt" "    keepme: local only BY RULE, never push"
+check "ground truth: a worktree whose branch tracks another remote, against that branch, fetched" \
+  has "$T/gt.txt" "    api-v2 [v2]: ahead 1 / behind 1 of dev/v2"
+check "ground truth: a branch that tracks another remote, its commits not pushed there" \
+  has "$T/gt.txt" "    priv: 1 commit(s) not pushed to dev/priv"
+check "ground truth: a branch pushed to the remote it tracks is not listed" lacks "$T/gt.txt" "pushed-to-dev"
 check "ground truth: the docs repo, in sync" has "$T/gt.txt" "ahead 0 / behind 0 of origin/main, 0 uncommitted"
 check "ground truth: complete" has "$T/gt.txt" "GROUND TRUTH: complete"
 check "ground truth: no claim" eval 'grep -A1 "^== claims (BACKLOG.md, shared on origin/main)$" "$T/gt.txt" | grep -qx "  none"'
