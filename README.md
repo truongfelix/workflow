@@ -135,7 +135,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    the next session, on any machine, starts from what it holds). Ask the owner for the remote this folder is pushed
    to (a private one if the folder will hold other repos: step 2). A folder that is not a git repo yet gets
    `git init`; with no remote yet, offer to create one (`gh repo create <name> --private`) and wait for the
-   owner's yes. Set it as `origin`.
+   owner's yes. Set it as `origin`. On GitHub, before the first commit: GitHub refuses a push whose commits show an
+   email address the owner keeps private. Unless `git config user.email` is already a `users.noreply.github.com`
+   address, ask: "GitHub can refuse pushes that show your email address. Use your GitHub no-reply address as this
+   project's commit email?" On a yes, set it for this repo alone (another clone needs the same line):
+   `git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"`
 2. **Choose the shape.** Ask the owner which one, as a multiple-choice question that recommends neither: both are
    valid, and the owner knows what the folder holds or will hold.
    - *One repo:* the project root is the repo; the trackers are committed with the code.
