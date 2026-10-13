@@ -185,8 +185,9 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo,
      in the same shape. Then `bash .claude/skills/session-start/items.sh check` until it exits 0.
    - The skills' FILL item (project-specific checks, what is expected and not news).
-   - `.claude/settings.json`, when the project had one (`adopt.sh` lists it as skipped): add the template's
-     `PostToolUse` hook to it, which rebuilds the board after each change.
+   - `.claude/settings.json`, only when `adopt.sh` listed it as skipped (the project had its own): add the
+     template's `PostToolUse` hook to it, which rebuilds the board after each change. When `adopt.sh` installed it,
+     the hook is there and there is nothing to do or report.
 5. **Workspace shape only:** at the root, the repo of step 1, check `git status --ignored` and the staged list
    before the first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Push to the
    remote of step 1 as the table allows.
