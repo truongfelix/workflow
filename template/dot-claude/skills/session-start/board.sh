@@ -65,11 +65,12 @@ done
 [ -n "$out" ] && case $out in /*) ;; *) out="$(pwd)/$out" ;; esac
 
 # The hook: Claude Code passes the tool call as JSON. A path or a command that names a tracker, a lesson or a handoff,
-# a git command that moves a branch, or a claim (claim.sh), rebuilds the page; a push or a `gh pr` also reads the
-# PRs again. A false match costs one rebuild. Quiet, and never an error: a hook that fails would show in every session.
+# a git command that moves a branch, a `gh pr` call (a PR opened, merged or closed), or a claim (claim.sh), rebuilds
+# the page; a push or a `gh pr` also reads the PRs again. A false match costs one rebuild. Quiet, and never an error:
+# a hook that fails would show in every session.
 if [ "$hook" = 1 ]; then
   input=$(cat)
-  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|claim\.sh|git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
+  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|claim\.sh|gh pr |git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
     exit 0
   want=offline
   printf '%s' "$input" | grep -Eq 'git [^|;&]{0,80}push|gh pr ' && want=online
@@ -320,18 +321,22 @@ while IFS="$tab" read -r id sec f; do
   done <"$T/repos"
   # The PRs of that branch, in the repo that has it (any repo when none does: a merged branch is often deleted).
   pr=$(awk -F '\t' -v b="$b" -v r="$rname" '$6 == b && (r == "" || index(", " $1 ", ", ", " r ", ")) {
-      if ($5 == "OPEN") { o = $3; ci = $15 } else if ($5 == "MERGED") mg = $3 }
-    END { print o "|" ci "|" mg }' "$T/prs") # not a tab: read merges empty fields split by one
-  IFS='|' read -r open ci merged <<<"$pr"
-  read_ok=1
-  [ -n "$rname" ] && ! awk -F '\t' -v r="$rname" 'index(", " $1 ", ", ", " r ", ") && $3 ~ /^ok/ { f = 1 } END { exit !f }' \
-    "$T/prs-read" && read_ok=0
-  if [ -n "$open" ]; then w="PR #$open open, ${ci:-CI not read}"
+      nm = $1; if ($5 == "OPEN") { o = $3; ci = $15 } else if ($5 == "MERGED") mg = $3 }
+    END { print o "|" ci "|" mg "|" nm }' "$T/prs") # not a tab: read merges empty fields split by one
+  IFS='|' read -r open ci merged nm <<<"$pr"
+  # When those PRs were read: now, earlier (an --offline build, such as the hook's, shows the PRs last read, which a
+  # PR opened or merged since does not change: say when), or never.
+  pr_repo=${rname:-${nm%%, *}} asof=""
+  st=$(awk -F '\t' -v r="$pr_repo" 'r != "" && index(", " $1 ", ", ", " r ", ") { print $3; exit }' "$T/prs-read")
+  case $st in "ok: as read "*) asof=${st#ok: as read } ;; esac
+  if [ -n "$open" ]; then w="PR #$open open, ${ci:-CI not read}${asof:+, as read $asof}"
   elif [ -n "$merged" ]; then w="merged (PR #$merged): the item can be deleted"
   elif [ "$rmt" = 1 ]; then
     w="pushed"
     if [ "$own" = 0 ]; then w="$w, no commit beyond $def yet"
-    elif [ "$b" != "$def" ]; then [ "$read_ok" = 1 ] && w="$w, no PR yet" || w="$w, PRs not read"; fi
+    elif [ "$b" != "$def" ]; then
+      case $st in "ok: as read "*) w="$w, no PR as read $asof" ;; ok*) w="$w, no PR yet" ;; *) w="$w, PRs not read" ;; esac
+    fi
   elif [ "$loc" = 1 ]; then
     w="only on $MACHINE, not pushed"
     [ "$own" = 0 ] && w="$w, no commit beyond $def yet"

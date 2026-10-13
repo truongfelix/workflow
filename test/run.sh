@@ -509,6 +509,14 @@ check "board, where: the CI of an open PR" has "$T/board5.html" '"number":42,"ti
 check "board, where: the CI is read with the PRs" has "$T/board5.html" '"ci":"CI green","body":"B-2."}'
 check "board, where: this machine, as claims name it" has "$T/board5.html" '"machine":"laptop"}'
 check "board --text, where: under the item" has "$T/board5.txt" "        where: spike: only on laptop, not pushed"
+# Offline (the hook's builds), the PRs are those last read: a PR opened or merged since is not in them, so what the
+# board says of a PR says when it was read, never "no PR yet".
+CLAIM_MACHINE=laptop PATH="$T/fakebin2:$PATH" "$SH" "$BD" --no-open --offline --out "$T/board5.html" "$T/board5" \
+  >/dev/null 2>&1
+check "board --offline, where: an open PR read earlier says when" \
+  has "$T/board5.html" '"B-2":"feat/two: PR #42 open, CI green, as read 20'
+check "board --offline, where: no PR when they were last read, not \"no PR yet\"" \
+  has "$T/board5.html" '"B-5":"feat/pushed: pushed, no PR as read 20'
 cd "$T/board2" || exit 1
 
 # Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
@@ -586,6 +594,9 @@ check "hook: a git commit rebuilds the page" has "$T/hook.html" '"id":"B-4",'
 printf '%s\n' '' '### 🔲 B-5 Fifth' 'Done when: done.' >>"$T/board/BACKLOG.md"
 hook '{"tool_name":"Bash","tool_input":{"command":"bash .claude/skills/session-start/claim.sh B-5 feat/five"}}'
 check "hook: a claim rebuilds the page" has "$T/hook.html" '"id":"B-5",'
+printf '%s\n' '' '### 🔲 B-6 Sixth' 'Done when: done.' >>"$T/board/BACKLOG.md"
+hook '{"tool_name":"Bash","tool_input":{"command":"gh pr create --title \"B-6 Sixth\" --body x"}}'
+check "hook: a gh pr call alone (a PR opened) rebuilds the page" has "$T/hook.html" '"id":"B-6",'
 for _ in 1 2 3 4; do hook '{"tool_name":"Write","tool_input":{"file_path":"/p/notes/lessons.md"}}' & done
 wait
 check "hook: calls at once leave no lock and no mark" [ ! -e "$T/hook.lock" -a ! -e "$T/hook.dirty" ]
