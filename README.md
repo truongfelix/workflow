@@ -154,7 +154,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    never a bare "gate". Free text (what the project is, its rules) is asked in the chat, as an open question: never an
    option that only says "I'll type it", which returns no text when picked. A question that fails, or a free-text one
    left unanswered, is asked again in the chat: never write an answer the owner did not give (a folder's name is not
-   what the project is).
+   what the project is). A question where the owner can pick several has an option "None of these": with nothing
+   picked, it returns no answer at all, which reads as a skip.
    - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset as a
      multiple-choice question, and list in it the steps the preset decides: start the day's task, commit the docs
      (the notes and trackers), push them, add an item to the backlog, claim one, commit code, push a work branch,
@@ -162,26 +163,27 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      stop a background job it started, release, comment or message anyone. Each option says which of them Claude
      asks about first and which it does, then tells: **Careful** asks first for every one; **Balanced** asks first
      to start the day's task, to open or merge a pull request, to release, and to comment or message; **Hands-off**
-     asks first only to release, and to comment or message. Then ask which steps to change, with one option per step
-     that the owner picks or not, each showing the preset's answer ("Commit code: does it, then tells you"); a
-     picked step takes the other answer. Each question says that picking none keeps its steps as they are: nothing
-     picked is that answer, not a skip. Four questions asked at once hold them all: the docs and the backlog
-     (commit the docs, push them, add an item, claim one), code (commit code, push a work branch, delete a branch
-     whose work has landed, stop a background job), sharing (open a pull request, merge one, release), and the rest
-     (start the day's task, comment or message). Set the table's rows, then delete its FILL comment.
+     asks first only to release, and to comment or message. Then ask whether to keep that preset as it is or to
+     change some steps, a question with these two options. Only on "change some steps", ask which, with one option
+     per step that the owner picks or not, each showing the preset's answer ("Commit code: does it, then tells
+     you"); a picked step takes the other answer. Five questions hold the steps, with at most three each next to
+     "None of these": the docs (commit them, push them), the backlog (add an item, claim one), code (commit code,
+     push a work branch, delete a branch whose work has landed), sharing (open a pull request, merge one, release),
+     and the rest (start the day's task, stop a background job, comment or message). Four are asked at once, then
+     the fifth. Set the table's rows, then delete its FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The gate, in `.claude/ground-truth.conf`: `GATES`, each repo's gate command (the one whose exit code says
      "ready": a test script, `make check`, what CI runs). Look for it in the repo, then ask the owner about it in a
-     question of its own: "Is `<command>` the check that says the code is ready?" A project with no such check yet
-     (a new one) has no gate: say so and skip the rest of this bullet; this step runs again when the project has
-     one. With a gate, ask which rules to keep, as one question where the owner picks any, each rule a plain
-     sentence: "A release needs this check to have passed on its exact commit" (`receipt`), "Each bug fix comes with
-     a check that fails without the fix" (`regression`), "After a merge, the check runs again on the main branch"
+     question of its own: "Is `<command>` the check that says the code is ready?" A project with no such check yet (a
+     new one) has no gate: say so and skip the rest of this bullet; this step runs again when the project has one.
+     With a gate, ask which rules to keep, as one question where the owner picks any or "None of these", each rule a
+     plain sentence: "A release needs this check to have passed on its exact commit" (`receipt`), "Each bug fix comes
+     with a check that fails without the fix" (`regression`), "After a merge, the check runs again on the main branch"
      (`merge`). Name no preset: Production, Steady and Prototype are what the ground truth calls the result, not
-     options to explain. Set `GATE_RULES`; with `receipt`, run `bash .claude/skills/session-start/gate.sh hook
-     <repo>` for each repo with a gate.
+     options to explain. Set `GATE_RULES`; with `receipt`, run `bash .claude/skills/session-start/gate.sh hook <repo>`
+     for each repo with a gate.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
