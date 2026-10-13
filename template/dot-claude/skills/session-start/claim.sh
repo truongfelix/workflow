@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
 # claim.sh — claim a BACKLOG item when an agent starts working on it: add its `claimed:` line, which names the
-# agent, its session and its branch, and push it, so other sessions see it (notes/item-format.md, Claims).
+# agent, its session, its branch and its machine, and push it, so other sessions see it (notes/item-format.md,
+# Claims).
 #
 # Two sessions must not work on the same item. The claim is a commit on the default branch of the repo that holds
 # BACKLOG.md, built on the tip of its remote and pushed there: the push is the lock. When another session pushed
@@ -21,6 +22,8 @@
 #                   it): the line is replaced only while the remote still has that claim
 #   The remote and the default branch: the entry of .claude/ground-truth.conf for the project root, else origin and
 #   its HEAD (main, master).
+#   The machine: where the branch's commits are until they are pushed. CLAIM_MACHINE when set, else "cloud" in a
+#   Claude Code cloud session (CLAUDE_CODE_REMOTE=true), else this machine's name (uname -n, up to its first dot).
 # Exit 0 = the claim is on the remote: the item is yours (or was already). Exit 1 = refused: another session
 # claimed it first (or holds it, for --from another one), or the item is not open on the remote (push a new item before claiming it). Exit 2 = nothing was
 # claimed: a usage error, no remote, a push that failed for another reason, an unreadable BACKLOG.md (UNKNOWN).
@@ -44,7 +47,11 @@ id=${args[0]} branch=${args[1]} who=${args[2]:-claude@$(basename "$ROOT")}
 [[ $branch =~ ^[^[:space:]]+$ ]] || { echo "a branch name has no space: $branch" >&2; usage; }
 [[ $who =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $who" >&2; usage; }
 [ -z "$from" ] || [[ $from =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $from" >&2; usage; }
-line="claimed: $who on $branch"
+machine=${CLAIM_MACHINE:-}
+[ -z "$machine" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && machine=cloud
+[ -z "$machine" ] && machine=$(uname -n 2>/dev/null) && machine=${machine%%.*}
+machine=${machine//[[:space:]]/-}
+line="claimed: $who on $branch at ${machine:-unknown}"
 
 fail() { echo "UNKNOWN: $*; nothing claimed"; exit 2; }
 cd "$ROOT" || fail "cannot reach the project root"
@@ -164,7 +171,7 @@ for attempt in 1 2 3 4 5; do
 
   if out=$(git push -q "$remote" "$commit:refs/heads/$def" 2>&1); then
     git update-ref "refs/remotes/$base" "$commit" "$tip" 2>/dev/null
-    echo "CLAIMED: $id $title, by $who on $branch${over:+, taken over from $over} ($base, $(git rev-parse --short "$commit"))"
+    echo "CLAIMED: $id $title, by ${line#claimed: }${over:+, taken over from $over} ($base, $(git rev-parse --short "$commit"))"
     sync_here "$commit"
     exit 0
   fi

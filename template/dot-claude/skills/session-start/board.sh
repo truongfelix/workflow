@@ -27,6 +27,9 @@
 # (the page itself needs no network); a PR names an item by its id (title, description, branch), an item names a PR
 # by `#<number>`. When gh cannot answer, the page says the PRs were not read, never that there are none. The PRs
 # read are kept next to the page (<page>-prs.tsv), and an --offline build shows them with the time they were read.
+# Where: for each claimed item, where its work is, computed at each build and never written in the item, where it
+# would drift: its branch in the item's repos (pushed, commits not pushed, only on this machine), the PR of that
+# branch (open, with its CI, read with the PRs; merged: the item can be deleted), else the machine it was claimed on.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -231,6 +234,13 @@ fi
 
 # The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does. Those
 # read are kept for the next --offline build, with the time they were read.
+CI_JQ='def verdict: [ .statusCheckRollup[]?
+    | if (.status // "COMPLETED") != "COMPLETED" then "PENDING" else (.conclusion // .state // "PENDING") end ]
+  | if length == 0 then "no CI"
+    elif any(.[]; IN("FAILURE","CANCELLED","TIMED_OUT","ERROR","ACTION_REQUIRED","STARTUP_FAILURE")) then "CI red"
+    elif any(.[]; IN("PENDING","EXPECTED","QUEUED","IN_PROGRESS","")) then "CI running"
+    else "CI green" end;
+  .[] | "\(.number)\t\(verdict)"'
 : >"$T/prs" && : >"$T/prs-read" && : >"$T/read-now"
 cut -f3 "$T/repos" | grep -v '^$' | awk '!seen[$0]++' >"$T/ghs"
 while IFS= read -r gh_repo; do
@@ -250,6 +260,12 @@ while IFS= read -r gh_repo; do
     >"$T/pr" 2>"$T/pr.err" </dev/null; then
     st="ok"
     [ "$(wc -l <"$T/pr" | tr -d ' ')" -ge 500 ] && st="ok: the 500 latest only"
+    # The CI of each open PR, in a word as in ground-truth.sh, as a last field: empty for a PR that is not open, or
+    # when gh could not tell.
+    with_timeout 30 gh pr list -R "$gh_repo" --state open --limit 100 --json number,statusCheckRollup --jq "$CI_JQ" \
+      >"$T/ci" 2>/dev/null </dev/null || : >"$T/ci"
+    awk -F '\t' -v cfile="$T/ci" 'BEGIN { while ((getline l < cfile) > 0) { split(l, c, "\t"); ci[c[1]] = c[2] } }
+      { print $0 "\t" ci[$1] }' "$T/pr" >"$T/pr2" && mv -f "$T/pr2" "$T/pr"
     awk -v r="$names" -v g="$gh_repo" '{ print r "\t" g "\t" $0 }' "$T/pr" >>"$T/prs"
     printf '%s\t%s\n' "$gh_repo" "$(date '+%Y-%m-%d %H:%M')" >>"$T/read-now"
   else
@@ -265,6 +281,66 @@ if [ -s "$T/read-now" ]; then # keep what was read now, and what an earlier buil
     >"$T/cache.read"
   mv -f "$T/cache" "$cache" && mv -f "$T/cache.read" "$cache.read"
 fi
+
+# Where the work of each claimed item is (notes/item-format.md, Claims): computed at each build, never written in the
+# item, where it would drift. Its branch in the first repo that has it, here or on the repo's remote; the PR of that
+# branch, open (with its CI) or merged; else the machine it was claimed on, where commits not pushed are. This
+# machine's name is the one claim.sh writes; "cloud" is never this one. One "<id>\t<text>" line per claimed item.
+MACHINE=${CLAIM_MACHINE:-}
+[ -z "$MACHINE" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && MACHINE=cloud
+[ -z "$MACHINE" ] && MACHINE=$(uname -n 2>/dev/null) && MACHINE=${MACHINE%%.*}
+MACHINE=${MACHINE//[[:space:]]/-}
+: >"$T/where"
+grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
+while IFS="$tab" read -r id sec f; do
+  c=${f#*claimed: } c=${c%%\\n*} # "<agent>@<session> on <branch>[ at <machine>]"
+  b=${c#* on } m=""
+  case $b in *" at "*) m=${b#* at } b=${b%% at *} ;; esac
+  # The repos to look in: the item's, as on the page (its `repos:` line, else its section's first word when that
+  # names a repo), else all of them.
+  cands=""
+  case $f in *"repos: "*) cands=${f#*repos: } cands=${cands%%\\n*} cands=${cands//→/ } cands=${cands//->/ } cands=${cands//,/ } ;; esac
+  [ -z "$cands" ] && cands=${sec%%[[:space:](:/]*} &&
+    ! awk -F '\t' -v n="$cands" '$1 == n { f = 1 } END { exit !f }' "$T/repos" && cands=""
+  loc=0 rmt=0 ahead=0 own=1 rname="" def=""
+  while IFS="$tab" read -r name path _; do
+    [ -z "$cands" ] || case " $cands " in *" $name "*) ;; *) continue ;; esac
+    rem=$(awk -F '|' -v n="$name" '$1 == n { print $3; exit }' "$T/conf") rem=${rem:-origin}
+    git -C "$path" rev-parse -q --verify "refs/heads/$b" >/dev/null 2>&1 && loc=1
+    git -C "$path" rev-parse -q --verify "refs/remotes/$rem/$b" >/dev/null 2>&1 && rmt=1
+    [ "$loc$rmt" = 00 ] && continue
+    rname=$name ref=refs/heads/$b
+    [ "$loc" = 1 ] || ref=refs/remotes/$rem/$b
+    def=$(awk -F '|' -v n="$name" '$1 == n { print $4; exit }' "$T/conf")
+    [ -n "$def" ] || { def=$(git -C "$path" symbolic-ref -q --short "refs/remotes/$rem/HEAD" 2>/dev/null); def=${def#"$rem"/}; }
+    [ "$loc$rmt" = 11 ] && ahead=$(git -C "$path" rev-list --count "refs/remotes/$rem/$b..refs/heads/$b" 2>/dev/null)
+    [ -n "$def" ] && [ "$b" != "$def" ] && git -C "$path" merge-base --is-ancestor "$ref" "refs/remotes/$rem/$def" 2>/dev/null &&
+      own=0
+    break
+  done <"$T/repos"
+  # The PRs of that branch, in the repo that has it (any repo when none does: a merged branch is often deleted).
+  pr=$(awk -F '\t' -v b="$b" -v r="$rname" '$6 == b && (r == "" || index(", " $1 ", ", ", " r ", ")) {
+      if ($5 == "OPEN") { o = $3; ci = $15 } else if ($5 == "MERGED") mg = $3 }
+    END { print o "|" ci "|" mg }' "$T/prs") # not a tab: read merges empty fields split by one
+  IFS='|' read -r open ci merged <<<"$pr"
+  read_ok=1
+  [ -n "$rname" ] && ! awk -F '\t' -v r="$rname" 'index(", " $1 ", ", ", " r ", ") && $3 ~ /^ok/ { f = 1 } END { exit !f }' \
+    "$T/prs-read" && read_ok=0
+  if [ -n "$open" ]; then w="PR #$open open, ${ci:-CI not read}"
+  elif [ -n "$merged" ]; then w="merged (PR #$merged): the item can be deleted"
+  elif [ "$rmt" = 1 ]; then
+    w="pushed"
+    if [ "$own" = 0 ]; then w="$w, no commit beyond $def yet"
+    elif [ "$b" != "$def" ]; then [ "$read_ok" = 1 ] && w="$w, no PR yet" || w="$w, PRs not read"; fi
+  elif [ "$loc" = 1 ]; then
+    w="only on $MACHINE, not pushed"
+    [ "$own" = 0 ] && w="$w, no commit beyond $def yet"
+  elif [ -n "$m" ] && { [ "$m" != "$MACHINE" ] || [ "$m" = cloud ]; }; then w="not here: on $m alone (not pushed), or gone"
+  else w="no branch $b here or on a remote"; fi
+  [ "${ahead:-0}" -gt 1 ] && w="$w, $ahead commits not pushed"
+  [ "${ahead:-0}" = 1 ] && w="$w, 1 commit not pushed"
+  printf '%s\t%s: %s\n' "$id" "$b" "$w" >>"$T/where"
+done <"$T/claims"
 
 # The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
 # described once, in the first repo that has it.
@@ -404,8 +480,9 @@ END {
 }
 ' "$T/versions" "$T/hist" "$T/now" >"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
-# The commits, the PRs and whether each repo's PRs could be read. A PR's text comes escaped by @tsv: quotes only.
-awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" '
+# The commits, the PRs and whether each repo's PRs could be read, where the work of each claimed item is, and this
+# machine's name. A PR's text comes escaped by @tsv: quotes only.
+awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v machine="$MACHINE" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
@@ -427,8 +504,9 @@ BEGIN {
     if (split(rec, F, "\t") < 14) continue
     printf "%s\n{\"repo\":%s,\"gh\":%s,\"number\":%d,\"title\":%s,\"state\":%s,\"branch\":%s,\"base\":%s,", sep, \
       je(F[1]), je(F[2]), F[3], je(F[4]), je(F[5]), je(F[6]), je(F[7])
-    printf "\"created\":%s,\"merged\":%s,\"closed\":%s,\"url\":%s,\"author\":%s,\"merge\":%s,\"body\":%s}", \
-      je(substr(F[8], 1, 10)), je(substr(F[9], 1, 10)), je(substr(F[10], 1, 10)), je(F[11]), je(F[12]), je(F[13]), je(F[14])
+    printf "\"created\":%s,\"merged\":%s,\"closed\":%s,\"url\":%s,\"author\":%s,\"merge\":%s,\"ci\":%s,\"body\":%s}", \
+      je(substr(F[8], 1, 10)), je(substr(F[9], 1, 10)), je(substr(F[10], 1, 10)), je(F[11]), je(F[12]), je(F[13]), \
+      je(F[15]), je(F[14])
     sep = ","
   }
   printf "],\n\"prsRead\":["; sep = ""
@@ -436,7 +514,12 @@ BEGIN {
     split(rec, F, "\t")
     printf "%s{\"repo\":%s,\"gh\":%s,\"status\":%s}", sep, js(F[1]), js(F[2]), js(F[3]); sep = ","
   }
-  printf "]}\n"
+  printf "],\n\"where\":{"; sep = ""
+  while ((getline rec < wfile) > 0) {
+    i = index(rec, "\t")
+    printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
+  }
+  printf "},\n\"machine\":%s}\n", js(machine)
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
 # The build's stamp: the data without the time it was built, so a rebuild that changes nothing leaves an open page
@@ -497,6 +580,7 @@ tr.row:hover { background: var(--soft); }
 tr.row.sel { background: var(--on); }
 tr.closed td { color: var(--muted); }
 td.id, td.date, td.st, td.who { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.where { min-width: 12em; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
 .tablewrap { padding: 0 8px 16px; overflow-x: auto; }
@@ -598,6 +682,8 @@ D.items.forEach(function (it) {
   it.status = !it.closed ? it.state : it.kind === "Q" && it.state === "ruling" ? "archived" : "closed";
   // Claimed is not a state: a claimed item is still open. Its column names who works on it, or None.
   it.claimedBy = it.kind === "B" && !it.closed && it.f.claimed ? it.f.claimed.split(" on ")[0] : "";
+  // Where its work is: computed by board.sh from git and the PRs at each build, never written in the item.
+  it.where = it.claimedBy && D.where ? D.where[it.id] || "" : "";
   it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
   it.num = it.old ? 0 : parseInt(it.id.slice(2), 10);
   it.ruled = it.f.ruled || "";
@@ -746,6 +832,7 @@ function claimCell(it) {
   return it.claimedBy ? "<td class=\"who\" title=\"claimed: " + esc(it.f.claimed) + "\">" + esc(it.claimedBy) + "</td>" :
     "<td class=\"who muted\">None</td>";
 }
+function whereCell(it) { return "<td class=\"where\">" + esc(it.where) + "</td>"; }
 function chip(label, n, on, attrs) {
   return "<button class=\"chip" + (on ? " on" : "") + "\" " + attrs + ">" + esc(label) +
     (n === null ? "" : "<span class=\"n\">" + n + "</span>") + "</button>";
@@ -824,12 +911,12 @@ function render() {
     return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
-    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th>" : "") +
+    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th>" : "") +
     "<th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";
@@ -901,6 +988,7 @@ function panel() {
     (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>") +
     (it.kind === "B" && !it.closed && !it.f.claimed ? "<dt>claimed</dt><dd class=\"muted\">None</dd>" : "");
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
+  if (it.where) h += "<dt>where</dt><dd>" + esc(it.where) + "</dd>";
   h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
   var ps = prsOf(it);
   if (ps.length) h += "<b>Pull requests</b><div class=\"body\">" + ps.map(prLine).join("\n") + "</div>";
@@ -1020,7 +1108,8 @@ fi
 
 if [ "$text" = 1 ]; then
   echo
-  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" '
+  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" -v wfile="$T/where" '
+BEGIN { while ((getline l < wfile) > 0) { i = index(l, "\t"); where[substr(l, 1, i - 1)] = substr(l, i + 1) } }
 function unesc(s) { gsub(/\\n/, " · ", s); gsub(/\\t/, " ", s); gsub(/\\\\/, "\\", s); return s }
 function mark(st) {
   if (st == "open") return "🔲"; if (st == "waiting") return "⏸️"; if (st == "question") return "💬"; return st
@@ -1033,6 +1122,7 @@ k == "B" {
   if (!(sec in seen)) { seen[sec] = 1; order[++ns] = sec }
   line = "    " mark($5) " " ($6 == 1 ? "⚠ " : "") $4 "  " $8
   if ($9 != "") line = line "  (" unesc($9) ")"
+  if ($4 in where) line = line "\n        where: " where[$4]
   items[sec] = items[sec] line "\n"; next
 }
 k == "Q" { if ($5 == "ruling") rulings++; else { nq++; qs = qs "  " mark($5) " " $4 "  " $8 "\n" }; next }

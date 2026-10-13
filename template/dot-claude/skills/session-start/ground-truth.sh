@@ -271,7 +271,9 @@ fi
 # the branch it names in the item's repos (its `repos:` line, else its section's first word, as on the board; all
 # the repos when neither names one). A claim not pushed is seen by no other session. A branch that is
 # gone, or has had no commit for CLAIM_STALE_DAYS days (counted from the claim when the branch is older), holds an
-# item for a session that may have stopped. Parsed in bash, not awk: titles hold emoji (macOS awk, notes/lessons.md).
+# item for a session that may have stopped. A branch claimed on another machine (`at <machine>`; "cloud" is never
+# this one) and found nowhere here is not gone: its commits may be there alone, not pushed. This machine's name is
+# the one claim.sh writes. Parsed in bash, not awk: titles hold emoji (macOS awk, notes/lessons.md).
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed item
   local rec f kv c r
@@ -292,6 +294,10 @@ claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed it
       printf '%s\t%s\t%s\t%s\n' "$(printf '%s\n' "$rec" | cut -f4)" "$c" "$r" "$(printf '%s\n' "$rec" | cut -f8)"
     done
 }
+MACHINE=${CLAIM_MACHINE:-}
+[ -z "$MACHINE" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && MACHINE=cloud
+[ -z "$MACHINE" ] && MACHINE=$(uname -n 2>/dev/null) && MACHINE=${MACHINE%%.*}
+MACHINE=${MACHINE//[[:space:]]/-}
 echo
 echo "== claims (BACKLOG.md${DOCS_BASE:+, shared on $DOCS_BASE})"
 CT=$(mktemp -d "${TMPDIR:-/tmp}/ground-truth.XXXXXX") || { unknown "mktemp failed: claims not read"; CT=""; }
@@ -324,7 +330,8 @@ if [ -n "$CT" ]; then
   while IFS= read -r l; do
     cid=$(printf '%s\n' "$l" | cut -f1) claim=$(printf '%s\n' "$l" | cut -f2) crepos=$(printf '%s\n' "$l" | cut -f3)
     ctitle=$(printf '%s\n' "$l" | cut -f4) where=$(printf '%s\n' "$l" | cut -f5)
-    branch=${claim#* on }
+    branch=${claim#* on } cmachine=""
+    case $branch in *" at "*) cmachine=${branch#* at } branch=${branch%% at *} ;; esac
     case $where in
       here) note="${DOCS_BASE:+, ⚠ NOT PUSHED: no other session sees it}"; claimed_at=$now ;;
       *) [ "$where" = there ] && note=" (on $DOCS_BASE, not here yet: pull)" || note=""
@@ -371,7 +378,11 @@ if [ -n "$CT" ]; then
       [ "$days" -ge "$CLAIM_STALE_DAYS" ] && st="$st, ⚠ STALE: no commit for $days days"
       echo "      ${R_NAME[$i]}: last commit $when, $st"
     done
-    [ "$found" = 0 ] && echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
+    if [ "$found" = 0 ] && [ -n "$cmachine" ] && { [ "$cmachine" != "$MACHINE" ] || [ "$cmachine" = cloud ]; }; then
+      echo "      ⚠ NOT HERE: no branch $branch in ${names:-any repo}, here or on a remote: its commits are on $cmachine alone (not pushed), or it is gone"
+    elif [ "$found" = 0 ]; then
+      echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
+    fi
   done <"$CT/all"
 fi
 

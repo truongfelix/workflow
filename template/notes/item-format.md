@@ -25,7 +25,7 @@ holds; one that no longer holds is deleted.
 ## web
 
 ### 🔲 B-12 Shopping list works offline
-claimed: claude@pantry-12 on feat/offline-list
+claimed: claude@pantry-12 on feat/offline-list at laptop
 Edits made in a shop with no signal are lost. Worktree `web-offline/`.
 Done when: an edit made in airplane mode syncs on reconnect, conflicts resolved last-write-wins per item, tested on
 a phone.
@@ -87,7 +87,7 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 
 | key | on | value |
 |---|---|---|
-| `claimed` | BACKLOG items | `<agent>@<session> on <branch>`: who works on it, and where (Claims, below) |
+| `claimed` | BACKLOG items | `<agent>@<session> on <branch> at <machine>`: who works on it, and where (Claims, below) |
 | `repos` | ⚠ items | the repos in the order the work runs, producer first: `api → web` |
 | `repos` | questions, optional | the repos the decision is about: `api, web`; none = the whole project |
 | `repos` | lessons, optional | the repos the lesson is about; none = the whole project |
@@ -123,13 +123,15 @@ alone") allows:
 bash .claude/skills/session-start/claim.sh B-12 feat/B-12-offline-list
 ```
 
-It adds `claimed: <agent>@<session> on <branch>` under the item's heading, in a commit of its own (`claim B-12`) on
-the remote's default branch, and pushes it.
+It adds `claimed: <agent>@<session> on <branch> at <machine>` under the item's heading, in a commit of its own
+(`claim B-12`) on the remote's default branch, and pushes it.
 - **agent:** who does the work: `claude`, a subagent's name, `owner`.
 - **session:** the name other sessions message it by (`ListAgents`: "This session is workflow-dev-64"), so Claude
   knows at once which session works on what; the worktree's folder name where there is none. Claude passes it as
   the third argument, `claude@<name>`.
 - **branch:** where the work goes: the fact behind the claim, which the ground truth follows.
+- **machine:** where the branch's commits are until they are pushed: this machine's name (`uname -n`), `cloud` in a
+  Claude Code cloud session, or `CLAIM_MACHINE` when set. Written once: the machine a session runs on does not change.
 
 The push is the lock. When another session pushed first, git refuses the push; the script reads the item again
 from the new tip, then claims it there, or exits 1 and names who has it: pick another item. The claim is built on
@@ -140,7 +142,12 @@ day.
 The ground truth lists every claim with its branch: the repo it is in, its last commit, pushed or not. It reports a
 claim not pushed (no other session sees it), a branch that is gone, and a branch with no commit for
 `CLAIM_STALE_DAYS` days (`.claude/ground-truth.conf`, 3 by default; counted from the claim when the branch is
-older): its session may have stopped without a handoff. Only the owner releases another session's claim.
+older): its session may have stopped without a handoff. A branch claimed on another machine and found nowhere here
+is not called gone: its commits may be on that machine alone. Only the owner releases another session's claim.
+
+Where the work is, is never written in the item: a status written there drifts (a PR merged on GitHub, a push from
+another machine). The board computes it at each build, in its "Where" column: the branch pushed or not, an open PR
+with its CI, a merged one (the item can be deleted), or the machine where the commits are.
 
 Releasing: when the work lands, the item is deleted, claim and all. When a session stops before that, `/handoff`
 keeps the claim with its branch pushed and named under "Unfinished", or deletes the line, and the docs push frees
@@ -153,8 +160,8 @@ the item. A new session has a new name: going on with a claim its handoff kept, 
 line, each place they depart from this format: a `###` heading that does not match the shape, an unknown state or field,
 a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without
 `Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
-`YYYY-MM-DD`, a `claimed:` line not in the shape `<agent>@<session> on <branch>`, a lesson with a state, a lesson
-left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot
+`YYYY-MM-DD`, a `claimed:` line not in the shape `<agent>@<session> on <branch> at <machine>` (` at <machine>` may
+be missing in a claim made before it was written), a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot
 be read: never a silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example. It checks
 the handoffs too (`notes/handoff-format.md`, "The check").
 

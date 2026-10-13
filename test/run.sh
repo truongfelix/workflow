@@ -154,27 +154,30 @@ check "ground truth: the docs repo, in sync" has "$T/gt.txt" "ahead 0 / behind 0
 check "ground truth: complete" has "$T/gt.txt" "GROUND TRUTH: complete"
 check "ground truth: no claim" eval 'grep -A1 "^== claims (BACKLOG.md, shared on origin/main)$" "$T/gt.txt" | grep -qx "  none"'
 
-# Claims: B-11 on a live branch, B-12 on a branch that is gone, B-13 on a branch with no commit since January (claimed
-# then too), B-14 claimed here and not pushed.
+# Claims: B-11 on a live branch, B-12 on a branch that is gone (claimed on this machine), B-13 on a branch with no
+# commit since January (claimed then too), B-15 on a branch claimed on another machine and not here, B-14 claimed here
+# and not pushed.
 old=$(GIT_COMMITTER_DATE=2026-01-02T10:00:00 git -C api commit-tree 'HEAD^{tree}' -p HEAD -m old)
 git -C api branch old "$old"
 cp BACKLOG.md "$T/ws-backlog.bak"
 claims_backlog() { # [<B-14's claim>]
-  printf '%s\n' '# Demo — Backlog' '' 'next id: B-15 (last given to claude@ws)' '' '## api' '' '### 🔲 B-11 Live' \
-    'claimed: claude@ws on feat' 'Done when: done.' '' '### 🔲 B-12 Gone' 'claimed: claude@other on feat/gone' \
-    'Done when: done.' '' '### 🔲 B-13 Old' 'claimed: claude@other on old' 'Done when: done.' '' '### 🔲 B-14 Mine' \
-    ${1:+"$1"} 'Done when: done.'
+  printf '%s\n' '# Demo — Backlog' '' 'next id: B-16 (last given to claude@ws)' '' '## api' '' '### 🔲 B-11 Live' \
+    'claimed: claude@ws on feat' 'Done when: done.' '' '### 🔲 B-12 Gone' 'claimed: claude@other on feat/gone at laptop' \
+    'Done when: done.' '' '### 🔲 B-13 Old' 'claimed: claude@other on old' 'Done when: done.' '' '### 🔲 B-15 Away' \
+    'claimed: claude@far on feat/away at desktop-2' 'Done when: done.' '' '### 🔲 B-14 Mine' ${1:+"$1"} 'Done when: done.'
 }
 claims_backlog >BACKLOG.md
 git add BACKLOG.md && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m claims && git_q push origin main
 claims_backlog 'claimed: claude@ws on spike' >BACKLOG.md
-"$SH" "$GT" >"$T/gt-claims.txt" 2>&1
+CLAIM_MACHINE=laptop "$SH" "$GT" >"$T/gt-claims.txt" 2>&1
 rc=$?
 sed 's/^/      | /' "$T/gt-claims.txt"
 check "ground truth, claims: exits 0, a stale claim is a finding" [ "$rc" = 0 ]
 check "ground truth, claims: a claim, its branch, its repo, pushed or not" \
   eval 'has "$T/gt-claims.txt" "  B-11 Live: claude@ws on feat" && has "$T/gt-claims.txt" ", ahead 1 / behind 0 of origin/feat"'
 check "ground truth, claims: a branch that is gone" has "$T/gt-claims.txt" "      ⚠ GONE: no branch feat/gone in api"
+check "ground truth, claims: a branch claimed on another machine is not gone, it may be there alone" \
+  has "$T/gt-claims.txt" "      ⚠ NOT HERE: no branch feat/away in api, here or on a remote: its commits are on desktop-2 alone"
 check "ground truth, claims: a stale claim" has "$T/gt-claims.txt" \
   "      api: last commit 01-02 10:00, LOCAL ONLY: on no remote at all, ⚠ STALE: no commit for "
 check "ground truth, claims: a live claim is not stale" [ "$(grep -c STALE "$T/gt-claims.txt")" = 1 ]
@@ -298,7 +301,7 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'web.md:6: H-4: a task in Next without an id' 'web.md:7: H-4: B-99 is in no tracker' \
   'web.md:12: H-4: no `## Running` before `## Unfinished`' 'web.md:15: H-4: `## Done` is empty' \
   'web.md:17: H-4: `## Notes` is not a section of a handoff' 'web.md:18: H-4: no `## Learned` section' \
-  'BACKLOG.md:36: B-7: `claimed:` is not `<agent>@<session> on <branch>`: claude@web' \
+  'BACKLOG.md:36: B-7: `claimed:` is not `<agent>@<session> on <branch> at <machine>`: claude@web' \
   'handoff/README.md:3: `next id` is H-3, not above the highest handoff, H-4'; do
   check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
 done
@@ -360,7 +363,7 @@ check "board: a closed item keeps its last text" item_has B-1 '"title":"First"'
 check "board: an item not committed yet" item_has B-3 '"not committed yet","added"]'
 check "board: a question's repos" item_has Q-1 '"fields":"repos: api, web"'
 check "board: claimed is a column of the backlog, not a state" \
-  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th>\" : \"\")" && lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
+  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th><th>Where</th>\" : \"\")" && lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
 check "board: text cannot end the page's script early" [ "$(grep -c '</script>' "$T/board.html")" = 2 ]
 if command -v node >/dev/null 2>&1; then
   node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
@@ -464,6 +467,49 @@ PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --offline --out "$T/board3.html" "
 check "board --offline: the PRs last read, from the same page's cache" has "$T/board3.html" '"number":41,"title":"Round to 1 g"'
 check "board --offline: says when they were read" has "$T/board3.html" '"gh":"demo/api","status":"ok: as read 20'
 check "board --offline: a repo never read is still not read" has "$T/board3.html" '"gh":"demo/docs","status":"not read: --offline"'
+
+# Where the work of each claimed item is (notes/item-format.md, Claims): computed from git and the PRs, never written
+# in the item. In the api repo: B-1's branch is gone and its PR merged; B-2's is pushed, a commit ahead, in an open PR
+# with green CI; B-3's is only here; B-4's was claimed on another machine and is nowhere here; B-5's is pushed, no PR.
+cp -R "$T/board2" "$T/board5" && cd "$T/board2-api" || exit 1
+git update-ref refs/remotes/origin/main main
+git_q checkout -b feat/two && git_q commit --allow-empty -m two && git update-ref refs/remotes/origin/feat/two HEAD
+git_q commit --allow-empty -m "two, not pushed"
+git_q checkout -b spike main && git_q commit --allow-empty -m spike
+git_q checkout -b feat/pushed main && git_q commit --allow-empty -m pushed
+git update-ref refs/remotes/origin/feat/pushed HEAD && git_q checkout main && git_q branch -D feat/pushed
+cd "$T/board5" || exit 1
+printf '%s\n' '# Demo — Backlog' '' 'next id: B-6 (last given to claude@s1)' '' '## api' '' '### 🔲 B-1 First' \
+  'claimed: claude@s1 on fix/B-1-rounding at laptop' 'Done when: done.' '' '### 🔲 B-2 Second' \
+  'claimed: claude@s1 on feat/two at laptop' 'Done when: done.' '' '### 🔲 B-3 Third' \
+  'claimed: claude@s1 on spike at laptop' 'Done when: done.' '' '### 🔲 B-4 Fourth' \
+  'claimed: claude@s2 on feat/away at desktop-2' 'Done when: done.' '' '### 🔲 B-5 Fifth' \
+  'claimed: claude@s1 on feat/pushed at laptop' 'Done when: done.' >BACKLOG.md
+mkdir "$T/fakebin2"
+cat >"$T/fakebin2/gh" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *"-R demo/api "*statusCheckRollup*) printf '42\tCI green\n' ;;
+  *"-R demo/api "*)
+    printf '41\tRound to 1 g\tMERGED\tfix/B-1-rounding\tmain\t2026-02-01T09:00:00Z\t2026-02-02T10:00:00Z\t2026-02-02T10:00:00Z\thttps://github.com/demo/api/pull/41\tdev\t\tFixes B-1.\n'
+    printf '42\tTwo\tOPEN\tfeat/two\tmain\t2026-02-03T09:00:00Z\t\t\thttps://github.com/demo/api/pull/42\tdev\t\tB-2.\n' ;;
+  *) echo "HTTP 404: Not Found" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$T/fakebin2/gh"
+CLAIM_MACHINE=laptop PATH="$T/fakebin2:$PATH" "$SH" "$BD" --no-open --text --out "$T/board5.html" "$T/board5" \
+  >"$T/board5.txt" 2>&1
+check "board, where: exits 0" [ $? = 0 ]
+for w in '"B-1":"fix/B-1-rounding: merged (PR #41): the item can be deleted"' \
+  '"B-2":"feat/two: PR #42 open, CI green, 1 commit not pushed"' '"B-3":"spike: only on laptop, not pushed"' \
+  '"B-4":"feat/away: not here: on desktop-2 alone (not pushed), or gone"' '"B-5":"feat/pushed: pushed, no PR yet"'; do
+  check "board, where: $w" has "$T/board5.html" "$w"
+done
+check "board, where: the CI of an open PR" has "$T/board5.html" '"number":42,"title":"Two","state":"OPEN"'
+check "board, where: the CI is read with the PRs" has "$T/board5.html" '"ci":"CI green","body":"B-2."}'
+check "board, where: this machine, as claims name it" has "$T/board5.html" '"machine":"laptop"}'
+check "board --text, where: under the item" has "$T/board5.txt" "        where: spike: only on laptop, not pushed"
+cd "$T/board2" || exit 1
 
 # Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
 # line), so an open page loads its own file to see whether it was rebuilt. The stamp ignores the build time.
@@ -686,11 +732,16 @@ printf '%s\n' '# Backlog' '' 'next id: B-4 (last given to claude@a)' '' '## api'
   '### 🔲 B-2 Second' 'Done when: done.' '' '### ⏸️ B-3 Later' 'waits: the API' 'Done when: done.' >a/BACKLOG.md
 git -C a add -A && git_q -C a commit -m start && git_q -C a push origin main
 git_q clone remote.git b
+# The machine a claim names: this one's name up to its first dot, or "cloud" in a Claude Code cloud session.
+unset CLAIM_MACHINE
+hm=$(uname -n) hm=${hm%%.*}
+[ "${CLAUDE_CODE_REMOTE:-}" = true ] && hm=cloud
+hm=${hm//[[:space:]]/-}
 (cd a && "$SH" "$CL" B-1 feat/one) >"$T/claim-a.txt" 2>&1
 check "claim: exits 0" [ $? = 0 ]
-check "claim: says it is claimed" has "$T/claim-a.txt" "CLAIMED: B-1 First, by claude@a on feat/one (origin/main, "
-check "claim: the line is on the remote, under the heading" \
-  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,8p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a on feat/one" ]
+check "claim: says it is claimed, with the machine" has "$T/claim-a.txt" "CLAIMED: B-1 First, by claude@a on feat/one at $hm (origin/main, "
+check "claim: the line is on the remote, under the heading, with the machine" \
+  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,8p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a on feat/one at $hm" ]
 check "claim: one commit, BACKLOG.md alone" \
   [ "$(git -C remote.git show --format=%s --name-only main | tr '\n' ' ')" = "claim B-1  BACKLOG.md " ]
 check "claim: the default branch here shows it" \
@@ -706,12 +757,12 @@ check "claim: claiming one's own item again is fine" eval '[ $? = 0 ] && has "$T
 # The next session (a new name) goes on with B-1: it takes the claim over, only from the session that holds it.
 (cd a && "$SH" "$CL" B-1 feat/one claude@a-2 --from claude@other) >"$T/claim-over-no.txt" 2>&1
 check "claim --from: refused when another session holds the claim" \
-  eval '[ $? = 1 ] && has "$T/claim-over-no.txt" "is claimed by claude@a on feat/one (origin/main), not by claude@other"'
+  eval '[ $? = 1 ] && has "$T/claim-over-no.txt" "is claimed by claude@a on feat/one at $hm (origin/main), not by claude@other"'
 (cd a && "$SH" "$CL" B-1 feat/one-more claude@a-2 --from claude@a) >"$T/claim-over.txt" 2>&1
 check "claim --from: takes the claim over" \
-  eval '[ $? = 0 ] && has "$T/claim-over.txt" "CLAIMED: B-1 First, by claude@a-2 on feat/one-more, taken over from claude@a"'
+  eval '[ $? = 0 ] && has "$T/claim-over.txt" "CLAIMED: B-1 First, by claude@a-2 on feat/one-more at $hm, taken over from claude@a"'
 check "claim --from: the line is replaced, not added" \
-  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,9p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a-2 on feat/one-more"$'\n'"Done when: done." ]
+  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,9p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a-2 on feat/one-more at $hm"$'\n'"Done when: done." ]
 check "claim --from: its commit says so" [ "$(git -C remote.git log -1 --format=%s main)" = "claim B-1, taken over from claude@a" ]
 (cd a && "$SH" "$CL" B-3 feat/three) >"$T/claim-waits.txt" 2>&1
 check "claim: an item waiting for its trigger is refused" eval '[ $? = 1 ] && has "$T/claim-waits.txt" "waits for its trigger"'
