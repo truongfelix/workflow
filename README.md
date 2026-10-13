@@ -168,8 +168,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The gate, in `.claude/ground-truth.conf`: `GATES`, each repo's gate command (the one whose exit code says
      "ready": a test script, `make check`, what CI runs). Look for it in the repo, then ask the owner about it in a
-     question of its own: "Is `<command>` the check that says the code is ready?" A project with no such check yet (a
-     new one) has no gate: say so and skip the rest of this bullet; this step runs again when the project has one.
+     question of its own: "Is `<command>` the check that says the code is ready?" A local CI script the project
+     already has (one that runs its checks, maybe keeping its own record of passes) is that command: from then on it
+     runs through `gate.sh run`, never beside it, so one run gives both records, and the workflow never reads the
+     script's own. A project with no such check yet (a new one) has no gate: say so and skip the rest of this
+     bullet; this step runs again when the project has one.
      With a gate, ask which rules to keep, as one question where the owner picks any or "None of these", each rule a
      plain sentence: "A release needs this check to have passed on its exact commit" (`receipt`), "Each bug fix comes
      with a check that fails without the fix" (`regression`), "After a merge, the check runs again on the main branch"
