@@ -111,11 +111,13 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `attach.sh`, which adds a code repo to the list and writes its pointer; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers, the settings or the git history |
 
-It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of its
-own at the root. How Claude Code's machine-local memory fits next to these files:
+It fits one repo, or several (a fork, an app, a backend). There is one design: a docs repo, and a list of the code
+repos it follows (`REPOS`). The docs either belong to the main repo, which is then the first entry of the list, or have
+a repo of their own; more repos are added to the list later with one command (`attach.sh`, below). How Claude Code's
+machine-local memory fits next to these files:
 [`memory/README.md`](memory/README.md).
 
 ## The ideas behind it
@@ -151,13 +153,16 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    address, ask: "GitHub can refuse pushes that show your email address. Use your GitHub no-reply address as this
    project's commit email?" On a yes, set it for this repo alone (another clone needs the same line):
    `git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"`
-2. **Choose the shape.** Ask the owner which one, as a multiple-choice question that recommends neither: both are
-   valid, and the owner knows what the folder holds or will hold.
-   - *One repo:* the project root is the repo; the trackers are committed with the code.
-   - *Multi-repo workspace:* a folder holding several code repos (forks, an app, a backend). The root becomes a
-     docs-only repo of its own (CLAUDE.md, trackers, `notes/`, `.claude/`), with a whitelist `.gitignore` so the
-     nested repos, data and keys stay out, and a PRIVATE remote.
-3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` for the second shape). It copies only missing files,
+2. **Choose where the docs live.** Ask the owner which one, as a multiple-choice question that recommends neither: both
+   are valid, and the owner knows what the folder holds or will hold. Say in the question what each choice does, in
+   plain words, and that the docs cannot be moved out of a repo afterwards: "If the code may become public and the notes
+   must not, pick their own repo."
+   - *The docs belong to one repo:* the project root is that repo; the trackers are committed with its code. Other
+     repos can be added later, one command each; only this repo holds the docs.
+   - *The docs have their own repo:* a folder that holds only the docs (CLAUDE.md, trackers, `notes/`, `.claude/`),
+     with a whitelist `.gitignore` so the code repos inside it, data and keys stay out, and a PRIVATE remote. Every
+     code repo is attached to it.
+3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` when the docs have their own repo). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
 4. **Fill**, in this order. The owner has not read these files: all the setup says or writes for the owner (its
    questions, its summary at the end, the items it adds) is in plain words, with no preset name either, and each
@@ -168,7 +173,9 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      (`.claude/skills/autonomy/SKILL.md`): the owner picks a preset, with each step listed in plain words, then keeps
      it or picks the steps to switch. Its script sets the rows and deletes the FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
-     upstream), and KEEP_LOCAL for branches that must never be pushed.
+     upstream), and KEEP_LOCAL for branches that must never be pushed. The docs repo is `.`; attach every other repo
+     with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its line and writes its pointer
+     (below), also later, whenever a repo joins the project.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
      project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
@@ -187,7 +194,7 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `.claude/settings.json`, only when `adopt.sh` listed it as skipped (the project had its own): add the
      template's `PostToolUse` hook to it, which rebuilds the board after each change. When `adopt.sh` installed it,
      the hook is there and there is nothing to do or report.
-5. **Workspace shape only:** at the root, the repo of step 1, check `git status --ignored` and the staged list
+5. **Docs in a repo of their own only:** at the root, the repo of step 1, check `git status --ignored` and the staged list
    before the first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Push to the
    remote of step 1 as the table allows.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
@@ -201,6 +208,20 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
+
+## A session opened in a code repo
+
+A session finds the project's rules in the `CLAUDE.md` of the folder it is opened in and of the folders above it. A code
+repo inside the docs repo's folder is covered by the docs' `CLAUDE.md` above it; a repo elsewhere on the disk, or any
+repo whose own `CLAUDE.md` loads alone, is not. So `attach.sh` writes a **pointer** in each attached repo: a short
+`CLAUDE.md` (or `CLAUDE.local.md`, when the repo has a `CLAUDE.md` of its own, which is left alone) that says where the
+docs are, to start the session there, and imports the docs' `CLAUDE.md` so its rules load too. It is kept out of the
+repo's commits (`.git/info/exclude`), since it names a path on this machine, and `ground-truth.sh` reports an attached repo
+that has none (`NO POINTER`).
+
+Two limits. The pointer exists on the machine where `attach.sh` ran: a clone on another machine needs the script run
+again there. And a cloud session works on one repo, so it cannot work on a project with several: the docs repo and the
+code repos are cloned side by side only on your own machines.
 
 ## Upgrade a project from here
 
@@ -226,6 +247,10 @@ counts (none when the line is missing). Merge the comments above `GATES` from th
 
 `/autonomy`, `/checks` and the setup ask the owner as the rule "A question to the owner" in `CLAUDE.md` says: copy
 that bullet from the template's Rules. The skill scripts share `session-start/lib.sh`: upgrade them together.
+
+Code repos listed in `REPOS` got pointers (`attach.sh`, "A session opened in a code repo"): `adopt.sh` installs the
+script, and `ground-truth.sh` says `NO POINTER` for each listed repo that has none; run
+`bash .claude/skills/session-start/attach.sh <name>` for each.
 
 ## Improve the workflow
 

@@ -73,6 +73,12 @@ for spec in "${REPOS[@]}"; do
     continue
   fi
 
+  # A code repo needs its pointer (attach.sh): a session opened there finds the docs through it.
+  if ! [ "$repo" -ef "$ROOT" ] && ! grep -qsF -- "workflow pointer: written by attach.sh" \
+    "$repo/CLAUDE.md" "$repo/CLAUDE.local.md"; then
+    echo "  ⚠ NO POINTER: a session opened in $repo does not find the docs (bash .claude/skills/session-start/attach.sh $name)"
+  fi
+
   # The remote and its default branch. No remote at all is a finding, not a failure: nothing here is pushed.
   base=""
   if ! git -C "$repo" remote get-url "$remote" >/dev/null 2>&1; then

@@ -28,7 +28,7 @@ echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 for f in bin/adopt.sh template/dot-claude/skills/session-start/ground-truth.sh \
   template/dot-claude/skills/session-start/items.sh template/dot-claude/skills/session-start/board.sh \
   template/dot-claude/skills/session-start/claim.sh template/dot-claude/skills/session-start/gate.sh \
-  template/dot-claude/skills/session-start/lib.sh \
+  template/dot-claude/skills/session-start/lib.sh template/dot-claude/skills/session-start/attach.sh \
   template/dot-claude/skills/autonomy/autonomy.sh \
   template/dot-claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
@@ -1201,6 +1201,62 @@ printf '%s\n' 'REPOS=("other|elsewhere|origin||")' 'GATE_RULES="receipt"' >>.cla
 PATH=$GP git push origin v1.0.3 >"$T/ci-push6.txt" 2>&1
 check "gate hook: a repo REPOS does not name is refused a release tag, with the reason" \
   eval '[ $? != 0 ] && has "$T/ci-push6.txt" "REFUSED: this repo is not in REPOS of "'
+# One repo, then more (attach.sh): the docs belong to the first repo (the root, "." in REPOS) and a second repo is
+# attached later by one command: its line in REPOS, a pointer in the repo so a session opened there finds the docs.
+cd "$T" || exit 1
+git_q init --bare remote-one.git && git_q init --bare remote-svc.git
+git_q clone "$T/remote-one.git" one && cd one || exit 1
+git symbolic-ref HEAD refs/heads/main
+"$SH" "$WF/bin/adopt.sh" "$T/one" >/dev/null 2>&1
+check "attach: adopt.sh installs attach.sh, executable" [ -x .claude/skills/session-start/attach.sh ]
+printf '%s\n' 'REPOS=("one|.|origin|main|")' 'KEEP_LOCAL=""' 'UNITS=0' >.claude/ground-truth.conf
+printf '%s\n' '# One — Backlog' '' 'next id: B-3 (last given to claude@test)' '' '## one' '' '### 🔲 B-1 First' \
+  'Done when: done.' '' '## svc' '' '### 🔲 B-2 Second' 'Done when: done.' >BACKLOG.md
+git add CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
+git_q clone "$T/remote-svc.git" svc && (cd svc && git symbolic-ref HEAD refs/heads/main && git_q commit --allow-empty -m first &&
+  git_q push -u origin main && git remote set-head origin main)
+AT=.claude/skills/session-start/attach.sh
+"$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt0.txt" 2>&1
+check "attach: one repo, the docs repo, needs no pointer" lacks "$T/at-gt0.txt" "NO POINTER"
+"$SH" "$AT" svc svc >"$T/at1.txt" 2>&1
+check "attach: exits 0" [ $? = 0 ]
+check "attach: says the line it added" has "$T/at1.txt" "added to REPOS: svc|svc|origin||"
+atrepos() { (REPOS=(); . ./.claude/ground-truth.conf; printf '%s\n' "${REPOS[@]}" | tr '\n' ' '); }
+check "attach: REPOS has both repos, the first one untouched" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| " ]
+check "attach: the pointer is in the repo, names the docs and imports their CLAUDE.md" \
+  eval 'has svc/CLAUDE.md "workflow pointer: written by attach.sh" && has svc/CLAUDE.md "@$T/one/CLAUDE.md" &&
+    has svc/CLAUDE.md "\`$T/one\`"'
+check "attach: the pointer is kept out of the repo's commits" eval '[ -z "$(git -C svc status --porcelain)" ]'
+check "attach: the repo inside the root is kept out of the docs repo" eval '! git status --porcelain | grep -q svc'
+"$SH" "$AT" svc svc >"$T/at2.txt" 2>&1
+check "attach: run again, exit 0, nothing added twice" \
+  eval '[ $? = 0 ] && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 1 ] && [ "$(grep -c "^/CLAUDE.md$" svc/.git/info/exclude)" = 1 ]'
+"$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt1.txt" 2>&1
+check "attach: ground truth exits 0 and lists the second repo, with its pointer" \
+  eval '[ $? = 0 ] && has "$T/at-gt1.txt" "== svc (svc)" && lacks "$T/at-gt1.txt" "NO POINTER"'
+rm svc/CLAUDE.md
+"$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt2.txt" 2>&1
+check "attach: ground truth flags a repo with no pointer, with the command" \
+  has "$T/at-gt2.txt" "⚠ NO POINTER: a session opened in $T/one/svc does not find the docs (bash .claude/skills/session-start/attach.sh svc)"
+"$SH" "$AT" svc >"$T/at3.txt" 2>&1
+check "attach: a name already in REPOS gets its pointer back, no path needed" \
+  eval '[ $? = 0 ] && [ -f svc/CLAUDE.md ] && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 1 ]'
+git_q add .claude/ground-truth.conf && git_q commit -m "svc attached" && git_q push origin main
+"$SH" .claude/skills/session-start/claim.sh B-2 feat/two claude@test >"$T/at-claim.txt" 2>&1
+check "attach: a claim still works with two repos" eval '[ $? = 0 ] && has "$T/at-claim.txt" "CLAIMED: B-2 Second"'
+"$SH" .claude/skills/session-start/board.sh --no-open --offline --out "$T/at-board.html" "$T/one" >/dev/null 2>&1
+check "attach: the board lists both repos" has "$T/at-board.html" '"repos":["one","svc"]'
+# A repo with a CLAUDE.md of its own keeps it; the pointer is CLAUDE.local.md. A repo outside the root is allowed.
+git_q clone "$T/remote-svc.git" "$T/far" && printf '%s\n' '# the repo own rules' >"$T/far/CLAUDE.md"
+"$SH" "$AT" far "$T/far" >"$T/at4.txt" 2>&1
+check "attach: a repo outside the root, with a CLAUDE.md of its own: that file untouched, the pointer beside it" \
+  eval '[ $? = 0 ] && [ "$(cat "$T/far/CLAUDE.md")" = "# the repo own rules" ] &&
+    has "$T/far/CLAUDE.local.md" "workflow pointer: written by attach.sh" && ! git -C "$T/far" status --porcelain | grep -q CLAUDE.local'
+"$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt3.txt" 2>&1
+check "attach: ground truth accepts a CLAUDE.local.md pointer" lacks "$T/at-gt3.txt" "NO POINTER"
+"$SH" "$AT" nope "$T/nowhere" >"$T/at5.txt" 2>&1
+check "attach: a path that is not a git checkout is UNKNOWN (exit 2), REPOS unchanged" \
+  eval '[ $? = 2 ] && has "$T/at5.txt" "UNKNOWN: " && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 2 ]'
 cd "$T" || exit 1
 
 echo
