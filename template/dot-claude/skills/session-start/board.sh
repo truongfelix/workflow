@@ -342,7 +342,7 @@ ci_of_branch() { # <repo name> <GitHub repo> <commit>: its CI verdict, read now 
   if [ "$cit" = "CI running" ]; then # how far it is: the jobs done of those GitHub lists so far
     n=$(with_timeout 30 gh api "repos/$2/commits/$3/check-runs" \
       --jq '"\([.check_runs[] | select(.status == "completed")] | length)/\(.total_count)"' 2>/dev/null </dev/null) || n=""
-    case $n in [0-9]*/[0-9]*) [ "${n#*/}" != 0 ] && cit="CI running ($n done)" ;; esac
+    case $n in [0-9]*/[0-9]*) [ "${n#*/}" != 0 ] && cit="CI running $n" ;; esac
   fi
   now=$(date '+%Y-%m-%d %H:%M')
   printf '%s\t%s\t%s\t%s\n' "$2" "$3" "$cit" "$now" >>"$T/ci-now"
@@ -706,7 +706,7 @@ td.title { min-width: 14em; }
 td .cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 td.who .cut { max-width: 8em; }
 td.where .cut { max-width: 10em; }
-td.gate .cut { max-width: 16em; }
+td.gate .cut { max-width: 19em; }
 td.gate.failed { color: var(--warn); font-weight: 600; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
@@ -982,7 +982,7 @@ function claimCell(it) {
     "<td class=\"who muted\">None</td>";
 }
 function whereCell(it) { return cutCell("where", it.where, it.where); }
-function gateCell(it) { // the gate, then the CI verdict of the branch's last commit: "passed (ce8526d); CI running (2/3 done)"
+function gateCell(it) { // the gate, then the CI verdict of the branch's last commit: "passed (ce8526d); CI running 2/3"
   var t = [it.gate, it.ci].filter(Boolean).join("; ");
   return cutCell("gate" + (/^failed|CI red/.test(t) ? " failed" : ""), t, t);
 }

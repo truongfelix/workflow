@@ -1342,7 +1342,7 @@ c51() { # <verdict> [<jobs done/all>] [board.sh options...]: build the board wit
 }
 ci51() { grep -qF "\"ci\":{\"B-1\":\"$1\"}" "$T/c51.html"; } # <text>: the CI map of the data
 c51 PENDING 2/3
-check "board, CI: running, with the jobs done" ci51 "CI running (2/3 done)"
+check "board, CI: running, with the jobs done" ci51 "CI running 2/3"
 check "board, CI: beside the gate, which still says passed" has "$T/c51.html" "\"gate\":{\"B-1\":\"passed ($(git -C app rev-parse --short=7 feat/one))\"}"
 c51 SUCCESS; check "board, CI: green" ci51 "CI green"
 c51 FAILURE; check "board, CI: red" ci51 "CI red"
@@ -1358,7 +1358,7 @@ check "board --text, CI: under the item" has "$T/c51.txt" "        CI: CI green 
 conf51 '' '"app"'
 c51 PENDING 1/4
 check "board, CI: a repo checked by CI alone shows the CI, no gate text" \
-  eval 'has "$T/c51.html" "\"gated\":true," && has "$T/c51.html" "\"gate\":{}," && ci51 "CI running (1/4 done)"'
+  eval 'has "$T/c51.html" "\"gated\":true," && has "$T/c51.html" "\"gate\":{}," && ci51 "CI running 1/4"'
 conf51 '"app|true"' ''
 c51 SUCCESS
 check "board, CI: a repo checked by a gate alone shows no CI" eval 'has "$T/c51.html" "\"ci\":{}," && has "$T/c51.html" "\"B-1\":\"not run on the last commit; passed at "'
