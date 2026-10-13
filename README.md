@@ -147,7 +147,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 4. **Fill**, in this order. The owner answers each question without having read these files: a question names no
    file, table or setting, and says in plain words what each choice does. Free text (what the project is, its rules)
    is asked in the chat, as an open question: never an option that only says "I'll type it", which returns no text
-   when picked.
+   when picked. A question that fails, or a free-text one left unanswered, is asked again in the chat: never write
+   an answer the owner did not give (a folder's name is not what the project is).
    - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset as a
      multiple-choice question, and list in it the steps the preset decides: start the day's task, commit the docs
      (the notes and trackers), push them, add an item to the backlog, claim one, commit code, push a work branch,
