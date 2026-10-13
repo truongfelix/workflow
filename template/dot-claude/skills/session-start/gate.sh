@@ -5,7 +5,8 @@
 # A receipt says that a commit, with nothing uncommitted, passed the gate on this machine. It is a file in the
 # clone's git directory (gate-receipts/<commit>), shared by its worktrees, never tracked and never pushed: another
 # clone runs the gate again. Untracked files are not counted as uncommitted: a build leaves some, and the owner drops
-# working files into the tree.
+# working files into the tree. A failed run leaves a record beside the receipts (gate-failures/<commit>), which the
+# board shows; a later pass on that commit removes it, and a failure never removes a receipt.
 #
 # The gate rules a project keeps (GATE_RULES in .claude/ground-truth.conf, chosen at setup) decide what reads the
 # receipts: with "receipt", the pre-push hook refuses a release tag (v*) whose commit has none; with "merge", the
@@ -128,6 +129,11 @@ case $cmd in
     "${BASH:-bash}" -c "${G_CMD[$g]}"
     rc=$?
     if [ "$rc" != 0 ]; then
+      failures="$(common_dir .)/gate-failures"
+      { mkdir -p "$failures" &&
+        printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" "${G_CMD[$g]}" \
+          "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$(hostname 2>/dev/null || uname -n)" >"$failures/$sha"; } 2>/dev/null ||
+        echo "  (the failure could not be recorded in $failures)"
       echo "FAILED: the gate of ${G_NAME[$g]} exited $rc: no receipt for $short"
       exit 1
     fi
@@ -142,6 +148,7 @@ case $cmd in
     printf 'commit: %s\nrepo: %s\ngate: %s\npassed: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" "${G_CMD[$g]}" \
       "$(date '+%Y-%m-%d %H:%M %Z')" "$(hostname 2>/dev/null || uname -n)" >"$receipts/$sha" ||
       fail "cannot write $receipts/$sha"
+    rm -f "$(common_dir .)/gate-failures/$sha"
     echo "RECEIPT: $short passed the gate of ${G_NAME[$g]}"
     ;;
   check)

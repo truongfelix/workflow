@@ -147,7 +147,10 @@ is not called gone: its commits may be on that machine alone. Only the owner rel
 
 Where the work is, is never written in the item: a status written there drifts (a PR merged on GitHub, a push from
 another machine). The board computes it at each build, in its "Where" column: the branch pushed or not, an open PR
-with its CI, a merged one (the item can be deleted), or the machine where the commits are.
+with its CI, a merged one (the item can be deleted), or the machine where the commits are. Its "Gate" column says
+whether the branch passed the project's own check (`gate.sh`) on this machine: passed or failed on its last commit,
+not run on the last commits, not run here, or no gate. GitHub's CI and the gate are separate: a project may keep
+one, the other, or both.
 
 Releasing: when the work lands, the item is deleted, claim and all. When a session stops before that, `/handoff`
 keeps the claim with its branch pushed and named under "Unfinished", or deletes the line, and the docs push frees

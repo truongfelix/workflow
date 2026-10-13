@@ -30,6 +30,9 @@
 # Where: for each claimed item, where its work is, computed at each build and never written in the item, where it
 # would drift: its branch in the item's repos (pushed, commits not pushed, only on this machine), the PR of that
 # branch (open, with its CI, read with the PRs; merged: the item can be deleted), else the machine it was claimed on.
+# Gate: for each claimed item, the project's own check (gate.sh) on its branch, as run in this clone: passed or
+# failed on its last commit, not run on the last N commits (and the result before them), not run here, or no gate.
+# GitHub's CI and the gate are separate: a project may keep one, the other, or both.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -293,6 +296,19 @@ MACHINE=${CLAIM_MACHINE:-}
 MACHINE=${MACHINE//[[:space:]]/-}
 : >"$T/where"
 grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
+# The gate of each claimed item, as this clone ran it (gate.sh: a receipt per commit that passed, a record per commit
+# that failed, in the git directory its worktrees share): on its branch's last commit, else on the nearest older
+# one, else not run here; "no gate" for a repo GATES does not name. One "<id>\t<text>" line in $T/gate.
+: >"$T/gate"
+{ [ -f .claude/ground-truth.conf ] && (GATES=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
+  for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "${g%%|*}"; done); } >"$T/gates"
+git_common() { # <dir>: the git directory its worktrees share, as a full path (as gate.sh finds it)
+  local top d
+  top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
+  d=$(git -C "$top" rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] || return 1
+  case $d in /* | [A-Za-z]:*) ;; *) d="$top/$d" ;; esac
+  (cd "$d" && pwd -P)
+}
 while IFS="$tab" read -r id sec f; do
   c=${f#*claimed: } c=${c%%\\n*} # "<agent>@<session> on <branch>[ at <machine>]"
   b=${c#* on } m=""
@@ -303,14 +319,14 @@ while IFS="$tab" read -r id sec f; do
   case $f in *"repos: "*) cands=${f#*repos: } cands=${cands%%\\n*} cands=${cands//→/ } cands=${cands//->/ } cands=${cands//,/ } ;; esac
   [ -z "$cands" ] && cands=${sec%%[[:space:](:/]*} &&
     ! awk -F '\t' -v n="$cands" '$1 == n { f = 1 } END { exit !f }' "$T/repos" && cands=""
-  loc=0 rmt=0 ahead=0 own=1 rname="" def=""
+  loc=0 rmt=0 ahead=0 own=1 rname="" rpath="" def=""
   while IFS="$tab" read -r name path _; do
     [ -z "$cands" ] || case " $cands " in *" $name "*) ;; *) continue ;; esac
     rem=$(awk -F '|' -v n="$name" '$1 == n { print $3; exit }' "$T/conf") rem=${rem:-origin}
     git -C "$path" rev-parse -q --verify "refs/heads/$b" >/dev/null 2>&1 && loc=1
     git -C "$path" rev-parse -q --verify "refs/remotes/$rem/$b" >/dev/null 2>&1 && rmt=1
     [ "$loc$rmt" = 00 ] && continue
-    rname=$name ref=refs/heads/$b
+    rname=$name rpath=$path ref=refs/heads/$b
     [ "$loc" = 1 ] || ref=refs/remotes/$rem/$b
     def=$(awk -F '|' -v n="$name" '$1 == n { print $4; exit }' "$T/conf")
     [ -n "$def" ] || { def=$(git -C "$path" symbolic-ref -q --short "refs/remotes/$rem/HEAD" 2>/dev/null); def=${def#"$rem"/}; }
@@ -345,6 +361,21 @@ while IFS="$tab" read -r id sec f; do
   [ "${ahead:-0}" -gt 1 ] && w="$w, $ahead commits not pushed"
   [ "${ahead:-0}" = 1 ] && w="$w, 1 commit not pushed"
   printf '%s\t%s: %s\n' "$id" "$b" "$w" >>"$T/where"
+  [ -n "$rname" ] || continue # no branch here: no gate to read
+  if ! grep -qxF "$rname" "$T/gates"; then printf '%s\tno gate\n' "$id" >>"$T/gate"; continue; fi
+  gd=$(git_common "$rpath") || continue
+  gt="not run here" k=0
+  for cm in $(git -C "$rpath" rev-list --max-count=100 "$ref" 2>/dev/null); do
+    pass="$gd/gate-receipts/$cm" failed="$gd/gate-failures/$cm"
+    if [ -f "$failed" ] && { [ ! -f "$pass" ] || [ "$failed" -nt "$pass" ]; }; then res=failed
+    elif [ -f "$pass" ]; then res=passed
+    else k=$((k + 1)); continue; fi
+    if [ "$k" = 0 ]; then gt="$res (${cm:0:7})"
+    elif [ "$k" = 1 ]; then gt="not run on the last commit; $res at ${cm:0:7}"
+    else gt="not run on the last $k commits; $res at ${cm:0:7}"; fi
+    break
+  done
+  printf '%s\t%s\n' "$id" "$gt" >>"$T/gate"
 done <"$T/claims"
 
 # The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
@@ -487,7 +518,8 @@ END {
 
 # The commits, the PRs and whether each repo's PRs could be read, where the work of each claimed item is, and this
 # machine's name. A PR's text comes escaped by @tsv: quotes only.
-awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v machine="$MACHINE" '
+awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v gfile="$T/gate" \
+  -v machine="$MACHINE" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
@@ -521,6 +553,11 @@ BEGIN {
   }
   printf "],\n\"where\":{"; sep = ""
   while ((getline rec < wfile) > 0) {
+    i = index(rec, "\t")
+    printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
+  }
+  printf "},\n\"gate\":{"; sep = ""
+  while ((getline rec < gfile) > 0) {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
@@ -586,6 +623,7 @@ tr.row.sel { background: var(--on); }
 tr.closed td { color: var(--muted); }
 td.id, td.date, td.st, td.who { white-space: nowrap; font-variant-numeric: tabular-nums; }
 td.where { min-width: 12em; }
+td.gate.failed { color: var(--warn); font-weight: 600; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
 .tablewrap { padding: 0 8px 16px; overflow-x: auto; }
@@ -689,6 +727,7 @@ D.items.forEach(function (it) {
   it.claimedBy = it.kind === "B" && !it.closed && it.f.claimed ? it.f.claimed.split(" on ")[0] : "";
   // Where its work is: computed by board.sh from git and the PRs at each build, never written in the item.
   it.where = it.claimedBy && D.where ? D.where[it.id] || "" : "";
+  it.gate = it.claimedBy && D.gate ? D.gate[it.id] || "" : ""; // the gate of its branch, as run on this machine
   it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
   it.num = it.old ? 0 : parseInt(it.id.slice(2), 10);
   it.ruled = it.f.ruled || "";
@@ -838,6 +877,9 @@ function claimCell(it) {
     "<td class=\"who muted\">None</td>";
 }
 function whereCell(it) { return "<td class=\"where\">" + esc(it.where) + "</td>"; }
+function gateCell(it) {
+  return "<td class=\"gate" + (/^failed/.test(it.gate) ? " failed" : "") + "\">" + esc(it.gate) + "</td>";
+}
 function chip(label, n, on, attrs) {
   return "<button class=\"chip" + (on ? " on" : "") + "\" " + attrs + ">" + esc(label) +
     (n === null ? "" : "<span class=\"n\">" + n + "</span>") + "</button>";
@@ -916,12 +958,12 @@ function render() {
     return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
-    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th>" : "") +
+    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th><th title=\"the project's own check, as run on this machine\">Gate</th>" : "") +
     "<th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) + gateCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";
@@ -994,6 +1036,7 @@ function panel() {
     (it.kind === "B" && !it.closed && !it.f.claimed ? "<dt>claimed</dt><dd class=\"muted\">None</dd>" : "");
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
   if (it.where) h += "<dt>where</dt><dd>" + esc(it.where) + "</dd>";
+  if (it.gate) h += "<dt>gate</dt><dd>" + esc(it.gate) + " <span class=\"muted\">(on this machine)</span></dd>";
   h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
   var ps = prsOf(it);
   if (ps.length) h += "<b>Pull requests</b><div class=\"body\">" + ps.map(prLine).join("\n") + "</div>";
@@ -1113,8 +1156,11 @@ fi
 
 if [ "$text" = 1 ]; then
   echo
-  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" -v wfile="$T/where" '
-BEGIN { while ((getline l < wfile) > 0) { i = index(l, "\t"); where[substr(l, 1, i - 1)] = substr(l, i + 1) } }
+  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" -v wfile="$T/where" -v gfile="$T/gate" '
+BEGIN {
+  while ((getline l < wfile) > 0) { i = index(l, "\t"); where[substr(l, 1, i - 1)] = substr(l, i + 1) }
+  while ((getline l < gfile) > 0) { i = index(l, "\t"); gate[substr(l, 1, i - 1)] = substr(l, i + 1) }
+}
 function unesc(s) { gsub(/\\n/, " · ", s); gsub(/\\t/, " ", s); gsub(/\\\\/, "\\", s); return s }
 function mark(st) {
   if (st == "open") return "🔲"; if (st == "waiting") return "⏸️"; if (st == "question") return "💬"; return st
@@ -1128,6 +1174,7 @@ k == "B" {
   line = "    " mark($5) " " ($6 == 1 ? "⚠ " : "") $4 "  " $8
   if ($9 != "") line = line "  (" unesc($9) ")"
   if ($4 in where) line = line "\n        where: " where[$4]
+  if ($4 in gate) line = line "\n        gate: " gate[$4] " (on this machine)"
   items[sec] = items[sec] line "\n"; next
 }
 k == "Q" { if ($5 == "ruling") rulings++; else { nq++; qs = qs "  " mark($5) " " $4 "  " $8 "\n" }; next }

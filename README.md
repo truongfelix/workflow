@@ -19,9 +19,9 @@ This template keeps a project going across sessions, machines and weeks with fou
   decisions, lessons learned), and commits. When `questions.md` grows past a size you set, it goes through the
   rulings with you: keep, shorten, move to its doc, or delete (git keeps it).
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history, and for
-  each claimed item where its work is: on which machine, pushed or not, in an open PR with its CI, or merged. A hook
-  rebuilds it after each change, and an open tab updates itself. Where no browser can show it (a cloud session,
-  SSH), it prints the open items instead.
+  each claimed item where its work is (on which machine, pushed or not, in an open PR with its CI, or merged) and
+  whether it passed the project's own gate on this machine. A hook rebuilds it after each change, and an open tab
+  updates itself. Where no browser can show it (a cloud session, SSH), it prints the open items instead.
 - **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
   release, …), and changes it: a preset, or the steps you pick from a list.
 

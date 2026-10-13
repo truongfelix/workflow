@@ -423,7 +423,8 @@ check "board: a closed item keeps its last text" item_has B-1 '"title":"First"'
 check "board: an item not committed yet" item_has B-3 '"not committed yet","added"]'
 check "board: a question's repos" item_has Q-1 '"fields":"repos: api, web"'
 check "board: claimed is a column of the backlog, not a state" \
-  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th><th>Where</th>\" : \"\")" && lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
+  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th><th>Where</th><th title=" && has "$T/board.html" ">Gate</th>\" : \"\")" &&
+    lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
 check "board: text cannot end the page's script early" [ "$(grep -c '</script>' "$T/board.html")" = 2 ]
 if command -v node >/dev/null 2>&1; then
   node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");
@@ -538,7 +539,15 @@ git_q commit --allow-empty -m "two, not pushed"
 git_q checkout -b spike main && git_q commit --allow-empty -m spike
 git_q checkout -b feat/pushed main && git_q commit --allow-empty -m pushed
 git update-ref refs/remotes/origin/feat/pushed HEAD && git_q checkout main && git_q branch -D feat/pushed
+# The gate (gate.sh's records in the clone's git directory): B-2's last commit passed after an older failure, B-3's
+# failed, B-5's was not run, but the commit before it passed.
+mkdir -p .git/gate-receipts .git/gate-failures
+echo "failed: before" >".git/gate-failures/$(git rev-parse feat/two)" && touch -t 202601010000 ".git/gate-failures/$(git rev-parse feat/two)"
+echo "passed: now" >".git/gate-receipts/$(git rev-parse feat/two)"
+echo "failed: now" >".git/gate-failures/$(git rev-parse spike)"
+echo "passed: then" >".git/gate-receipts/$(git rev-parse main)"
 cd "$T/board5" || exit 1
+echo 'GATES=("api|true")' >>.claude/ground-truth.conf
 printf '%s\n' '# Demo — Backlog' '' 'next id: B-6 (last given to claude@s1)' '' '## api' '' '### 🔲 B-1 First' \
   'claimed: claude@s1 on fix/B-1-rounding at laptop' 'Done when: done.' '' '### 🔲 B-2 Second' \
   'claimed: claude@s1 on feat/two at laptop' 'Done when: done.' '' '### 🔲 B-3 Third' \
@@ -569,6 +578,14 @@ check "board, where: the CI of an open PR" has "$T/board5.html" '"number":42,"ti
 check "board, where: the CI is read with the PRs" has "$T/board5.html" '"ci":"CI green","body":"B-2."}'
 check "board, where: this machine, as claims name it" has "$T/board5.html" '"machine":"laptop"}'
 check "board --text, where: under the item" has "$T/board5.txt" "        where: spike: only on laptop, not pushed"
+gate_of() { grep -qF "\"$1\":\"$2\"" "$T/board5.html"; } # <id> <text>: in the data's gate map
+check "board, gate: passed on the last commit, after an older failure" gate_of B-2 "passed ($(git -C "$T/board2-api" rev-parse --short=7 feat/two))"
+check "board, gate: failed on the last commit" gate_of B-3 "failed ($(git -C "$T/board2-api" rev-parse --short=7 spike))"
+check "board, gate: not run on the last commit, and the result before it" \
+  gate_of B-5 "not run on the last commit; passed at $(git -C "$T/board2-api" rev-parse --short=7 main)"
+check "board, gate: nothing for a branch that is not here" \
+  eval 'grep -q "^\"gate\":{" "$T/board5.html" && [ -z "$(grep "^\"gate\":{" "$T/board5.html" | grep -F "\"B-4\"")" ]'
+check "board --text, gate: under the item, on this machine" has "$T/board5.txt" "        gate: failed ($(git -C "$T/board2-api" rev-parse --short=7 spike)) (on this machine)"
 # Offline (the hook's builds), the PRs are those last read: a PR opened or merged since is not in them, so what the
 # board says of a PR says when it was read, never "no PR yet".
 CLAIM_MACHINE=laptop PATH="$T/fakebin2:$PATH" "$SH" "$BD" --no-open --offline --out "$T/board5.html" "$T/board5" \
@@ -577,6 +594,9 @@ check "board --offline, where: an open PR read earlier says when" \
   has "$T/board5.html" '"B-2":"feat/two: PR #42 open, CI green, as read 20'
 check "board --offline, where: no PR when they were last read, not \"no PR yet\"" \
   has "$T/board5.html" '"B-5":"feat/pushed: pushed, no PR as read 20'
+grep -v '^GATES=' .claude/ground-truth.conf >"$T/conf5" && cat "$T/conf5" >.claude/ground-truth.conf
+CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --out "$T/board6.html" "$T/board5" >/dev/null 2>&1
+check "board, gate: no gate for a repo that GATES does not name" grep -qF '"B-2":"no gate"' "$T/board6.html"
 cd "$T/board2" || exit 1
 
 # Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
@@ -921,10 +941,13 @@ echo fail >state.txt && git_q commit -am broken
 "$SH" "$GA" run >"$T/gate-fail.txt" 2>&1
 check "gate run: a gate that fails, no receipt (exit 1)" eval '[ $? = 1 ] && has "$T/gate-fail.txt" "FAILED: the gate of project exited 1: no receipt for $(git rev-parse --short HEAD)" &&
   [ ! -e ".git/gate-receipts/$(git rev-parse HEAD)" ]'
+check "gate run: a failed run is recorded, with its exit code, for the board" \
+  grep -qx "exit: 1" ".git/gate-failures/$(git rev-parse HEAD)"
 echo edit >state.txt && git_q commit -am edits
 "$SH" "$GA" run >"$T/gate-edit.txt" 2>&1
 check "gate run: a gate that edits the tree, no receipt (exit 1)" eval '[ $? = 1 ] && has "$T/gate-edit.txt" "NO RECEIPT: the gate passed, but the checkout changed" &&
   [ ! -e ".git/gate-receipts/$(git rev-parse HEAD)" ]'
+check "gate run: a checkout changed while the gate passed is no failure" [ ! -e ".git/gate-failures/$(git rev-parse HEAD)" ]
 echo pass >state.txt && git_q commit -am fixed
 # The rule "receipt": the pre-push hook refuses a release tag whose commit has no receipt.
 "$SH" "$GA" hook >"$T/gate-hook.txt" 2>&1
@@ -938,7 +961,9 @@ git push origin v1.0.0 >"$T/gate-push0.txt" 2>&1
 check "gate hook: a release tag on a commit with no receipt is refused" \
   eval '[ $? != 0 ] && has "$T/gate-push0.txt" "REFUSED: v1.0.0 is on $(git rev-parse --short HEAD), which has not passed the gate here" &&
   [ -z "$(git ls-remote --tags origin v1.0.0)" ]'
+mkdir -p .git/gate-failures && echo "failed: before" >".git/gate-failures/$(git rev-parse HEAD)"
 "$SH" "$GA" run >/dev/null 2>&1
+check "gate run: a pass removes the record of a failure on that commit" [ ! -e ".git/gate-failures/$(git rev-parse HEAD)" ]
 git push origin v1.0.0 >"$T/gate-push1.txt" 2>&1
 check "gate hook: a release tag on a commit with a receipt goes" \
   eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.0)" ]'
