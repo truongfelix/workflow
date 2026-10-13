@@ -157,7 +157,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      to start the day's task, to open or merge a pull request, to release, and to comment or message; **Hands-off**
      asks first only to release, and to comment or message. Then ask which steps to change, with one option per step
      that the owner picks or not, each showing the preset's answer ("Commit code: does it, then tells you"); a
-     picked step takes the other answer. Four questions asked at once hold them all: the docs and the backlog
+     picked step takes the other answer. Each question says that picking none keeps its steps as they are: nothing
+     picked is that answer, not a skip. Four questions asked at once hold them all: the docs and the backlog
      (commit the docs, push them, add an item, claim one), code (commit code, push a work branch, delete a branch
      whose work has landed, stop a background job), sharing (open a pull request, merge one, release), and the rest
      (start the day's task, comment or message). Set the table's rows, then delete its FILL comment.
