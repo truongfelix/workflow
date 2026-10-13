@@ -153,15 +153,20 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    address, ask: "GitHub can refuse pushes that show your email address. Use your GitHub no-reply address as this
    project's commit email?" On a yes, set it for this repo alone (another clone needs the same line):
    `git config user.email "$(gh api user --jq '"\(.id)+\(.login)@users.noreply.github.com"')"`
-2. **Choose where the docs live.** Ask the owner which one, as a multiple-choice question that recommends neither: both
-   are valid, and the owner knows what the folder holds or will hold. Say in the question what each choice does, in
-   plain words, and that the docs cannot be moved out of a repo afterwards: "If the code may become public and the notes
-   must not, pick their own repo."
-   - *The docs belong to one repo:* the project root is that repo; the trackers are committed with its code. Other
-     repos can be added later, one command each; only this repo holds the docs.
-   - *The docs have their own repo:* a folder that holds only the docs (CLAUDE.md, trackers, `notes/`, `.claude/`),
-     with a whitelist `.gitignore` so the code repos inside it, data and keys stay out, and a PRIVATE remote. Every
-     code repo is attached to it.
+2. **Choose where the docs live.** Ask the owner this, as a multiple-choice question that recommends neither: both
+   are valid, and the owner knows what the folder holds or will hold. Ask it in these words (they follow the rule "A
+   question to the owner" of `CLAUDE.md`), changing only what the owner has told you:
+   > **Where should this project's notes and to-do lists live?**
+   > 1. **With the code, in this repo.** The notes are saved in the same repo as your code. This is simpler. You can
+   >    add other repos to the project later. The notes stay with this repo and can't be moved out afterwards.
+   > 2. **In a separate repo of their own.** The notes get a private repo, and every code repo is attached to it. This
+   >    takes one more repo to set up. Pick it if your code may become public and your notes must stay private. It
+   >    also suits a project with several repos from the start.
+
+   What the answer does: the first makes the project root the repo that holds the docs, committed with its code, and
+   other repos are attached later with `attach.sh`. The second makes the root a folder that holds only the docs
+   (CLAUDE.md, trackers, `notes/`, `.claude/`), with a whitelist `.gitignore` so the code repos inside it, data and keys
+   stay out, and a PRIVATE remote; every code repo is attached to it.
 3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` when the docs have their own repo). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
 4. **Fill**, in this order. The owner has not read these files: all the setup says or writes for the owner (its
