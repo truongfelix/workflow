@@ -470,7 +470,7 @@ tr.row { cursor: pointer; }
 tr.row:hover { background: var(--soft); }
 tr.row.sel { background: var(--on); }
 tr.closed td { color: var(--muted); }
-td.id, td.date, td.st { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.id, td.date, td.st, td.who { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
 .tablewrap { padding: 0 8px 16px; overflow-x: auto; }
@@ -547,7 +547,7 @@ catch (e) { document.body.textContent = "The board data could not be read: " + e
 var KINDS = { B: "Backlog", Q: "Questions", L: "Lessons", H: "Handoffs" };
 var FILES = { B: "BACKLOG.md", Q: "questions.md", L: "notes/lessons.md", H: "notes/handoff" };
 var STATES = {
-  B: [["open", "🔲", "open"], ["claimed", "🔲", "claimed"], ["waiting", "⏸️", "waiting"], ["closed", "✓", "closed"]],
+  B: [["open", "🔲", "open"], ["waiting", "⏸️", "waiting"], ["closed", "✓", "closed"]],
   Q: [["question", "💬", "open question"], ["waiting", "⏸️", "deferred"], ["ruling", "🟢", "ruling"], ["closed", "✓", "closed"]],
   L: [["lesson", "📘", "holds"], ["closed", "✗", "dropped"]],
   H: [["handoff", "📍", "live"], ["closed", "↩", "replaced"]]
@@ -567,7 +567,9 @@ D.items.forEach(function (it) {
     var i = l.indexOf(":");
     if (i > 0) it.f[l.slice(0, i)] = l.slice(i + 1).trim();
   });
-  it.status = it.closed ? "closed" : (it.kind === "B" && it.f.claimed ? "claimed" : it.state);
+  it.status = it.closed ? "closed" : it.state;
+  // Claimed is not a state: a claimed item is still open. Its column names who works on it, or None.
+  it.claimedBy = it.kind === "B" && !it.closed && it.f.claimed ? it.f.claimed.split(" on ")[0] : "";
   it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
   it.num = it.old ? 0 : parseInt(it.id.slice(2), 10);
   it.ruled = it.f.ruled || "";
@@ -634,7 +636,7 @@ D.items.forEach(function (it) {
 var S;
 function defaults() {
   return { tab: "B", repos: [],
-    st: { B: ["open", "claimed", "waiting"], Q: ["question", "waiting", "ruling"], L: ["lesson"], H: ["handoff", "closed"] },
+    st: { B: ["open", "waiting"], Q: ["question", "waiting", "ruling"], L: ["lesson"], H: ["handoff", "closed"] },
     dk: "changed", from: "", to: "", q: "", sort: "old", sel: "", back: "" };
 }
 function load() {
@@ -712,6 +714,10 @@ function stateOf(it) {
   var s = STATES[it.kind].filter(function (x) { return x[0] === it.status; })[0] || ["", "", it.status];
   return s[1] + " " + s[2] + (it.cross ? " ⚠" : "");
 }
+function claimCell(it) {
+  return it.claimedBy ? "<td class=\"who\" title=\"claimed: " + esc(it.f.claimed) + "\">" + esc(it.claimedBy) + "</td>" :
+    "<td class=\"who muted\">None</td>";
+}
 function chip(label, n, on, attrs) {
   return "<button class=\"chip" + (on ? " on" : "") + "\" " + attrs + ">" + esc(label) +
     (n === null ? "" : "<span class=\"n\">" + n + "</span>") + "</button>";
@@ -788,11 +794,12 @@ function render() {
     return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
-    "<table><thead><tr><th>Id</th><th>State</th><th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
+    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th>" : "") +
+    "<th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td><td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";
@@ -859,7 +866,8 @@ function panel() {
   var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + idOf(it) + " " + fmt(it.title) + "</h2>" +
     "<div class=\"muted\">" + esc(stateOf(it)) + " · " + esc(where) + "</div><dl>" +
     "<dt>section</dt><dd>" + (fmt(it.section) || "—") + "</dd>" +
-    (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>");
+    (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>") +
+    (it.kind === "B" && !it.closed && !it.f.claimed ? "<dt>claimed</dt><dd class=\"muted\">None</dd>" : "");
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
   h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
   var ps = prsOf(it);

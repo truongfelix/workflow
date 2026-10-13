@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# claim.sh — take a BACKLOG item for this session: push its `claimed:` line before any work on it
-# (notes/item-format.md, Claims).
+# claim.sh — claim a BACKLOG item when an agent starts working on it: add its `claimed:` line, which names the
+# agent, its session and its branch, and push it, so other sessions see it (notes/item-format.md, Claims).
 #
 # Two sessions must not work on the same item. The claim is a commit on the default branch of the repo that holds
 # BACKLOG.md, built on the tip of its remote and pushed there: the push is the lock. When another session pushed
@@ -36,7 +36,7 @@ line="claimed: $who on $branch"
 
 fail() { echo "UNKNOWN: $*; nothing claimed"; exit 2; }
 cd "$ROOT" || fail "cannot reach the project root"
-top=$(git rev-parse --show-toplevel 2>/dev/null) || fail "$ROOT is not a git checkout: a claim is a push"
+top=$(git rev-parse --show-toplevel 2>/dev/null) || fail "$ROOT is not a git checkout: a claim is pushed, so other sessions see it"
 path="$(git rev-parse --show-prefix)BACKLOG.md" # BACKLOG.md's path in its repo
 
 remote=origin def=""

@@ -63,8 +63,8 @@ open that already shipped, "done" items whose code changed since).
    - The board's path in one line: `Board: <path> (/board opens it; an open board updates itself)`.
    - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
      CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
-5. **Claim the task before any work on it**, once it is started (the user's yes, or the row "Start the day's task
-   after the brief"): `bash .claude/skills/session-start/claim.sh <B-id> <branch>`, as the row "Claim an item" in
+5. **Claim the task when the work on it starts** (the user's yes, or the row "Start the day's task after the
+   brief"): `bash .claude/skills/session-start/claim.sh <B-id> <branch>`, as the row "Claim an item" in
    CLAUDE.md allows. The branch is where the work goes (`feat/B-12-offline-list`, or the branch an earlier session
    pushed); add `<agent>@<session>` when the owner named the session. Exit 0: the item is yours, say so. Exit 1:
    another session claimed it first, or the item is not on the remote yet (push a new item first, the row "Add an

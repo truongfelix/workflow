@@ -13,8 +13,8 @@ is in flight today (running jobs, the task of the day) is in the handoffs, `note
   `Done when:`. ⚠ marks a cross-repo item, which runs alone in the order of its `repos:` line, producer first; never
   inside one section's batch. ⏸️ marks an item waiting for the trigger in its `waits:` line.
 - **A new item takes the id in `next id`**; the same edit raises that line and names who took it.
-- **Claim an item before any work on it**: `claim.sh` pushes its `claimed:` line (`notes/item-format.md`, Claims),
-  so no other session takes it. An item another session claimed is theirs.
+- **An item is claimed when an agent starts working on it**: `claim.sh` adds its `claimed:` line and pushes it
+  (`notes/item-format.md`, Claims), so no other session takes it. An item another session claimed is theirs.
 - An item is what is wrong or missing, a pointer to the detail, and when it is **done**. How it was found goes in
   the commit message.
 - **Cite an item by its id** (with its title for the reader), never by a position: positions move, ids do not.

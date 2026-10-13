@@ -244,7 +244,7 @@ fi
 
 # Claims (notes/item-format.md, Claims): each `claimed:` line of BACKLOG.md, as pushed to DOCS_BASE and as here, with
 # the branch it names in the item's repos (its `repos:` line, else its section's first word, as on the board; all
-# the repos when neither names one). A claim not pushed is no claim yet: no other session sees it. A branch that is
+# the repos when neither names one). A claim not pushed is seen by no other session. A branch that is
 # gone, or has had no commit for CLAIM_STALE_DAYS days (counted from the claim when the branch is older), holds an
 # item for a session that may have stopped. Parsed in bash, not awk: titles hold emoji (macOS awk, notes/lessons.md).
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

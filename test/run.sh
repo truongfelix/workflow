@@ -294,6 +294,8 @@ check "board: a deleted item comes back as closed, with its date" item_has B-1 '
 check "board: a closed item keeps its last text" item_has B-1 '"title":"First"'
 check "board: an item not committed yet" item_has B-3 '"not committed yet","added"]'
 check "board: a question's repos" item_has Q-1 '"fields":"repos: api, web"'
+check "board: claimed is a column of the backlog, not a state" \
+  eval 'has "$T/board.html" "(S.tab === \"B\" ? \"<th>Claimed</th>\" : \"\")" && lacks "$T/board.html" "[\"claimed\", \"🔲\", \"claimed\"]"'
 check "board: text cannot end the page's script early" [ "$(grep -c '</script>' "$T/board.html")" = 2 ]
 if command -v node >/dev/null 2>&1; then
   node -e 'var h = require("fs").readFileSync(process.argv[1], "utf8");

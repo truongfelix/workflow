@@ -77,8 +77,8 @@ silently, leaving two items numbered B-13.
 | questions | 🟢 | ruling in force |
 | questions | ⏸️ | deferred: the trigger is in `waits:` |
 
-A lesson has no state. "In progress" and "done" are never written by hand: an item in progress has a `claimed:`
-line (Claims, below), and a finished item is deleted (git keeps it). So a state can never disagree with the facts
+A lesson has no state. "In progress" and "done" are never written by hand: an item in progress is still 🔲 open, with
+a `claimed:` line that names who works on it (Claims, below), and a finished item is deleted (git keeps it). So a state can never disagree with the facts
 behind it.
 
 ## Fields
@@ -115,8 +115,9 @@ name from `.claude/ground-truth.conf` (`## api`), so a BACKLOG item rarely needs
 
 ## Claims
 
-Two sessions must not work on one item. A session takes an item before any work on it, as the row "Claim an item"
-in `CLAUDE.md` ("What Claude does alone") allows:
+An item is claimed when an agent starts working on it: the claim says who works on it, and where. Two sessions must
+not work on one item, so the claim is pushed at once, as the row "Claim an item" in `CLAUDE.md` ("What Claude does
+alone") allows:
 
 ```bash
 bash .claude/skills/session-start/claim.sh B-12 feat/B-12-offline-list
@@ -158,7 +159,7 @@ the handoffs too (`notes/handoff-format.md`, "The check").
 ## The board
 
 `bash .claude/skills/session-start/board.sh` writes both trackers, the lessons and the handoffs as one page, a tab each,
-and opens it: the repos and their count, every item with its state, repos and dates, filters by repo (one, several, or
+and opens it: the repos and their count, every item with its state (and in the backlog, who claimed it), repos and dates, filters by repo (one, several, or
 the items that span more than one), state, date (added, last changed, closed, ruled) and text, each item's history from
 git, and the handoffs that name it. Each commit opens to its whole message and the files it changed; a commit hash
 quoted anywhere (an item, a handoff, a commit message, a PR) links to that commit in whichever repo of
