@@ -39,7 +39,7 @@ set -uo pipefail
 # handoffs too, those on disk and those git has seen, for the ones that name it. A shallow clone, or no git, holds
 # only part of the past: the history is UNKNOWN then, never "none".
 show() { # <id>
-  local id=$1 self sh tab n f v git_ok=0 shallow="" idre
+  local id=$1 self sh tab n f v git_ok=0 shallow="" idre gone
   self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
   sh=${BASH:-bash} tab=$(printf '\t')
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || { echo "UNKNOWN: cannot reach the project root"; return 2; }
@@ -85,7 +85,8 @@ show() { # <id>
     f="$T/v/$v/notes/handoff.md"
     [ -s "$f" ] && grep -Eq "$idre" "$f" && sed -n '1s/^# *Handoff *(\(.*\))[[:space:]]*$/\1/p' "$f"
   done | awk '$0 != "" && !seen[$0]++ { print "a 1.x handoff of " $0 " (before handoffs had ids)" }' >"$T/old"
-  awk -F '\t' -v id="$id" -v gone="$(case ${id%%-*} in L) echo dropped ;; H) echo replaced ;; *) echo closed ;; esac)" -v idre="$idre" -v vdir="$T/v" -v oldf="$T/old" -v shallow="$shallow" -v git_ok="$git_ok" '
+  case ${id%%-*} in L) gone=dropped ;; H) gone=replaced ;; *) gone=closed ;; esac # not in $( ): bash 3.2 misreads it
+  awk -F '\t' -v id="$id" -v gone="$gone" -v idre="$idre" -v vdir="$T/v" -v oldf="$T/old" -v shallow="$shallow" -v git_ok="$git_ok" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
