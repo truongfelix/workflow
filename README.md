@@ -118,6 +118,8 @@ wrong. A few:
   nothing". The script says UNKNOWN and exits 2.
 - **Nothing exists only on one disk without being named.** Uncommitted work on a dead laptop does not exist.
 - **Propose, then wait.** The session recommends; you pick the day's work.
+- **Only approved items are built.** A new idea or a bug met on the way becomes a backlog item first, and is built
+  once you approve it. So the backlog does not drift: it stays the whole list of the work.
 - **You choose what Claude does alone.** One table: for each step (the day's task, commit, push, PR, merge, release,
   messages), ask you first, or do it and tell you. Set at setup, changed whenever you say so.
 
