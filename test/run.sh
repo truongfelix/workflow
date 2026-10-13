@@ -164,6 +164,11 @@ check "adopt.sh lists no FILL marker of a script (B-52)" lacks "$T/adopt.txt" ".
 check "adopt.sh: the lessons hold no sample lesson" lacks notes/lessons.md "Stacked PRs"
 check "adopt.sh: CLAUDE.md does not send improvements back to the workflow repo" lacks CLAUDE.md "port that part back"
 check "adopt.sh: BACKLOG.md has no placeholder for a second repo" lacks BACKLOG.md "second repo"
+# B-55: the trackers' rules are in the item format, not in the files every session reads.
+check "adopt.sh: BACKLOG.md does not carry the rules, the item format does" \
+  eval 'lacks BACKLOG.md "Only approved items are built" && has notes/item-format.md "Only approved items are built"'
+check "adopt.sh: questions.md does not carry the rules, and points to the item format" \
+  eval 'lacks questions.md "moves to §2 as" && has questions.md "The rules of the two trackers"'
 # B-54: a config still holding its FILL lines is a finding in the ground truth, until the lines are gone.
 mkdir "$T/fresh" && (cd "$T/fresh" && git_q init -b main && "$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1)
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)

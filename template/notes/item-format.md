@@ -154,6 +154,36 @@ keeps the claim with its branch pushed and named under "Unfinished", or deletes 
 the item. A new session has a new name: going on with a claim its handoff kept, it takes the claim over with
 `--from <the claim's agent@session>`, which replaces the line only while the remote still has that claim.
 
+## The rules of the two trackers
+
+`BACKLOG.md` and `questions.md` point here instead of repeating these in every session.
+
+**BACKLOG.md**
+- **Only approved items are built.** A new idea, an extra or a bug met on the way becomes an item first, and is built
+  once the owner approved it: with a yes when it is added or when its work starts (`CLAUDE.md`, the rows "Add an item
+  to the backlog" and "Start the day's task after the brief"). So nothing is built that the file does not show, and it
+  stays the whole list of the work.
+- **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading as
+  authoritative. The commit that deletes it says where it landed (a commit hash, a PR number), so the board leads from
+  the closed item to the work. Measured results go to `notes/`.
+- **Sections are cut along repos or file trees**, so one session (or one worktree) can take a section while another
+  session takes another, and their work merges cleanly. A ⚠ cross-repo item runs alone, in the order of its `repos:`
+  line, producer first; never inside one section's batch.
+- An item is what is wrong or missing, a pointer to the detail, and when it is **done**. How it was found goes in the
+  commit message.
+- **Cite an item by its id** (with its title for the reader), never by a position: positions move, ids do not.
+- **Re-confirm before acting**: an item can be done already (`/session-start` step 3). A deleted item can also come
+  back through a long-lived branch that carried an old copy of the file: `git log -S'<id> ' -- BACKLOG.md`.
+
+**questions.md**
+- Name things by what the owner sees (a screen's title, a command), not by code names. A question carries the options
+  and a recommendation.
+- When the owner rules, the entry moves to §2 as 🟢 with their words and a `ruled:` date, or it is deleted if nothing
+  is left to guard. A ruling that no longer guards anything is deleted too: git keeps it, and the board shows it as
+  archived (`/handoff` proposes a trim when the file grows past `QUESTIONS_TRIM_LINES` in
+  `.claude/ground-truth.conf`).
+- Cite an entry by its id, with its title for the reader.
+
 ## The check
 
 `bash .claude/skills/session-start/items.sh check` reads both trackers and the lessons, and lists, with its file and

@@ -9,13 +9,8 @@ Status: 💬 needs the owner's decision · 🟢 decided (ruling in force) · ⏸
 
 next id: Q-4 (last given to claude@pantry)
 
-Every entry has one shape (`notes/item-format.md`): `### <state> <id> <title>`, its fields, then the question or
-the ruling, its reason, and a pointer to the detail. Name things by what the owner sees (a screen's title, a
-command), not by code names. A question carries the options and a recommendation. When the owner rules, the entry
-moves to §2 as 🟢 with their words and a `ruled:` date, or it is deleted if nothing is left to guard. A ruling that
-no longer guards anything is deleted too: git keeps it, and the board shows it as archived (`/handoff` proposes a trim
-when this file grows past `QUESTIONS_TRIM_LINES` in `.claude/ground-truth.conf`). Cite an entry by its **id**, with
-its title for the reader.
+Every entry has one shape, and its rules (a question carries options and a recommendation; a ruling keeps the
+owner's words) are in `notes/item-format.md`, "The rules of the two trackers".
 
 ---
 
