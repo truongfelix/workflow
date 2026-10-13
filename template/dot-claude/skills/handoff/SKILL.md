@@ -15,7 +15,7 @@ session can find out what happened and why.
 | What | Where | Rule |
 |---|---|---|
 | Next tasks (task of the day), what waits for the user, what runs in the background, the last session | `notes/handoff/<session>.md`, one per live session (`notes/handoff-format.md`) | Rewritten by its own session at each handoff, after the old one is distilled; deleted when the session's work has landed or was taken over |
-| Earlier handoffs, closed items, dropped lessons | git | No archive files: the board shows them; search with `git log -p -S'<id> ' -- <file>` |
+| Earlier handoffs, closed items, dropped lessons | git | No archive files: the board shows them; `items.sh show <id>` prints one |
 | Open work | `BACKLOG.md` | One section per repo or file tree; every item in the shape of `notes/item-format.md`, with its id. A landed item is deleted, not ticked. Cross-repo items marked ⚠ |
 | Questions for the user, rulings, deliberate non-fixes | `questions.md` | §1 💬 open; when the user rules, it moves to §2 as 🟢 with their words and a `ruled:` date. Same item shape as `BACKLOG.md` |
 | Long-term state, rules, how-tos | `CLAUDE.md` | State, not history: no PR lists, no commit hashes, no to-dos |

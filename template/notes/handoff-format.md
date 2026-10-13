@@ -61,9 +61,12 @@ Keep it under about 60 lines: what needs more space goes in a topic note, linked
 ## Git is the archive
 
 There is no archive file. A replaced handoff, a finished item, a ruling that no longer guards anything and a lesson
-that no longer holds are deleted from their live file, and git keeps each one word for word: `git log -p
--S'H-11 ' -- notes/handoff/` finds a handoff, `git log -S'B-12 '` an item's whole life (search with the next
-character too, so `B-12` does not match `B-120`). The board shows them all, from git: past handoffs, closed items, dropped lessons.
+that no longer holds are deleted from their live file, and git keeps each one word for word.
+`bash .claude/skills/session-start/items.sh show <id>` prints any of them (B-, Q-, L- or H-), live or deleted: its
+text, the commits that added, changed and closed it, and the handoffs that name it. The board shows them all: past
+handoffs, closed items, dropped lessons. Both say when git cannot vouch for the past: in a shallow clone the history
+before its oldest commit is UNKNOWN (`git fetch --unshallow`), never "none"; and an id that git shows given twice
+(back under another title after it was closed, or held by two items at once) is flagged.
 
 ## The check
 

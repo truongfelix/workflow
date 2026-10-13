@@ -135,8 +135,11 @@ add_version() { # <file> <sha or ""> <day> <subject>: one version of <file>, fro
   printf '%s\t%s\t%s\t%s\t%s\n' "$n" "$1" "$2" "$3" "${4//$tab/ }" >>"$T/versions"
   if [ "$1" = notes/handoff.md ]; then oldv+=("$n/$1"); else versions+=("$n/$1"); fi
 }
+shallow="" # a shallow clone: the date of the oldest commit it holds; what came before is UNKNOWN
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   head=$(git rev-parse --short HEAD 2>/dev/null)
+  [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ] &&
+    shallow=$(git log --format=%cd --date=short 2>/dev/null | tail -n 1)
   {
     printf '%s\n' "${trackers[@]}" notes/handoff.md
     git log --format= --name-only --relative -- notes/handoff/ 2>/dev/null
@@ -300,9 +303,11 @@ fi
 
 # The data: one JSON object, one item per line. An item's events come from comparing each version with the one
 # before: added, changed (and how), closed when a version no longer has it, reopened when a later one has it again.
+# An id that git shows given twice is flagged: back under another title after it was closed, or held by two items in
+# one version. In a shallow clone, what the oldest commit holds has no "added": its past is UNKNOWN.
 # Text from items.sh is already escaped for JSON but for its quotes; "</" is cut so the page's script cannot end early.
 awk -v vfile="$T/versions" -v hfile="$T/hist" -v project="$project" -v head="$head" -v repos="$repos" \
-  -v generated="$(date '+%Y-%m-%d %H:%M')" '
+  -v shallow="$shallow" -v generated="$(date '+%Y-%m-%d %H:%M')" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
@@ -312,7 +317,7 @@ function je(s) { return "\"" swap(swap(swap(s, "\"", "\\\""), "</", "<\\/"), "*/
 function js(s) { return je(swap(swap(swap(swap(s, "\\", "\\\\"), "\t", "\\t"), "\n", "\\n"), "\r", "\\r")) }
 function ev(id, n, what) {
   hist[id] = hist[id] (hist[id] == "" ? "" : ",") "[" js(vday[n]) "," js(vsha[n]) "," js(vsubj[n]) "," js(what) "]"
-  if (!(id in added)) added[id] = vday[n]
+  if (!(id in added)) added[id] = (what == UNK) ? "" : vday[n]
   changed[id] = vday[n]
   closed[id] = (what == "closed") ? n : 0
 }
@@ -326,19 +331,24 @@ function how(a, b,   A, B, out) { # A and B: state, cross, section, title, field
   if (out == "" || A[2] != B[2] || A[6] != B[6]) out = out ", edited"
   return substr(out, 3)
 }
+function at(n) { return vsha[n] != "" ? substr(vsha[n], 1, 7) " (" vday[n] ")" : "the files not committed yet" }
+function given_twice(id, why) {
+  if (!(id in twice)) torder[++nt] = id
+  twice[id] = twice[id] (twice[id] == "" ? "" : "; ") why
+}
 function item(id, state, cross, section, title, fields, body, file, line, closedn) {
   printf "%s{\"kind\":%s,\"id\":%s,\"state\":%s,\"cross\":%d,\"section\":%s,\"title\":%s,\"fields\":%s,\"body\":%s,", \
     sep, js(substr(id, 1, 1)), js(id), js(state), cross, je(section), je(title), je(fields), je(body)
-  printf "\"file\":%s,\"line\":%d,\"added\":%s,\"changed\":%s,\"closed\":%s,\"history\":[%s]}\n", js(file), line, \
-    js(added[id]), js(changed[id]), js(closedn ? vday[closedn] : ""), hist[id]
+  printf "\"file\":%s,\"line\":%d,\"added\":%s,\"changed\":%s,\"closed\":%s,\"twice\":%s,\"history\":[%s]}\n", \
+    js(file), line, js(added[id]), js(changed[id]), js(closedn ? vday[closedn] : ""), js(twice[id]), hist[id]
   sep = ","
 }
-BEGIN { FS = "\t" }
+BEGIN { FS = "\t"; UNK = "in the oldest commit of this shallow clone: what came before is UNKNOWN" }
 FILENAME == vfile { N = $1 + 0; vtr[N] = $2; vsha[N] = $3; vday[N] = $4; vsubj[N] = $5; next }
 FILENAME == hfile {
   if ($1 != "I") next
   n = substr($2, 1, index($2, "/") - 1) + 0
-  if ((n, $4) in has) next
+  if ((n, $4) in has) { if (!($4 in dup)) { dup[$4] = 1; given_twice($4, "two items hold it in " at(n)) }; next }
   has[n, $4] = $5 "\t" $6 "\t" $7 "\t" $8 "\t" $9 "\t" $10; ids[n] = ids[n] " " $4; lastn[$4] = n
   next
 }
@@ -348,14 +358,24 @@ END {
     p = prev[vtr[n]] + 0
     k = split(ids[n], L, " ")
     for (i = 1; i <= k; i++) {
-      if (!p || !((p, L[i]) in has)) ev(L[i], n, (L[i] in added) ? "reopened" : "added")
-      else if (has[p, L[i]] != has[n, L[i]]) ev(L[i], n, how(has[p, L[i]], has[n, L[i]]))
+      id = L[i]
+      if (!p || !((p, id) in has)) {
+        if (!p && shallow != "" && vsha[n] != "") w = UNK
+        else if (!(id in added)) w = "added"
+        else {
+          split(last[id], A, "\t"); split(has[n, id], B, "\t"); w = "reopened"
+          if (A[4] != B[4]) { w = "given again"; given_twice(id, "closed as \"" A[4] "\", given again in " at(n) " to \"" B[4] "\"") }
+        }
+        ev(id, n, w)
+        if (w == "given again") added[id] = vday[n] # another item: added when the id was given again
+      } else if (has[p, id] != has[n, id]) ev(id, n, how(has[p, id], has[n, id]))
+      last[id] = has[n, id]
     }
     if (p) { k = split(ids[p], L, " "); for (i = 1; i <= k; i++) if (!((n, L[i]) in has)) ev(L[i], n, "closed") }
     prev[vtr[n]] = n
   }
-  printf "{\"project\":%s,\"generated\":%s,\"head\":%s,\"git\":%s,\"repos\":[", js(project), js(generated), js(head), \
-    N ? "true" : "false"
+  printf "{\"project\":%s,\"generated\":%s,\"head\":%s,\"git\":%s,\"shallow\":%s,\"repos\":[", js(project), \
+    js(generated), js(head), N ? "true" : "false", js(shallow)
   k = split(repos, L, " "); for (i = 1; i <= k; i++) printf "%s%s", (i > 1 ? "," : ""), js(L[i])
   printf "],\n\"items\":[\n"
   for (i = 1; i <= nn; i++) {
@@ -372,6 +392,12 @@ END {
     if (F[1] != "P" && F[1] != "U") continue
     printf "%s\n{\"type\":%s,\"file\":%s,\"line\":%d,\"text\":%s}", sep, js(F[1]), js(F[2]), F[3], \
       (F[2] == "" ? js(F[4]) : je(F[4]))
+    sep = ","
+  }
+  for (i = 1; i <= nt; i++) {
+    id = torder[i]
+    printf "%s\n{\"type\":\"P\",\"file\":%s,\"line\":0,\"text\":%s}", sep, js(vtr[lastn[id]]), \
+      js(id " is given twice in git: " twice[id])
     sep = ","
   }
   printf "],\n"
@@ -729,7 +755,9 @@ function render() {
   document.title = D.project + " board";
   document.getElementById("title").textContent = D.project + " board";
   document.getElementById("meta").textContent = "built " + D.generated + (D.head ? " at " + D.head : "") +
-    (D.git ? "" : " · no git history: no dates, no closed items") + " · read-only: the trackers are the source";
+    (D.git ? "" : " · no git history: no dates, no closed items") +
+    (D.shallow ? " · a shallow clone: the history before " + D.shallow + " is UNKNOWN (git fetch --unshallow)" : "") +
+    " · read-only: the trackers are the source";
 
   // Repos: how many the project has, and how many items each holds with the other filters applied.
   var cnt = function (pred) { return tabItems.filter(function (it) { return shown(it, "repos") && pred(it); }).length; };
@@ -776,7 +804,7 @@ function render() {
     "<details class=\"problems\"><summary>" + probs.length + " problem(s) in " + FILES[S.tab] +
     ": not in its format (" + (S.tab === "H" ? "notes/handoff-format.md" : "notes/item-format.md") + ")</summary>" + probs.map(function (p) {
       return p.type === "U" ? "<div>" + esc(p.file + ":" + p.line) + ": not read as an item, shown as written:</div><pre>" +
-        esc(p.text) + "</pre>" : "<div>" + esc((p.file ? p.file + ":" + p.line + ": " : "") + p.text) + "</div>";
+        esc(p.text) + "</pre>" : "<div>" + esc((p.file ? p.file + (p.line ? ":" + p.line : "") + ": " : "") + p.text) + "</div>";
     }).join("") + "</details>";
 
   var unread = D.prsRead.filter(function (r) { return r.status.indexOf("ok") !== 0; });
@@ -799,7 +827,7 @@ function render() {
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) : "") + "<td>" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";
@@ -864,7 +892,8 @@ function panel() {
   if (!it) return;
   var where = it.closed ? "closed on " + it.closed + "; last in " + it.file : it.file + ":" + it.line;
   var h = "<button class=\"chip close\" id=\"close\">Close</button><h2>" + idOf(it) + " " + fmt(it.title) + "</h2>" +
-    "<div class=\"muted\">" + esc(stateOf(it)) + " · " + esc(where) + "</div><dl>" +
+    "<div class=\"muted\">" + esc(stateOf(it)) + " · " + esc(where) + "</div>" +
+    (it.twice ? "<div class=\"note\">⚠ " + esc(it.id) + " is given twice in git: " + esc(it.twice) + "</div>" : "") + "<dl>" +
     "<dt>section</dt><dd>" + (fmt(it.section) || "—") + "</dd>" +
     (it.f.repos ? "" : "<dt>repos</dt><dd>" + (esc(it.repos.join(", ")) || "—") + "</dd>") +
     (it.kind === "B" && !it.closed && !it.f.claimed ? "<dt>claimed</dt><dd class=\"muted\">None</dd>" : "");
@@ -876,7 +905,8 @@ function panel() {
   if (by.length) h += "<b>Named in handoffs</b><div class=\"body\">" + by.map(function (x) {
     return "<a href=\"#\" data-id=\"" + esc(x.id) + "\">" + esc(idOf(x)) + "</a> " + esc(x.title) + (x.closed ? " (replaced)" : "");
   }).join("\n") + "</div>";
-  h += "<b>History</b>";
+  h += "<b>History</b>" + (D.shallow ? "<div class=\"note\">A shallow clone: what came before " + esc(D.shallow) +
+    " is UNKNOWN (git fetch --unshallow).</div>" : "");
   h += !it.history.length ? "<div class=\"muted\">No commit has it yet.</div>" : "<ol class=\"hist\">" +
     it.history.slice().reverse().map(function (e) {
       var c = commits[e[1]];

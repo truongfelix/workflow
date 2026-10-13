@@ -28,8 +28,9 @@ open that already shipped, "done" items whose code changed since).
    A project still on 1.x has one `notes/handoff.md`: read it; its next `/handoff` moves it.
    - If there is none for this session, or it is older than the latest activity in git or on GitHub, say so, and
      build the brief from `BACKLOG.md`, `questions.md` and the ground truth instead.
-   - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: search an id with
-     `git log -p -S'<id> ' -- <file>` when a handoff or a question points there.
+   - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: when a handoff or a
+     question points to one, `bash .claude/skills/session-start/items.sh show <id>` prints it, with its history and
+     the handoffs that name it.
    - Beyond the Next list, open work is in `BACKLOG.md` and the user's open questions in `questions.md` §1. Read them
      when the Next list is done or the user asks for something else. `questions.md` §2 holds rulings and deliberate
      non-fixes: never propose "fixing" one of those.

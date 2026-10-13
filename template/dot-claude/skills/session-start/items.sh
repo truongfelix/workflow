@@ -9,11 +9,12 @@
 # runs it after the ground truth, /handoff before committing the trackers. A handoff is checked for its heading,
 # its six sections in order, and the B- or Q- id that each task in Next and Waiting for the user starts with: an id
 # that is in no tracker read in the same run is reported. `list` prints the items themselves, for the board
-# (board.sh).
+# (board.sh). `show` prints one item, live or deleted, from the files and git: a session finds it without the board.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
 # Usage: bash .claude/skills/session-start/items.sh check|list [file...]
+#        bash .claude/skills/session-start/items.sh show <B-, Q-, L- or H- id>
 #   No file: BACKLOG.md, questions.md, notes/lessons.md and notes/handoff/*.md at the project root. A file named
 #   BACKLOG*.md holds B- items, one named questions*.md Q- items, one named lessons*.md L- items; in a handoff/
 #   folder, README.md holds the handoffs' `next id` and every other *.md file is one handoff (H-).
@@ -26,12 +27,153 @@
 #     P <file> <line> <problem>         what check would report
 # Exit 0 = every item follows the format. Exit 2 = a problem was found, or a file could not be read (UNKNOWN, never
 # a pass). Exit 1 on a usage error only.
+#   show prints the item: its text (live, or its last version in git and the commit that closed it), its history
+#   (each commit that added, changed, closed or reopened it), and the handoffs that name it, live or replaced. Exit 0
+#   = shown; 1 = no item has this id, in the files or in git, or a usage error; 2 = UNKNOWN: a shallow clone or no git
+#   holds only part of the past (what is there is shown first).
 
 set -uo pipefail
 
+# show: one item, live or from git, with its history and the handoffs that name it (notes/handoff-format.md, "Git is
+# the archive"). Every version of its file is read from git (first parent, oldest first), then the file on disk; the
+# handoffs too, those on disk and those git has seen, for the ones that name it. A shallow clone, or no git, holds
+# only part of the past: the history is UNKNOWN then, never "none".
+show() { # <id>
+  local id=$1 self sh tab n f v git_ok=0 shallow="" idre
+  self="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+  sh=${BASH:-bash} tab=$(printf '\t')
+  cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || { echo "UNKNOWN: cannot reach the project root"; return 2; }
+  T=$(mktemp -d "${TMPDIR:-/tmp}/items-show.XXXXXX") || { echo "UNKNOWN: mktemp failed"; return 2; }
+  trap 'rm -rf "$T"' EXIT
+  if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; then export LC_ALL=en_US.UTF-8; fi
+  if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git_ok=1
+    [ "$(git rev-parse --is-shallow-repository 2>/dev/null)" = true ] &&
+      shallow=$(git log --format=%cd --date=short 2>/dev/null | tail -n 1)
+  fi
+  # The files: the item's tracker, and every handoff (an H item is one; the others name items).
+  {
+    case ${id%%-*} in B) echo BACKLOG.md ;; Q) echo questions.md ;; L) echo notes/lessons.md ;; esac
+    for f in notes/handoff/*.md; do [ -e "$f" ] && echo "$f"; done
+    [ "$git_ok" = 1 ] && git log --format= --name-only --relative -- notes/handoff/ 2>/dev/null
+    echo notes/handoff.md # a 1.x handoff, read for the ids it names
+  } | grep -v '/README\.md$' | grep '\.md$' | awk '!seen[$0]++' >"$T/files"
+  : >"$T/versions"
+  n=0
+  version() { # <file> <sha or ""> <day> <subject>
+    n=$((n + 1))
+    mkdir -p "$T/v/$n/$(dirname "$1")"
+    if [ -n "$2" ]; then git show "$2:./$1" >"$T/v/$n/$1" 2>/dev/null || : >"$T/v/$n/$1"
+    elif [ -f "$1" ]; then cp "$1" "$T/v/$n/$1"
+    else : >"$T/v/$n/$1"
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$n" "$1" "$2" "$3" "${4//$tab/ }" >>"$T/versions"
+  }
+  while IFS= read -r f; do
+    if [ "$git_ok" = 1 ]; then
+      git log --first-parent --reverse --date=short --format="%H$tab%cd$tab%s" -- "$f" >"$T/log" 2>/dev/null
+      while IFS="$tab" read -r sha day subject; do version "$f" "$sha" "$day" "$subject"; done <"$T/log"
+    fi
+    version "$f" "" "$(date +%Y-%m-%d)" "not committed yet" # the file now: an event only where it differs
+  done <"$T/files"
+  awk -F '\t' '$2 != "notes/handoff.md" { print $1 "/" $2 }' "$T/versions" >"$T/paths"
+  : >"$T/list"
+  [ -s "$T/paths" ] && (cd "$T/v" && xargs "$sh" "$self" list <"$T/paths" >"$T/list" 2>/dev/null)
+  idre="(^|[^A-Za-z0-9-])$id([^0-9]|\$)"
+  # 1.x handoffs (one notes/handoff.md, no id) that name it: by the date in their heading.
+  awk -F '\t' '$2 == "notes/handoff.md" { print $1 }' "$T/versions" | while IFS= read -r v; do
+    f="$T/v/$v/notes/handoff.md"
+    [ -s "$f" ] && grep -Eq "$idre" "$f" && sed -n '1s/^# *Handoff *(\(.*\))[[:space:]]*$/\1/p' "$f"
+  done | awk '$0 != "" && !seen[$0]++ { print "a 1.x handoff of " $0 " (before handoffs had ids)" }' >"$T/old"
+  awk -F '\t' -v id="$id" -v gone="$(case ${id%%-*} in L) echo dropped ;; H) echo replaced ;; *) echo closed ;; esac)" -v idre="$idre" -v vdir="$T/v" -v oldf="$T/old" -v shallow="$shallow" -v git_ok="$git_ok" '
+function swap(s, a, b,   out, i) {
+  out = ""
+  while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
+  return out s
+}
+function unesc(s) { return swap(swap(swap(swap(s, "\\\\", "\001"), "\\n", "\n"), "\\t", "\t"), "\001", "\\") }
+function short(n) { return vsha[n] == "" ? "-------" : substr(vsha[n], 1, 7) }
+function has_claim(fields) { return index("\n" fields, "\nclaimed: ") > 0 }
+function how(a, b,   A, B, out) { # state, cross, section, title, fields, body
+  split(a, A, "\t"); split(b, B, "\t"); out = ""
+  if (A[1] != B[1]) out = out ", " A[1] " → " B[1]
+  if (has_claim(A[5]) != has_claim(B[5])) out = out (has_claim(B[5]) ? ", claimed" : ", claim released")
+  if (A[4] != B[4]) out = out ", renamed"
+  if (A[3] != B[3]) out = out ", moved to " B[3]
+  if (out == "" || A[2] != B[2] || A[6] != B[6]) out = out ", edited"
+  return substr(out, 3)
+}
+function event(n, what) { ev[++ne] = vday[n] "  " short(n) "  " what ": " vsubj[n] }
+function text(n, ln, f,   path, line, i, fence, out) { # the item as written in version n, from its heading
+  path = vdir "/" n "/" f; i = 0; fence = 0; out = ""
+  while ((getline line < path) > 0) {
+    sub(/\r$/, "", line)
+    if (++i < ln) continue
+    if (i > ln && !fence && f !~ /handoff\// && (line ~ /^#+ / || line ~ /^---+[ \t]*$/)) break
+    if (line ~ /^[ \t]*(```|~~~)/) fence = !fence
+    out = out line "\n"
+  }
+  close(path); sub(/\n+$/, "", out); return out
+}
+FILENAME ~ /versions$/ { vfile[$1] = $2; vsha[$1] = $3; vday[$1] = $4; vsubj[$1] = $5; N = $1 + 0; disk[$2] = $1 + 0; next }
+$1 != "I" { next }
+{ n = substr($2, 1, index($2, "/") - 1) + 0 }
+$4 == id && (n in rec) { if (!twice) twice = "two items hold it in " short(n) " (" vday[n] ")"; next }
+$4 == id { rec[n] = $5 "\t" $6 "\t" $7 "\t" $8 "\t" unesc($9) "\t" unesc($10); line[n] = $3; title[n] = $8; next }
+$5 == "handoff" { inv[$4, n] = 1 }
+$5 == "handoff" && match(" " unesc($10) " ", idre) { cites[$4] = $8; cn[$4] = n; if (!($4 in corder)) corder[$4] = ++nc }
+END {
+  for (n = 1; n <= N; n++) {
+    f = vfile[n]; p = prev[f] + 0
+    if (n in rec) {
+      if (!p || !(p in rec)) {
+        if (!p && shallow != "" && vsha[n] != "") event(n, "here in the oldest commit of this shallow clone: its past is UNKNOWN")
+        else if (!seen) event(n, "added")
+        else if (title[n] != lasttitle) {
+          event(n, "given again, to another item")
+          twice = (twice ? twice "; " : "") "closed as \"" lasttitle "\", given again in " short(n) " (" vday[n] ") to \"" title[n] "\""
+        } else event(n, "reopened")
+        seen = 1
+      } else if (rec[p] != rec[n]) event(n, how(rec[p], rec[n]))
+      lastn = n; lasttitle = title[n]
+    } else if (p && (p in rec)) { event(n, gone); closedn = n }
+    prev[f] = n
+  }
+  if (!seen) {
+    if (git_ok && shallow == "") { print id ": no item has this id, in the files or in their history in git"; exit 1 }
+    print "UNKNOWN: " id " is in no file here" (git_ok ? ", and this shallow clone holds the history since " shallow \
+      " only (git fetch --unshallow)" : ", and with no git its past is unknown")
+    exit 2
+  }
+  f = vfile[lastn]; split(rec[lastn], R, "\t")
+  print id " " title[lastn]
+  if (lastn == disk[f]) print "  " R[1] (R[2] == 1 ? " ⚠ cross-repo" : "") ", " f ":" line[lastn]
+  else print "  " gone " on " vday[closedn] " by " short(closedn) " " vsubj[closedn] "; its last version, " f " in " short(lastn) ":"
+  if (twice) print "  ⚠ " id " is given twice in git: " twice
+  print ""; print text(lastn, line[lastn], f); print ""
+  print "History (" f ", first parent):"
+  if (!git_ok) print "  UNKNOWN: not a git repo"
+  else if (shallow != "") print "  UNKNOWN before " shallow ": a shallow clone (git fetch --unshallow)"
+  for (i = 1; i <= ne; i++) print "  " ev[i]
+  print "Handoffs that name it:"
+  for (h in corder) order[corder[h]] = h
+  for (i = 1; i <= nc; i++) {
+    h = order[i]
+    print "  " h " " cites[h] (((h, disk[vfile[cn[h]]]) in inv) ? " (live: " vfile[cn[h]] ")" : " (replaced)")
+  }
+  while ((getline l < oldf) > 0) { print "  " l; nc++ }
+  if (!nc) print "  none"
+  exit (git_ok && shallow == "") ? 0 : 2
+}' "$T/versions" "$T/list"
+}
+
 case ${1:-} in
   check | list) mode=$1 ;;
-  *) echo "usage: $0 check|list [file...]" >&2; exit 1 ;;
+  show)
+    [ $# = 2 ] && [[ $2 =~ ^[BQLH]-[1-9][0-9]*$ ]] || { echo "usage: $0 show <B-, Q-, L- or H- id>" >&2; exit 1; }
+    show "$2"
+    exit $? ;;
+  *) echo "usage: $0 check|list [file...] | show <id>" >&2; exit 1 ;;
 esac
 shift
 if [ $# = 0 ]; then

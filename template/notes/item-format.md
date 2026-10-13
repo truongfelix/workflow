@@ -49,8 +49,8 @@ A whole project in this shape: the workflow repo's `example/BACKLOG.md`, `exampl
 - An id never changes (a new title, state or section keeps it) and is never reused: `next id` only goes up, and a
   deleted item keeps its number in git.
 - It is how an item is cited, everywhere: the handoff, other items, commit messages, branch names
-  (`feat/B-12-offline-list`), PR descriptions. Give the title too, for the reader. `git log -S B-12` shows an item's
-  whole life, renames included; search with the next character too (`B-12 `, `B-12:`) so `B-120` does not match. A
+  (`feat/B-12-offline-list`), PR descriptions. Give the title too, for the reader. `items.sh show B-12` prints an item,
+  live or deleted, with its whole life, renames included (`notes/handoff-format.md`, "Git is the archive"). A
   position ("item 2 of today's list") is never a reference: the next day's list numbers differently.
 - Why a letter: on GitHub, a bare `#12` in a commit or PR links to issue 12, and the letter says which file to open.
 
@@ -169,7 +169,9 @@ quoted anywhere (an item, a handoff, a commit message, a PR) links to that commi
 `gh` when the page is built: a PR that names an item (title, description, branch) and a PR an item names (`#41`) show
 with the item, with their description and merge commit. Without `gh`, or with `--offline`, the page says the PRs were
 not read. Closed items come back from git: a deleted item as "closed", a deleted lesson as "dropped", a replaced handoff
-as "replaced". Handoffs written before they had ids (one `notes/handoff.md`) are shown by their date. The page is
+as "replaced". Handoffs written before they had ids (one `notes/handoff.md`) are shown by their date. An id that
+git shows given twice is a problem, and its row has a ⚠; a shallow clone says from which date the history is
+known. The page is
 read-only and rebuilt at each run (no server, nothing to install): run the script again to refresh it. An item the
 parser cannot read shows in the problems box as written, never dropped.
 

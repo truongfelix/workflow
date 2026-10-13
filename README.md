@@ -97,7 +97,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `claim.sh`, which takes an item for a session; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
@@ -202,7 +202,7 @@ template/                     copied into a project's root by bin/adopt.sh
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh, claim.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used

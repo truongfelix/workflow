@@ -538,6 +538,66 @@ check "the control: the same next id line merges without a conflict" [ $? = 0 ]
 check "the control: the format check exits 2" [ $? = 2 ]
 check "the control: the format check names the id given twice" has "$T/it-dup.txt" "B-4 is given twice"
 
+# items.sh show, and what git cannot vouch for: B-2 is closed (H-1 names it), B-3 is closed then given again to
+# another item; a shallow clone holds only the last commit.
+mkdir -p "$T/show/notes/handoff" "$T/show/.claude/skills/session-start" && cd "$T/show" || exit 1
+cp "$ITS" .claude/skills/session-start/
+git_q init && git symbolic-ref HEAD refs/heads/main
+show_backlog() { printf '%s\n' '# Demo — Backlog' '' 'next id: B-4 (last given to claude@s1)' '' '## api' '' "$@"; }
+show_handoff() { # <id> <the item it names> <continues line or "">
+  printf '%s\n' "# $1 2026-01-02 10:00 CET · claude@s1" ${3:+"$3"} '' '## Next' "1. $2: go on." '' \
+    '## Waiting for the user' 'None.' '' '## Running' 'None.' '' '## Unfinished' 'None.' '' '## Done' 'None.' '' \
+    '## Learned' 'None.'
+}
+show_backlog '### 🔲 B-1 First' 'Done when: done.' '' '### 🔲 B-2 Second' 'The second one.' 'Done when: done.' '' \
+  '### 🔲 B-3 Third' 'Done when: done.' >BACKLOG.md
+printf '%s\n' '# Demo — questions' '' 'next id: Q-1 (none given yet)' >questions.md
+printf '%s\n' '# Handoffs' '' 'next id: H-2 (last given to claude@s1)' >notes/handoff/README.md
+show_handoff H-1 "B-2 Second" >notes/handoff/s1.md
+git add BACKLOG.md questions.md notes && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m "three items"
+show_backlog '### 🔲 B-1 First' 'Done when: done.' >BACKLOG.md
+printf '%s\n' '# Handoffs' '' 'next id: H-3 (last given to claude@s1)' >notes/handoff/README.md
+show_handoff H-2 "B-1 First" "continues: H-1" >notes/handoff/s1.md
+GIT_COMMITTER_DATE=2026-02-03T10:00:00 git_q commit -am "B-2 done, B-3 dropped"
+show_backlog '### 🔲 B-1 First' 'Done when: done.' '' '### 🔲 B-3 Not the third' 'Done when: done.' >BACKLOG.md
+GIT_COMMITTER_DATE=2026-03-04T10:00:00 git_q commit -am "B-3 added again"
+"$SH" "$IT" show B-2 >"$T/show-b2.txt" 2>&1
+rc=$?
+sed 's/^/      | /' "$T/show-b2.txt"
+check "items.sh show: a closed item exits 0" [ "$rc" = 0 ]
+check "items.sh show: when it was closed, and by which commit" has "$T/show-b2.txt" "  closed on 2026-02-03 by "
+check "items.sh show: its last version, as written" \
+  eval 'has "$T/show-b2.txt" "### 🔲 B-2 Second" && has "$T/show-b2.txt" "The second one."'
+check "items.sh show: its history" has "$T/show-b2.txt" "  2026-01-02  "
+check "items.sh show: the handoffs that name it, replaced or live" \
+  has "$T/show-b2.txt" "  H-1 2026-01-02 10:00 CET · claude@s1 (replaced)"
+"$SH" "$IT" show B-3 >"$T/show-b3.txt" 2>&1
+check "items.sh show: an id given twice in git is flagged" has "$T/show-b3.txt" \
+  "⚠ B-3 is given twice in git: closed as \"Third\", given again in "
+"$SH" "$IT" show H-1 >"$T/show-h1.txt" 2>&1
+check "items.sh show: a replaced handoff, in full" \
+  eval 'has "$T/show-h1.txt" "  replaced on 2026-02-03 by " && has "$T/show-h1.txt" "1. B-2 Second: go on."'
+"$SH" "$IT" show B-9 >"$T/show-none.txt" 2>&1
+check "items.sh show: an id nobody gave exits 1" [ $? = 1 ]
+"$SH" "$BD" --no-open --offline --out "$T/show.html" "$T/show" >/dev/null 2>&1
+check "board: an id given twice in git is a problem" has "$T/show.html" \
+  '"text":"B-3 is given twice in git: closed as \"Third\", given again in '
+check "board: and on the item, added when the id was given again" \
+  eval 'grep -F "\"id\":\"B-3\"," "$T/show.html" | grep -F "\"added\":\"2026-03-04\"," | grep -qF "\"twice\":\"closed as"'
+git_q clone --depth 1 "file://$T/show" "$T/shallow"
+mkdir -p "$T/shallow/.claude/skills/session-start" && cp "$ITS" "$T/shallow/.claude/skills/session-start/"
+(cd "$T/shallow" && "$SH" "$IT" show B-2) >"$T/show-shallow.txt" 2>&1
+check "items.sh show, shallow clone: an item it cannot see is UNKNOWN (exit 2)" [ $? = 2 ]
+check "items.sh show, shallow clone: says why" has "$T/show-shallow.txt" \
+  "UNKNOWN: B-2 is in no file here, and this shallow clone holds the history since 2026-03-04 only"
+(cd "$T/shallow" && "$SH" "$IT" show B-1) >"$T/show-shallow1.txt" 2>&1
+check "items.sh show, shallow clone: an item it sees, its history UNKNOWN (exit 2)" \
+  eval '[ $? = 2 ] && has "$T/show-shallow1.txt" "UNKNOWN before 2026-03-04: a shallow clone"'
+"$SH" "$BD" --no-open --offline --out "$T/shallow.html" "$T/shallow" >/dev/null 2>&1
+check "board, shallow clone: says so, with the date" has "$T/shallow.html" '"shallow":"2026-03-04",'
+check "board, shallow clone: no false date added" \
+  eval 'grep -F "\"id\":\"B-1\"," "$T/shallow.html" | grep -qF "\"added\":\"\","'
+
 # Claims (notes/item-format.md, Claims): two clones claim the same item; the one that pushes second is refused, even
 # when the other's push lands between its fetch and its push (a pre-push hook makes that happen).
 mkdir "$T/claims" && cd "$T/claims" || exit 1
