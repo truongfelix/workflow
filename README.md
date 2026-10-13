@@ -100,7 +100,7 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, each repo's gate and the gate rules you keep |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, each repo's gate (the command that says the code is ready, such as its tests) and the gate rules you keep |
 | `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session; `gate.sh`, which runs a repo's gate and keeps a receipt of each commit that passed it; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
@@ -144,11 +144,13 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      nested repos, data and keys stay out, and a PRIVATE remote.
 3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` for the second shape). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
-4. **Fill**, in this order. The owner answers each question without having read these files: a question names no
-   file, table or setting, and says in plain words what each choice does. Free text (what the project is, its rules)
-   is asked in the chat, as an open question: never an option that only says "I'll type it", which returns no text
-   when picked. A question that fails, or a free-text one left unanswered, is asked again in the chat: never write
-   an answer the owner did not give (a folder's name is not what the project is).
+4. **Fill**, in this order. The owner has not read these files: all the setup says or writes for the owner (its
+   questions, its summary at the end, the items it adds) is in plain words, with no file, table, setting or preset
+   name, and a question says what each choice does. The gate is "the check that says the code is ready" (its tests),
+   never a bare "gate". Free text (what the project is, its rules) is asked in the chat, as an open question: never an
+   option that only says "I'll type it", which returns no text when picked. A question that fails, or a free-text one
+   left unanswered, is asked again in the chat: never write an answer the owner did not give (a folder's name is not
+   what the project is).
    - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset as a
      multiple-choice question, and list in it the steps the preset decides: start the day's task, commit the docs
      (the notes and trackers), push them, add an item to the backlog, claim one, commit code, push a work branch,
