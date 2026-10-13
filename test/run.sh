@@ -96,6 +96,28 @@ check "adopt.sh run again exits 0" [ $? = 0 ]
 check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (identical)"
 check "adopt.sh run again still lists what is left to FILL" has "$T/adopt2.txt" "  CLAUDE.md:1:"
 
+# .claude/workflow-version names the release taken: its tag, or the tag and the commits since; with no tag, the
+# commit and its date; outside a checkout of the workflow (an archive unpacked in another repo), unversioned. On a
+# copy of the workflow, since CI checks out one commit and no tag.
+mkdir -p "$T/wf-copy" && cp -R "$WF/bin" "$WF/template" "$WF/workspace" "$T/wf-copy/" && cd "$T/wf-copy" || exit 1
+adopted() { # <workflow copy> <project>: the version file it writes
+  "$SH" "$1/bin/adopt.sh" "$2" >/dev/null 2>&1 && cat "$2/.claude/workflow-version"
+}
+git_q init && git_q add -A && git_q commit -m "a release"
+check "workflow-version: no tag, the commit and its date" \
+  eval 'adopted "$T/wf-copy" "$T/ver0" | grep -qE "^workflow [0-9a-f]{7,} [0-9]{4}-[0-9]{2}-[0-9]{2}, adopted "'
+git_q tag -a v1.0.0 -m v1.0.0
+check "workflow-version: adopted from the v1.0.0 tag, v1.0.0" \
+  eval 'adopted "$T/wf-copy" "$T/ver1" | grep -q "^workflow v1.0.0, adopted [0-9-]*$"'
+git_q commit --allow-empty -m "after the release"
+check "workflow-version: a commit after v1.0.0, the tag and the commits since" \
+  eval 'adopted "$T/wf-copy" "$T/ver2" | grep -qE "^workflow v1\.0\.0-1-g[0-9a-f]{7,}, adopted "'
+mkdir -p "$T/outer" && git -C "$T/outer" init -q && git -C "$T/outer" commit -q --allow-empty -m outer &&
+  cp -R "$T/wf-copy" "$T/outer/wf" && rm -rf "$T/outer/wf/.git"
+check "workflow-version: an archive unpacked in another repo, unversioned" \
+  eval 'adopted "$T/outer/wf" "$T/ver3" | grep -q "^workflow unversioned, adopted "'
+cd "$T/ws" || exit 1
+
 printf '%s\n' 'REPOS=("api|api|origin||")' 'KEEP_LOCAL="keepme"' 'UNITS=0' >.claude/ground-truth.conf
 git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs && git_q push -u origin main
 check "the workspace .gitignore keeps the code repos out" [ -z "$(git status --porcelain --untracked-files=all)" ]

@@ -7,7 +7,7 @@
 #                so the root becomes a docs-only repo next to the code repos it contains.
 #
 # Prints what was copied, what was skipped (and how to diff it against the template), the FILL markers left to
-# resolve, and records the workflow commit in .claude/workflow-version. Exit 1 on a usage error only.
+# resolve, and records the workflow release in .claude/workflow-version. Exit 1 on a usage error only.
 #
 # Two names differ in template/: CLAUDE.template.md and dot-claude/ are installed as CLAUDE.md and .claude/. Under
 # their real names, Claude Code would load them as instructions and skills in a session working on the workflow.
@@ -49,7 +49,15 @@ done < <(cd "$SRC/template" && find . -type f -print0 | sort -z)
 [ "$workspace" = 1 ] && install_file "$SRC/workspace/gitignore" ".gitignore"
 chmod +x "$dst/.claude/skills/session-start/"{ground-truth,items,board,claim}.sh 2>/dev/null || true
 
-version=$(git -C "$SRC" log -1 --format='%h %cd' --date=short 2>/dev/null || echo "unversioned")
+# The release taken, as on the releases page: its tag (v1.0.0), or the tag and the commits since (v1.0.0-3-gabc1234).
+# A clone with no tag: the commit and its date. No git checkout of the workflow itself (a downloaded archive, maybe
+# unpacked inside another repo, whose commit is not ours): unversioned.
+version="unversioned"
+top=$(git -C "$SRC" rev-parse --show-toplevel 2>/dev/null || true)
+if [ -n "$top" ] && [ "$top" -ef "$SRC" ]; then
+  version=$(git -C "$SRC" describe --tags --match 'v[0-9]*' 2>/dev/null ||
+    git -C "$SRC" log -1 --format='%h %cd' --date=short 2>/dev/null || echo "unversioned")
+fi
 echo "workflow $version, adopted $(date +%Y-%m-%d)" >"$dst/.claude/workflow-version"
 
 echo "Adopted the workflow ($version) into $dst"

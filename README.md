@@ -167,8 +167,8 @@ project's content and the template's structure.
 ## Upgrade a project from here
 
 `bin/adopt.sh <project-root>` again lists every skipped file with its `diff -u` command against the current
-template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which commit
-the project last took.
+template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which release
+the project last took, as the releases page names it: `v1.0.0`, or `v1.0.0-3-gabc1234` three commits after it.
 
 From 1.x: the trackers' items and the lessons moved from bullets cited by title to one shape with ids, and the one
 `notes/handoff.md` with its archive became one handoff per session, with git as the archive
