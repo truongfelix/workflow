@@ -649,8 +649,12 @@ tr.row { cursor: pointer; }
 tr.row:hover { background: var(--soft); }
 tr.row.sel { background: var(--on); }
 tr.closed td { color: var(--muted); }
-td.id, td.date, td.st, td.who { white-space: nowrap; font-variant-numeric: tabular-nums; }
-td.where { min-width: 12em; }
+td.id, td.date, td.st { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.title { min-width: 14em; }
+td .cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+td.who .cut { max-width: 8em; }
+td.where .cut { max-width: 10em; }
+td.gate .cut { max-width: 7em; }
 td.gate.failed { color: var(--warn); font-weight: 600; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
@@ -915,14 +919,17 @@ function stateOf(it) {
   var s = STATES[it.kind].filter(function (x) { return x[0] === it.status; })[0] || ["", "", it.status];
   return s[1] + " " + s[2] + (it.cross ? " ⚠" : "");
 }
+// Claimed, Where and Gate leave the room to Title: each is cut to a width, and whole on hover. Claimed shows the
+// session, the claim line on hover.
+function cutCell(cls, shown, whole) {
+  return "<td class=\"" + cls + "\" title=\"" + esc(whole) + "\"><div class=\"cut\">" + esc(shown) + "</div></td>";
+}
 function claimCell(it) {
-  return it.claimedBy ? "<td class=\"who\" title=\"claimed: " + esc(it.f.claimed) + "\">" + esc(it.claimedBy) + "</td>" :
+  return it.claimedBy ? cutCell("who", it.claimedBy.split("@").pop(), "claimed: " + it.f.claimed) :
     "<td class=\"who muted\">None</td>";
 }
-function whereCell(it) { return "<td class=\"where\">" + esc(it.where) + "</td>"; }
-function gateCell(it) {
-  return "<td class=\"gate" + (/^failed/.test(it.gate) ? " failed" : "") + "\">" + esc(it.gate) + "</td>";
-}
+function whereCell(it) { return cutCell("where", it.where, it.where); }
+function gateCell(it) { return cutCell("gate" + (/^failed/.test(it.gate) ? " failed" : ""), it.gate, it.gate); }
 function chip(label, n, on, attrs) {
   return "<button class=\"chip" + (on ? " on" : "") + "\" " + attrs + ">" + esc(label) +
     (n === null ? "" : "<span class=\"n\">" + n + "</span>") + "</button>";
@@ -1016,7 +1023,7 @@ function render() {
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
       return "<tr class=\"row" + (it.closed ? " closed" : "") + (S.sel === it.id ? " sel" : "") + "\" data-id=\"" + it.id + "\">" +
-        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) + (D.gated ? gateCell(it) : "") : "") + "<td>" + fmt(it.title) + "</td><td>" +
+        "<td class=\"id\"" + (it.old ? " title=\"written before handoffs had ids\"" : "") + ">" + idOf(it) + (it.twice ? " <span title=\"given twice in git\">⚠</span>" : "") + "</td><td class=\"st\">" + esc(stateOf(it)) + "</td>" + (S.tab === "B" ? claimCell(it) + whereCell(it) + (D.gated ? gateCell(it) : "") : "") + "<td class=\"title\">" + fmt(it.title) + "</td><td>" +
         it.repos.map(function (r) { return "<span class=\"tag\">" + esc(r) + "</span>"; }).join("") + "</td>" +
         "<td class=\"date hide-s\">" + esc(it.added || "") + "</td><td class=\"date hide-s\">" +
         esc((S.dk === "ruled" ? it.ruled : it.closed || it.changed) || "") + "</td></tr>";

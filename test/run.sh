@@ -662,6 +662,14 @@ if command -v node >/dev/null 2>&1; then
   check "board page, ids: a closed item's title, and its state" \
     eval 'grep -qE "data-id=\"L-2\" title=\"[^\"]+ \(✗ dropped\)\">L-2</a>" "$T/board8-ids.txt"'
   check "board page, ids: an id of no item stays text" has "$T/board8-ids.txt" " and B-99"
+  node "$T/page.js" "$T/board8.html" 'claimCell(byId["B-2"]) + "\n" + whereCell({ where: "feat/two: PR #42 open" })' \
+    >"$T/board8-cells.txt" 2>&1
+  check "board page, claimed: the session, cut to a width, the claim line on hover" has "$T/board8-cells.txt" \
+    '<td class="who" title="claimed: claude@s1 on feat/two at laptop"><div class="cut">s1</div></td>'
+  check "board page, where: cut to a width, whole on hover" has "$T/board8-cells.txt" \
+    '<td class="where" title="feat/two: PR #42 open"><div class="cut">feat/two: PR #42 open</div></td>'
+  check "board page: Title keeps its width, the columns beside it are cut" \
+    eval 'grep -qx "td.title { min-width: 14em; }" "$T/board8.html" && grep -qx "td.where .cut { max-width: 10em; }" "$T/board8.html"'
 fi
 cd "$T/board2" || exit 1
 
