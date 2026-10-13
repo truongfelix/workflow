@@ -766,8 +766,8 @@ footer { padding: 8px 16px 20px; color: var(--muted); font-size: 12px; }
   <span class="sep"></span>
   <input type="search" id="q" placeholder="Search id, title, text">
   <select id="sort">
-    <option value="old">Oldest first</option>
     <option value="new">Newest first</option>
+    <option value="old">Oldest first</option>
     <option value="changed">Last changed first</option>
   </select>
   <button class="chip" id="reset">Reset filters</button>
@@ -890,7 +890,7 @@ var S;
 function defaults() {
   return { tab: "B", repos: [],
     st: { B: ["open", "waiting"], Q: ["question", "waiting", "ruling"], L: ["lesson"], H: ["handoff", "closed"] },
-    dk: "changed", from: "", to: "", q: "", sort: "old", sel: "", back: "" };
+    dk: "changed", from: "", to: "", q: "", sort: "new", sel: "", back: "" };
 }
 function load() {
   S = defaults();
