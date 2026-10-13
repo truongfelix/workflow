@@ -25,7 +25,7 @@ holds; one that no longer holds is deleted.
 ## web
 
 ### 🔲 B-12 Shopping list works offline
-claimed: claude@pantry on feat/offline-list
+claimed: claude@pantry-12 on feat/offline-list
 Edits made in a shop with no signal are lost. Worktree `web-offline/`.
 Done when: an edit made in airplane mode syncs on reconnect, conflicts resolved last-write-wins per item, tested on
 a phone.
@@ -126,8 +126,9 @@ bash .claude/skills/session-start/claim.sh B-12 feat/B-12-offline-list
 It adds `claimed: <agent>@<session> on <branch>` under the item's heading, in a commit of its own (`claim B-12`) on
 the remote's default branch, and pushes it.
 - **agent:** who does the work: `claude`, a subagent's name, `owner`.
-- **session:** the worktree's folder name, unless the owner names the session (a third argument,
-  `claude@<name>`).
+- **session:** the name other sessions message it by (`ListAgents`: "This session is workflow-dev-64"), so Claude
+  knows at once which session works on what; the worktree's folder name where there is none. Claude passes it as
+  the third argument, `claude@<name>`.
 - **branch:** where the work goes: the fact behind the claim, which the ground truth follows.
 
 The push is the lock. When another session pushed first, git refuses the push; the script reads the item again
@@ -143,7 +144,8 @@ older): its session may have stopped without a handoff. Only the owner releases 
 
 Releasing: when the work lands, the item is deleted, claim and all. When a session stops before that, `/handoff`
 keeps the claim with its branch pushed and named under "Unfinished", or deletes the line, and the docs push frees
-the item.
+the item. A new session has a new name: going on with a claim its handoff kept, it takes the claim over with
+`--from <the claim's agent@session>`, which replaces the line only while the remote still has that claim.
 
 ## The check
 

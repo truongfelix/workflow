@@ -50,7 +50,7 @@ Waiting for you
 - "Metric only on the shopping list?" I recommend metric only: it matches #41, and a switch can
   come later.
 - spike/pwa-cache: push it, keep it local on purpose, or delete it?
-- "Import rejects recipes with no yield" was claimed on 1 Oct by another session (api-yield),
+- "Import rejects recipes with no yield" was claimed on 1 Oct by another session (api-yield-3),
   and its branch has had no commit since: release it, so a session can take it?
 
 I'd start with 1: it is small, and the release waits on it. Which one?

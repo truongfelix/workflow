@@ -13,25 +13,37 @@
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
-# Usage: bash .claude/skills/session-start/claim.sh <B-id> <branch> [<agent>@<session>]
+# Usage: bash .claude/skills/session-start/claim.sh <B-id> <branch> [<agent>@<session>] [--from <agent>@<session>]
 #   branch          the branch the work goes on: the fact behind the claim, which the ground truth follows
-#   agent@session   default: claude@<the project folder's name>
+#   agent@session   who works on it: the session by the name other sessions message it by (ListAgents: "This
+#                   session is <name>"); default: claude@<the project folder's name>
+#   --from          take over the claim of that agent@session (a session going on with the work of the one before
+#                   it): the line is replaced only while the remote still has that claim
 #   The remote and the default branch: the entry of .claude/ground-truth.conf for the project root, else origin and
 #   its HEAD (main, master).
 # Exit 0 = the claim is on the remote: the item is yours (or was already). Exit 1 = refused: another session
-# claimed it first, or the item is not open on the remote (push a new item before claiming it). Exit 2 = nothing was
+# claimed it first (or holds it, for --from another one), or the item is not open on the remote (push a new item before claiming it). Exit 2 = nothing was
 # claimed: a usage error, no remote, a push that failed for another reason, an unreadable BACKLOG.md (UNKNOWN).
 
 set -uo pipefail
 
-usage() { echo "usage: $0 <B-id> <branch> [<agent>@<session>]" >&2; exit 2; }
-[ $# -ge 2 ] && [ $# -le 3 ] || usage
+usage() { echo "usage: $0 <B-id> <branch> [<agent>@<session>] [--from <agent>@<session>]" >&2; exit 2; }
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$DIR/../../.." && pwd)
-id=$1 branch=$2 who=${3:-claude@$(basename "$ROOT")}
+from="" args=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --from) [ $# -ge 2 ] || usage; from=$2; shift 2 ;;
+    -*) usage ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+[ ${#args[@]} -ge 2 ] && [ ${#args[@]} -le 3 ] || usage
+id=${args[0]} branch=${args[1]} who=${args[2]:-claude@$(basename "$ROOT")}
 [[ $id =~ ^B-[1-9][0-9]*$ ]] || { echo "not a BACKLOG id: $id (B-<n>)" >&2; usage; }
 [[ $branch =~ ^[^[:space:]]+$ ]] || { echo "a branch name has no space: $branch" >&2; usage; }
 [[ $who =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $who" >&2; usage; }
+[ -z "$from" ] || [[ $from =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $from" >&2; usage; }
 line="claimed: $who on $branch"
 
 fail() { echo "UNKNOWN: $*; nothing claimed"; exit 2; }
@@ -113,35 +125,46 @@ for attempt in 1 2 3 4 5; do
     echo "$msg"
     exit 1
   fi
+  over=""
   if [ -n "$cur" ]; then
     if [ "${cur%% on *}" = "$who" ]; then
       echo "$id $title: already claimed, by $cur ($base)"
       sync_here "$tip"
       exit 0
     fi
-    echo "REFUSED: $id $title is claimed by $cur ($base): pick another item"
-    sync_here "$tip"
-    exit 1
+    if [ -n "$from" ] && [ "${cur%% on *}" = "$from" ]; then
+      over=$from
+    else
+      echo "REFUSED: $id $title is claimed by $cur ($base)${from:+, not by $from}: pick another item"
+      sync_here "$tip"
+      exit 1
+    fi
   fi
   if [ "$state" = waiting ]; then
     echo "REFUSED: $id $title waits for its trigger (⏸️): make it 🔲 first, when the trigger came"
     exit 1
   fi
 
-  # The claim commit: the remote's BACKLOG.md with the line under the item's heading, on the remote's tip.
+  # The claim commit: the remote's BACKLOG.md with the line under the item's heading (or in place of the claim taken
+  # over: the first `claimed:` line after the heading, in its fields), on the remote's tip.
+  at=$((ln + 1)) skip=0 msg="claim $id"
+  if [ -n "$over" ]; then
+    at=$((ln + $(tail -n +"$((ln + 1))" "$T/BACKLOG.md" | grep -n -m 1 '^claimed: ' | cut -d: -f1))) skip=1
+    msg="claim $id, taken over from $over"
+  fi
   cr=$(sed -n "${ln}p" "$T/BACKLOG.md" | tr -cd '\r') # a repo that stores CRLF keeps it
-  { head -n "$ln" "$T/BACKLOG.md" && printf '%s%s\n' "$line" "$cr" && tail -n +"$((ln + 1))" "$T/BACKLOG.md"; } >"$T/new" ||
-    fail "the new BACKLOG.md could not be written"
+  { head -n "$((at - 1))" "$T/BACKLOG.md" && printf '%s%s\n' "$line" "$cr" && tail -n +"$((at + skip))" "$T/BACKLOG.md"; } \
+    >"$T/new" || fail "the new BACKLOG.md could not be written"
   mode=$(git ls-tree "$tip" -- "$path" | cut -d' ' -f1)
   blob=$(git hash-object -w --no-filters "$T/new") &&
     GIT_INDEX_FILE=$idx git read-tree "$tip" &&
     GIT_INDEX_FILE=$idx git update-index --cacheinfo "$mode,$blob,$path" &&
     tree=$(GIT_INDEX_FILE=$idx git write-tree) &&
-    commit=$(git commit-tree "$tree" -p "$tip" -m "claim $id") || fail "the claim commit could not be made"
+    commit=$(git commit-tree "$tree" -p "$tip" -m "$msg") || fail "the claim commit could not be made"
 
   if out=$(git push -q "$remote" "$commit:refs/heads/$def" 2>&1); then
     git update-ref "refs/remotes/$base" "$commit" "$tip" 2>/dev/null
-    echo "CLAIMED: $id $title, by $who on $branch ($base, $(git rev-parse --short "$commit"))"
+    echo "CLAIMED: $id $title, by $who on $branch${over:+, taken over from $over} ($base, $(git rev-parse --short "$commit"))"
     sync_here "$commit"
     exit 0
   fi

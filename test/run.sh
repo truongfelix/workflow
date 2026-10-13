@@ -567,6 +567,16 @@ check "claim: the refusal names who has it" has "$T/claim-b.txt" "REFUSED: B-1 F
 check "claim: after a refusal, the default branch here shows the claim" has b/BACKLOG.md "claimed: claude@a on feat/one"
 (cd a && "$SH" "$CL" B-1 feat/one) >"$T/claim-again.txt" 2>&1
 check "claim: claiming one's own item again is fine" eval '[ $? = 0 ] && has "$T/claim-again.txt" "already claimed"'
+# The next session (a new name) goes on with B-1: it takes the claim over, only from the session that holds it.
+(cd a && "$SH" "$CL" B-1 feat/one claude@a-2 --from claude@other) >"$T/claim-over-no.txt" 2>&1
+check "claim --from: refused when another session holds the claim" \
+  eval '[ $? = 1 ] && has "$T/claim-over-no.txt" "is claimed by claude@a on feat/one (origin/main), not by claude@other"'
+(cd a && "$SH" "$CL" B-1 feat/one-more claude@a-2 --from claude@a) >"$T/claim-over.txt" 2>&1
+check "claim --from: takes the claim over" \
+  eval '[ $? = 0 ] && has "$T/claim-over.txt" "CLAIMED: B-1 First, by claude@a-2 on feat/one-more, taken over from claude@a"'
+check "claim --from: the line is replaced, not added" \
+  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,9p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a-2 on feat/one-more"$'\n'"Done when: done." ]
+check "claim --from: its commit says so" [ "$(git -C remote.git log -1 --format=%s main)" = "claim B-1, taken over from claude@a" ]
 (cd a && "$SH" "$CL" B-3 feat/three) >"$T/claim-waits.txt" 2>&1
 check "claim: an item waiting for its trigger is refused" eval '[ $? = 1 ] && has "$T/claim-waits.txt" "waits for its trigger"'
 cp a/BACKLOG.md "$T/claims-backlog.bak"

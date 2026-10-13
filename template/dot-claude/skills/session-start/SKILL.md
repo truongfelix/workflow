@@ -44,10 +44,12 @@ open that already shipped, "done" items whose code changed since).
      first.
    - Before proposing a `BACKLOG.md` item, re-confirm it in the code: is it still broken or missing? If it is done
      already, say so and delete it at the handoff. A fix you *depend on*: spot-check that it still holds.
-   - **Claims** → the claims section (`notes/item-format.md`, Claims). This session's own claims (`<agent>@<session>`)
-     are its work in flight: their branch is where it goes on. An item another session claimed is not proposed: it
-     is taken. A claim marked ⚠ STALE, GONE or NOT PUSHED goes in the brief: only the owner releases another
-     session's claim.
+   - **Claims** → the claims section (`notes/item-format.md`, Claims), with the sessions running now: `ListAgents`
+     says this session's name ("This session is <name>") and lists the others. A claim names its session by that
+     name, so Claude sees at once who works on what: a claim whose session is listed is work in flight there. A
+     claim kept by this session's handoff ("Unfinished") names the session before this one: this session takes it
+     over when it goes on with that work (step 5). An item another session claimed is not proposed: it is taken. A
+     claim marked ⚠ STALE, GONE or NOT PUSHED goes in the brief: only the owner releases another session's claim.
    - <!-- FILL: project-specific checks (a device, a server, a dashboard), and what is EXPECTED and not news
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
 4. **Brief the user** in under about 20 lines:
@@ -64,11 +66,13 @@ open that already shipped, "done" items whose code changed since).
    - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
      CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
 5. **Claim the task when the work on it starts** (the user's yes, or the row "Start the day's task after the
-   brief"): `bash .claude/skills/session-start/claim.sh <B-id> <branch>`, as the row "Claim an item" in
-   CLAUDE.md allows. The branch is where the work goes (`feat/B-12-offline-list`, or the branch an earlier session
-   pushed); add `<agent>@<session>` when the owner named the session. Exit 0: the item is yours, say so. Exit 1:
-   another session claimed it first, or the item is not on the remote yet (push a new item first, the row "Add an
-   item to the backlog"): tell the user, and propose another. Exit 2: nothing was claimed, say why.
+   brief"), as the row "Claim an item" in CLAUDE.md allows:
+   `bash .claude/skills/session-start/claim.sh <B-id> <branch> claude@<name>`. `<name>` is this session's name
+   from `ListAgents` (the worktree's folder name where there is none). The branch is where the work goes
+   (`feat/B-12-offline-list`, or the branch an earlier session pushed). Going on with a claim the handoff kept: add
+   `--from <its agent@session>` to take it over. Exit 0: the item is yours, say so. Exit 1: another session claimed
+   it first, or the item is not on the remote yet (push a new item first, the row "Add an item to the backlog"):
+   tell the user, and propose another. Exit 2: nothing was claimed, say why.
 6. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
    release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
    day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
