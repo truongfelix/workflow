@@ -277,10 +277,10 @@ check "ground truth, claims: a claim not pushed" has "$T/gt-claims.txt" \
   "  B-14 Mine: claude@ws on spike, ⚠ NOT PUSHED: no other session sees it"
 cp "$T/ws-backlog.bak" BACKLOG.md && git add BACKLOG.md && git_q commit -m "no claims" && git_q push origin main
 
-# questions.md: its size and its rulings; longer than QUESTIONS_TRIM_LINES (150 when unset), flagged for the trim pass
-# of /handoff; 0 turns the flag off.
+# questions.md: its size and its rulings; longer than QUESTIONS_TRIM_LINES (1000 when unset), flagged for a trim
+# session; 0 turns the flag off.
 check "ground truth, questions.md: its size, under the default threshold" \
-  eval 'grep -A1 "^== questions.md (trim above 150 lines)$" "$T/gt.txt" | grep -q "^  [0-9]* lines, 0 ruling(s) in §2$"'
+  eval 'grep -A1 "^== questions.md (trim above 1000 lines)$" "$T/gt.txt" | grep -q "^  [0-9]* lines, 0 ruling(s) in §2$"'
 cp questions.md "$T/ws-questions.bak" && cp .claude/ground-truth.conf "$T/ws-conf.bak"
 printf '%s\n' '# Demo — questions' '' 'next id: Q-4 (last given to claude@ws)' '' '# 1. Open decisions' '' \
   '### 💬 Q-3 Which one?' 'The question.' '' '# 2. Rulings' '' '### 🟢 Q-1 Never X' 'ruled: 2026-01-02' \
@@ -289,7 +289,7 @@ qn=$(wc -l <questions.md | tr -d ' ')
 echo "QUESTIONS_TRIM_LINES=$((qn - 1))" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, questions.md: above the threshold, flagged for a trim, its rulings counted" has "$T/gt-trim.txt" \
-  "  ⚠ TRIM: $qn lines, 2 ruling(s) in §2: /handoff proposes a trim pass"
+  "  ⚠ TRIM: $qn lines, 2 ruling(s) in §2: a trim session is due"
 echo "QUESTIONS_TRIM_LINES=$qn" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, questions.md: at the threshold, not flagged" \
@@ -298,11 +298,26 @@ echo "QUESTIONS_TRIM_LINES=0" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, questions.md: 0 turns the trim off" \
   eval 'has "$T/gt-trim.txt" "== questions.md (no trim: QUESTIONS_TRIM_LINES=0)" && lacks "$T/gt-trim.txt" TRIM:'
+# notes/lessons.md: the same flag, its own threshold.
+mkdir -p notes && { [ -f notes/lessons.md ] && cp notes/lessons.md "$T/ws-lessons.bak"; true; }
+printf '%s\n' '# Lessons' '' '### L-1 One' 'Rule.' '' '### L-2 Two' 'Rule.' >notes/lessons.md
+ln=$(wc -l <notes/lessons.md | tr -d ' ')
+echo "LESSONS_TRIM_LINES=$((ln - 1))" >>.claude/ground-truth.conf
+"$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
+check "ground truth, lessons.md: above its threshold, flagged for a trim" has "$T/gt-trim.txt" \
+  "  ⚠ TRIM: $ln lines, 2 lesson(s): a trim session is due"
+echo "LESSONS_TRIM_LINES=$ln" >>.claude/ground-truth.conf
+"$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
+check "ground truth, lessons.md: at the threshold, not flagged" \
+  eval 'has "$T/gt-trim.txt" "  $ln lines, 2 lesson(s)" && lacks "$T/gt-trim.txt" TRIM:'
+if [ -f "$T/ws-lessons.bak" ]; then cp "$T/ws-lessons.bak" notes/lessons.md; else rm -f notes/lessons.md; fi
 cp "$T/ws-questions.bak" questions.md && cp "$T/ws-conf.bak" .claude/ground-truth.conf
 check "/handoff runs the trim pass on the flag of the ground truth" \
   has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`'
-check "the template's ground-truth.conf sets the trim threshold" \
-  grep -qx 'QUESTIONS_TRIM_LINES=150' "$WF/template/dot-claude/ground-truth.conf"
+check "the template's ground-truth.conf sets both trim thresholds" \
+  grep -qx 'LESSONS_TRIM_LINES=1000' "$WF/template/dot-claude/ground-truth.conf"
+check "the template's ground-truth.conf sets the questions trim threshold" \
+  grep -qx 'QUESTIONS_TRIM_LINES=1000' "$WF/template/dot-claude/ground-truth.conf"
 
 # A probe that fails is UNKNOWN, never clean.
 git -C api remote set-url origin "$T/nowhere.git"

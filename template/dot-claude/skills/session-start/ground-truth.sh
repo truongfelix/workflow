@@ -31,7 +31,8 @@ REPOS=("$(basename "$ROOT")|.|origin||")
 KEEP_LOCAL=""
 UNITS=1
 CLAIM_STALE_DAYS=3
-QUESTIONS_TRIM_LINES=150
+QUESTIONS_TRIM_LINES=1000
+LESSONS_TRIM_LINES=1000
 GATES=()
 GATE_PASS=()
 GITHUB_CI=()
@@ -489,9 +490,25 @@ else
   rulings=$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/questions.md" 2>/dev/null | cut -f1,5 |
     grep -c "^I$(printf '\t')ruling$")
   if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$qlines" -gt "$QUESTIONS_TRIM_LINES" ]; then
-    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: /handoff proposes a trim pass"
+    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: a trim session is due"
   else
     echo "  $qlines lines, $rulings ruling(s) in §2"
+  fi
+fi
+
+# notes/lessons.md is imported by CLAUDE.md, so every session loads all of it: the same flag, its own threshold.
+echo
+if [ "$LESSONS_TRIM_LINES" -gt 0 ] 2>/dev/null; then echo "== notes/lessons.md (trim above $LESSONS_TRIM_LINES lines)"
+else echo "== notes/lessons.md (no trim: LESSONS_TRIM_LINES=0)"; fi
+if [ ! -f "$ROOT/notes/lessons.md" ]; then
+  echo "  none"
+else
+  llines=$(wc -l <"$ROOT/notes/lessons.md" | tr -d ' ')
+  lessons=$(grep -c '^### L-' "$ROOT/notes/lessons.md")
+  if [ "$LESSONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$llines" -gt "$LESSONS_TRIM_LINES" ]; then
+    echo "  ⚠ TRIM: $llines lines, $lessons lesson(s): a trim session is due"
+  else
+    echo "  $llines lines, $lessons lesson(s)"
   fi
 fi
 

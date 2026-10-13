@@ -246,6 +246,8 @@ what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs
 
 `/handoff` gained a trim pass of `questions.md` (step 3), set by `QUESTIONS_TRIM_LINES` in `ground-truth.conf` (150
 lines when the line is missing): merge the skill by hand, and add the line to set another size.
+The ground truth also flags `notes/lessons.md` past `LESSONS_TRIM_LINES`, and both sizes default to 1000 lines when
+the lines are missing; `/session-start` suggests a dedicated trim session on the flag.
 
 The gate became one way among others to check the code before a merge, beside GitHub CI (`/checks`): the ground
 truth's section `== gate` is `== checks`, and `ground-truth.conf` gained `GITHUB_CI`, the repos whose GitHub CI

@@ -55,6 +55,8 @@ open that already shipped, "done" items whose code changed since).
    - **The checks** → the checks section: a ⚠ NO RECEIPT or a CI not green (the rule "merge": a default branch not
      checked since it last changed) or a ⚠ NO HOOK (the rule "receipt") goes in the brief, with the command the
      section names.
+   - **A trim due** → the `questions.md` or `notes/lessons.md` section says `⚠ TRIM` (the file passed its own size in
+     `.claude/ground-truth.conf`): the brief suggests a dedicated session to trim it, and trims nothing itself.
    - **Landed work**: an item whose work is pushed with its checks passed and CI green, or merged, is deleted now
      (the commit says where it landed) and named in the brief; the owner is not asked whether it is done. Not when its
      `Done when:` needs a trial or a decision the work did not give.
