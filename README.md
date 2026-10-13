@@ -146,8 +146,12 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      stop a background job it started, release, comment or message anyone. Each option says which of them Claude
      asks about first and which it does, then tells: **Careful** asks first for every one; **Balanced** asks first
      to start the day's task, to open or merge a pull request, to release, and to comment or message; **Hands-off**
-     asks first only to release, and to comment or message. Then show each step with that preset's answer and ask
-     which to change; the owner names them, or none. Set the table's rows, then delete its FILL comment.
+     asks first only to release, and to comment or message. Then ask which steps to change, with one option per step
+     that the owner picks or not, each showing the preset's answer ("Commit code: does it, then tells you"); a
+     picked step takes the other answer. Four questions asked at once hold them all: the docs and the backlog
+     (commit the docs, push them, add an item, claim one), code (commit code, push a work branch, delete a branch
+     whose work has landed, stop a background job), sharing (open a pull request, merge one, release), and the rest
+     (start the day's task, comment or message). Set the table's rows, then delete its FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.

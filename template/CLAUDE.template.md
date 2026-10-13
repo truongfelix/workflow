@@ -27,8 +27,8 @@ the handoffs, the trackers, `notes/`, this file and `.claude/`: a push whose new
 docs", on any branch, the default one included.
 
 <!-- FILL: ask the owner for a preset (the last bullet below), listing the steps in plain words and naming no file
-(README, "Adopt in a new project", step 4), then show each step with its answer and ask which to change; set the
-rows, then delete this comment. Until then every row is Careful. -->
+(README, "Adopt in a new project", step 4), then offer each step as an option to pick or not, with its answer; set
+the rows, then delete this comment. Until then every row is Careful. -->
 
 | Step | Here |
 |---|---|
