@@ -42,12 +42,12 @@ done
 
 ASK="ask first" TELL="do, then tell"
 ALL=("Start the day's task after the brief" "Commit the docs" "Push the docs" "Add an item to the backlog"
-  "Claim an item (commit and push its claim line)" "Commit code" "Push a work branch" "Open a pull request"
+  "Claim an item (commit and push its claim line)" "Build something that is not an approved backlog item" "Commit code" "Push a work branch" "Open a pull request"
   "Merge a pull request, or push code to a default branch" "Delete a branch or worktree whose work has landed"
   "Stop a background job this session started" "Release: tag, publish" "Comment, or message anyone")
-BALANCED=("Start the day's task after the brief" "Open a pull request"
+BALANCED=("Start the day's task after the brief" "Build something that is not an approved backlog item" "Open a pull request"
   "Merge a pull request, or push code to a default branch" "Release: tag, publish" "Comment, or message anyone")
-HANDSOFF=("Release: tag, publish" "Comment, or message anyone")
+HANDSOFF=("Build something that is not an approved backlog item" "Release: tag, publish" "Comment, or message anyone")
 
 in_list() { # <text> <item>...: 0 when the text is one of the items
   local t=$1 x

@@ -35,6 +35,7 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 | Push the docs | ask first |
 | Add an item to the backlog | ask first |
 | Claim an item (commit and push its claim line) | ask first |
+| Build something that is not an approved backlog item | ask first |
 | Commit code | ask first |
 | Push a work branch | ask first |
 | Open a pull request | ask first |
@@ -45,13 +46,17 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 | Comment, or message anyone | ask first |
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
+- **Build something that is not an approved backlog item:** a task the owner names in the chat is approved by that
+  request. An extra, an idea or a bug met on the way becomes a backlog item first (the row "Add an item to the
+  backlog"), and is built once the owner approved it.
 - The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,
   which shows the steps to pick: edit the row here, at once; it holds from the next action on.
 - An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
   its ask-first steps in one question.
 - Presets, for setup or a reset: **Careful** asks first on every row. **Balanced** asks first to start the day's
-  task, to open or merge a pull request (or push code to a default branch), to release, and to comment or message;
-  it does the rest, then tells. **Hands-off** asks first only to release, and to comment or message.
+  task, to build something that is not an approved backlog item, to open or merge a pull request (or push code to a
+  default branch), to release, and to comment or message; it does the rest, then tells. **Hands-off** asks first only
+  to build something that is not an approved backlog item, to release, and to comment or message.
 
 ## Rules
 

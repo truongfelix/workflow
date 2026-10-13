@@ -24,16 +24,17 @@ tool cannot show a box already ticked, so each step's question says its answer n
    preset as it is or change some steps (two options). Otherwise ask first, with three options: keep it as it is,
    switch to a preset, change some steps.
    - **The preset question**, three options, each saying which steps Claude asks about first and which it does, then
-     tells. **Careful** asks first for every step. **Balanced** asks first to start the day's task, to open or merge
-     a pull request, to release, and to comment or message; it does the rest, then tells. **Hands-off** asks first
-     only to release, and to comment or message. Before the options, list the steps in plain words: start the day's
-     task, commit the docs (the notes and trackers), push them, add an item to the backlog, claim one, commit code,
-     push a work branch, open a pull request, merge one (or push code to the default branch), delete a branch whose
-     work has landed, stop a background job it started, release, comment or message anyone. Then
+     tells. **Careful** asks first for every step. **Balanced** asks first to start the day's task, to build
+     something that is not an approved backlog item, to open or merge a pull request, to release, and to comment or
+     message; it does the rest, then tells. **Hands-off** asks first only to build something that is not an approved
+     backlog item, to release, and to comment or message. Before the options, list the steps in plain words: start
+     the day's task, commit the docs (the notes and trackers), push them, add an item to the backlog, claim one, build
+     something that is not an approved backlog item, commit code, push a work branch, open a pull request, merge one
+     (or push code to the default branch), delete a branch whose work has landed, stop a background job it started, release, comment or message anyone. Then
      `autonomy.sh preset <name>`.
    - **Change some steps:** one option per step, which the owner picks or not, showing its answer now ("Commit code,
      now: does it, then tells you"); a picked step takes the other answer. Five questions, at most three steps each
-     next to "None of these": the docs (commit the docs, push the docs), the backlog (add an item, claim one), code
+     next to "None of these": the docs (commit the docs, push the docs), the backlog (add an item, claim one, build something not approved), code
      (commit code, push a work branch, delete a branch whose work has landed), sharing (open a pull request, merge
      one, release), and the rest (start the day's task, stop a background job, comment or message). Four are asked
      at once, then the fifth; a row of the project's own (`show` names them) goes in a sixth. Then

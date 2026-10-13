@@ -49,6 +49,8 @@ rows() { # <CLAUDE.md>: the table's rows, "| <step> | <answer> |"
 steps() { rows "$1" | sed 's/^| \(.*\) | [^|]* |$/\1/'; } # <CLAUDE.md>: the steps alone
 CT="$WF/template/CLAUDE.template.md" CE="$WF/example/CLAUDE.example.md"
 SKILLS=("$WF/template/dot-claude/skills/session-start/SKILL.md" "$WF/template/dot-claude/skills/handoff/SKILL.md")
+check "the template's table has the approval step, asking first (B-56)" \
+  eval 'rows "$CT" | grep -qxF "| Build something that is not an approved backlog item | ask first |"'
 check "the template's table has its rows" [ "$(rows "$CT" | wc -l | tr -d ' ')" -ge 10 ]
 check "the template's table asks first on every row" [ -z "$(rows "$CT" | grep -v '| ask first |$')" ]
 check "the example's table answers each row with ask first or do, then tell" \
@@ -72,7 +74,7 @@ check "autonomy show: the template's table is Careful, each step with its answer
 "$SH" "$AU" preset balanced -f "$T/au.md" >"$T/au-bal.txt" 2>&1
 check "autonomy preset balanced: asks first to start the day's task, open or merge a PR, release, message" \
   [ "$(rows "$T/au.md" | grep '| ask first |$' | sed 's/ | ask first |$//; s/^| //' | tr '\n' ';')" = \
-    "Start the day's task after the brief;Open a pull request;Merge a pull request, or push code to a default branch;Release: tag, publish;Comment, or message anyone;" ]
+    "Start the day's task after the brief;Build something that is not an approved backlog item;Open a pull request;Merge a pull request, or push code to a default branch;Release: tag, publish;Comment, or message anyone;" ]
 check "autonomy preset balanced: does the rest, then tells" [ "$(rows "$T/au.md" | grep -c '| do, then tell |$')" = 8 ]
 check "autonomy preset: says the preset the rows make" has "$T/au-bal.txt" "preset: Balanced"
 check "autonomy preset: the setup's FILL comment is gone" lacks "$T/au.md" "FILL: ask the owner for a preset"
@@ -81,7 +83,7 @@ check "autonomy: nothing but the rows and the FILL comment changes" [ "$(norm "$
 check "autonomy ask: a step by its text, then the closest preset and what differs" \
   eval '[ $? = 0 ] && has "$T/au.md" "| Commit code | ask first |" &&
     has "$T/au-ask.txt" "preset: none, closest Balanced, 1 step(s) switched: Commit code"'
-"$SH" "$AU" tell 6 "claim an item" -f "$T/au.md" >/dev/null 2>&1
+"$SH" "$AU" tell 7 "claim an item" -f "$T/au.md" >/dev/null 2>&1
 check "autonomy tell: a step by its number, or the start of its text in any case" \
   eval '[ $? = 0 ] && has "$T/au.md" "| Commit code | do, then tell |" &&
     has "$T/au.md" "| Claim an item (commit and push its claim line) | do, then tell |"'
@@ -89,8 +91,13 @@ cp "$T/au.md" "$T/au.bak"
 "$SH" "$AU" tell Push -f "$T/au.md" >/dev/null 2>&1
 check "autonomy: a step that is not one row exits 1 and changes nothing" eval '[ $? = 1 ] && cmp -s "$T/au.md" "$T/au.bak"'
 "$SH" "$AU" preset hands-off -f "$T/au.md" >/dev/null 2>&1
-check "autonomy preset hands-off: asks first only to release, and to comment or message" \
-  [ "$(rows "$T/au.md" | grep -c '| ask first |$')" = 2 ]
+check "autonomy preset hands-off: asks first only to build what is not approved, release, and to comment or message" \
+  [ "$(rows "$T/au.md" | grep -c '| ask first |$')" = 3 ]
+check "autonomy preset hands-off: the approval step still asks first (B-56)" \
+  has "$T/au.md" "| Build something that is not an approved backlog item | ask first |"
+"$SH" "$AU" tell "Build something" -f "$T/au.md" >/dev/null 2>&1
+check "autonomy tell: the approval step can be switched by the start of its text (B-56)" \
+  eval '[ $? = 0 ] && has "$T/au.md" "| Build something that is not an approved backlog item | do, then tell |"' 
 "$SH" "$AU" preset Careful -f "$T/au.md" >/dev/null 2>&1
 check "autonomy preset careful: the template's rows again" [ "$(rows "$T/au.md")" = "$(rows "$CT")" ]
 "$SH" "$AU" show -f "$CE" >"$T/au-ex.txt" 2>&1
