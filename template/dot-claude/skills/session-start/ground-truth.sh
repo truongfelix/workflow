@@ -434,7 +434,9 @@ for spec in ${GATES[@]+"${GATES[@]}"}; do
     grep -qF "gate.sh\" pre-push" "$ghooks/pre-push" 2>/dev/null ||
       st="$st, ⚠ NO HOOK: a release tag would go out without a receipt (gate.sh hook $gname)"
   fi
-  echo "  $gname ($gcmd): $st"
+  gpat=""
+  for gp in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${gp%%|*}" = "$gname" ] && gpat=${gp#*|}; done
+  echo "  $gname ($gcmd${gpat:+, passes on a line matching: $gpat}): $st"
 done
 
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than

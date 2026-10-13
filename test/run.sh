@@ -1000,6 +1000,30 @@ check "gate hook: never over another hook (exit 1), says what to add" \
 check "gate: a repo with no gate is UNKNOWN (exit 2)" [ $? = 2 ]
 check "/handoff names the gate check of each bug fix under the rule regression" \
   has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**The gate rule "regression"**, when the ground truth'"'"'s gate section lists it'
+# A gate whose exit code is not its verdict (GATE_PASS): a script that exits 0 once it has run, also with a stage
+# skipped, says it passed in a line it prints, in colour. It passes only when it exits 0 and that line is there.
+mkdir "$T/gate-line" && cd "$T/gate-line" || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main
+"$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1
+mkdir bin && printf '%s\n' '#!/bin/sh' 'g=$(printf "\033[32m") n=$(printf "\033[0m")' \
+  'if grep -q skip state.txt; then echo "${g}Local CI green${n} but 1 stage was skipped"; else echo "${g}Local CI green.${n}"; fi' \
+  'exit 0' >bin/ci
+printf '%s\n' 'GATES=("project|sh bin/ci")' 'GATE_PASS=("project|^Local CI green\.")' >>.claude/ground-truth.conf
+echo skip >state.txt && git add -A && git_q commit -m "a stage skipped"
+"$SH" "$GA" run >"$T/gate-line1.txt" 2>&1
+check "gate run, GATE_PASS: exit 0 without the line is a failure (exit 1), no receipt" \
+  eval '[ $? = 1 ] && [ ! -e ".git/gate-receipts/$(git rev-parse HEAD)" ] &&
+    has "$T/gate-line1.txt" "FAILED: the gate of project exited 0, but printed no line matching ^Local CI green\.: no receipt for "'
+check "gate run, GATE_PASS: the failure is recorded with why" \
+  grep -qxF 'why: exited 0, but printed no line matching ^Local CI green\.' ".git/gate-failures/$(git rev-parse HEAD)"
+check "gate run, GATE_PASS: the output still shows" has "$T/gate-line1.txt" "but 1 stage was skipped"
+echo green >state.txt && git_q commit -am green
+"$SH" "$GA" run >"$T/gate-line2.txt" 2>&1
+check "gate run, GATE_PASS: exit 0 and the line, in colour, is a pass" \
+  eval '[ $? = 0 ] && [ -f ".git/gate-receipts/$(git rev-parse HEAD)" ]'
+"$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-line-gt.txt" 2>&1
+check "ground truth, gate: names the line the gate passes on" \
+  has "$T/gate-line-gt.txt" "  project (sh bin/ci, passes on a line matching: ^Local CI green\.): "
 cd "$T" || exit 1
 
 echo

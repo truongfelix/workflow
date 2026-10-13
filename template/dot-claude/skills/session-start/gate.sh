@@ -12,6 +12,11 @@
 # receipts: with "receipt", the pre-push hook refuses a release tag (v*) whose commit has none; with "merge", the
 # ground truth reports a default branch whose last commit has none. Each repo's gate command: GATES, there too.
 #
+# The gate passes when its command exits 0. A command whose exit code is not its verdict (a script that exits 0
+# once it has run, green or not, with stages skipped) names the line it prints when it passed: GATE_PASS, an
+# extended regular expression matched against its output without colour codes. Then it passes only when it exits
+# 0 and a line matches; its output still shows as it runs.
+#
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
 # Usage: bash .claude/skills/session-start/gate.sh run [<repo>]
@@ -85,6 +90,10 @@ for spec in ${GATES[@]+"${GATES[@]}"}; do
 done
 [ -n "$names" ] || fail "no gate set: GATES in .claude/ground-truth.conf names none"
 
+pass_of() { # <name>: the pattern its output must match to pass (GATE_PASS), or nothing
+  local p
+  for p in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${p%%|*}" = "$1" ] && echo "${p#*|}"; done
+}
 here=$(common_dir "$PWD" || true)
 is_gated() { # <name>: true when GATES has it
   local k
@@ -125,16 +134,33 @@ case $cmd in
       printf '%s\n' "$changed" | sed 's/^/  /'
       exit 2
     fi
-    echo "GATE: ${G_NAME[$g]} at $short, in $wt: ${G_CMD[$g]}"
-    "${BASH:-bash}" -c "${G_CMD[$g]}"
-    rc=$?
+    pat=$(pass_of "${G_NAME[$g]}")
+    echo "GATE: ${G_NAME[$g]} at $short, in $wt: ${G_CMD[$g]}${pat:+ (passes on a line matching: $pat)}"
+    if [ -z "$pat" ]; then
+      "${BASH:-bash}" -c "${G_CMD[$g]}"
+      rc=$?
+    else # shown as it runs, and kept to look for the line
+      log=$(mktemp "${TMPDIR:-/tmp}/gate.XXXXXX") || fail "mktemp failed: the gate's output cannot be kept"
+      "${BASH:-bash}" -c "${G_CMD[$g]}" 2>&1 | tee "$log"
+      rc=${PIPESTATUS[0]}
+    fi
+    why=""
     if [ "$rc" != 0 ]; then
+      why="exited $rc"
+    elif [ -n "$pat" ]; then
+      esc=$(printf '\033')
+      tr -d '\r' <"$log" | sed "s/${esc}\[[0-9;]*[A-Za-z]//g" >"$log.plain" # into a file: grep -q ends a pipe early
+      grep -Eq -- "$pat" "$log.plain" || why="exited 0, but printed no line matching $pat"
+    fi
+    [ -z "$pat" ] || rm -f "$log" "$log.plain"
+    if [ -n "$why" ]; then
       failures="$(common_dir .)/gate-failures"
       { mkdir -p "$failures" &&
-        printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" "${G_CMD[$g]}" \
-          "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$(hostname 2>/dev/null || uname -n)" >"$failures/$sha"; } 2>/dev/null ||
+        printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nwhy: %s\nhost: %s\n' "$sha" "${G_NAME[$g]}" \
+          "${G_CMD[$g]}" "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$why" "$(hostname 2>/dev/null || uname -n)" \
+          >"$failures/$sha"; } 2>/dev/null ||
         echo "  (the failure could not be recorded in $failures)"
-      echo "FAILED: the gate of ${G_NAME[$g]} exited $rc: no receipt for $short"
+      echo "FAILED: the gate of ${G_NAME[$g]} $why: no receipt for $short"
       exit 1
     fi
     if [ "$(git rev-parse -q --verify HEAD)" != "$sha" ] ||

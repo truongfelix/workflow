@@ -171,14 +171,15 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      question of its own: "Is `<command>` the check that says the code is ready?" A local CI script the project
      already has (one that runs its checks, maybe keeping its own record of passes) is that command: from then on it
      runs through `gate.sh run`, never beside it, so one run gives both records, and the workflow never reads the
-     script's own. A project with no such check yet (a new one) has no gate: say so and skip the rest of this
-     bullet; this step runs again when the project has one.
-     With a gate, ask which rules to keep, as one question where the owner picks any or "None of these", each rule a
-     plain sentence: "A release needs this check to have passed on its exact commit" (`receipt`), "Each bug fix comes
-     with a check that fails without the fix" (`regression`), "After a merge, the check runs again on the main branch"
-     (`merge`). Name no preset: Production, Steady and Prototype are what the ground truth calls the result, not
-     options to explain. Set `GATE_RULES`; with `receipt`, run `bash .claude/skills/session-start/gate.sh hook <repo>`
-     for each repo with a gate.
+     script's own. A script that exits 0 once it has run, green or not (stages skipped, a partial run), says it passed
+     in a line it prints: ask "How do I know it passed: its exit code, or a line it prints?", and set that line in
+     `GATE_PASS`. A project with no such check yet (a new one) has no gate: say so and skip the rest of this bullet;
+     this step runs again when the project has one. With a gate, ask which rules to keep, as one question where the
+     owner picks any or "None of these", each rule a plain sentence: "A release needs this check to have passed on its
+     exact commit" (`receipt`), "Each bug fix comes with a check that fails without the fix" (`regression`), "After a
+     merge, the check runs again on the main branch" (`merge`). Name no preset: Production, Steady and Prototype are
+     what the ground truth calls the result, not options to explain. Set `GATE_RULES`; with `receipt`, run
+     `bash .claude/skills/session-start/gate.sh hook <repo>` for each repo with a gate.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
