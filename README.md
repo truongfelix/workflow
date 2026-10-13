@@ -64,7 +64,8 @@ script's output, is in [`example/`](example/).
 
 ## Quick start
 
-You need bash and git. Optional: the GitHub CLI `gh` (open PRs and CI) and systemd (background jobs, Linux only).
+You need bash, git and a remote for your project (on GitHub or any git host): the workflow keeps its state in git.
+Optional: the GitHub CLI `gh` (open PRs and CI) and systemd (background jobs, Linux only).
 Runs on Linux, macOS and Windows: in Git Bash, which Claude Code uses on Windows, or in WSL. CI tests all three.
 
 ```bash
@@ -76,11 +77,11 @@ Then open Claude Code in your project and ask:
 
 > Set up the workflow: follow "Adopt in a new project" in /path/to/workflow/README.md
 
-Claude first asks what it may do without asking you (commit, push, open a PR, merge, …: a preset, then any change),
-then fills in the blanks (what the project is, its repos, its rules), runs the ground truth until it comes back
-clean, and runs `/handoff` once to write the first handoff. You change any of those answers whenever you want: "from
-now on, push the docs without asking". From then on: `/session-start` when you sit down, `/handoff` before you stop,
-`/board` whenever you want to see the work at a glance.
+Claude first asks for your project's git remote, then what it may do without asking you (commit, push, open a PR,
+merge, …: a preset, then any change), then fills in the blanks (what the project is, its repos, its rules), runs
+the ground truth until it comes back clean, and runs `/handoff` once to write the first handoff. You change any of
+those answers whenever you want: "from now on, push the docs without asking". From then on: `/session-start` when
+you sit down, `/handoff` before you stop, `/board` whenever you want to see the work at a glance.
 
 ## What you get
 
@@ -129,7 +130,12 @@ wrong. A few:
 The detailed steps, written for the Claude session doing the setup (you can follow them by hand too). Read
 `PRINCIPLES.md` first; then:
 
-1. **Get the workflow:** a clone of this repo on the machine.
+1. **Get the workflow:** a clone of this repo on the machine. **Then a git remote, before any other question:** the
+   workflow does not work without one (the ground truth compares each branch with it, a claim is a push to it, and
+   the next session, on any machine, starts from what it holds). Ask the owner for the remote this folder is pushed
+   to (a private one if the folder will hold other repos: step 2). A folder that is not a git repo yet gets
+   `git init`; with no remote yet, offer to create one (`gh repo create <name> --private`) and wait for the
+   owner's yes. Set it as `origin`.
 2. **Choose the shape.** Ask the owner which one, as a multiple-choice question that recommends neither: both are
    valid, and the owner knows what the folder holds or will hold.
    - *One repo:* the project root is the repo; the trackers are committed with the code.
@@ -179,9 +185,9 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - The skills' FILL item (project-specific checks, what is expected and not news).
    - `.claude/settings.json`, when the project had one (`adopt.sh` lists it as skipped): add the template's
      `PostToolUse` hook to it, which rebuilds the board after each change.
-5. **Workspace shape only:** `git init` at the root; check `git status --ignored` and the staged list before the
-   first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Create the private remote
-   and push as the table allows.
+5. **Workspace shape only:** at the root, the repo of step 1, check `git status --ignored` and the staged list
+   before the first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Push to the
+   remote of step 1 as the table allows.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
    ground truth. Then end the setup with one sentence for each skill, when to use it and what it is for:
    `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's
