@@ -5,11 +5,9 @@
 # same for its first answer. It rewrites the table's rows and nothing else, and once the owner has chosen it deletes
 # the setup's FILL comment above the table.
 #
-# The presets, as the last bullet under the table defines them: Careful asks first on every row; Balanced asks first
-# to start the day's task, to open or merge a pull request (or push code to a default branch), to release, and to
-# comment or message, and does the rest, then tells; Hands-off asks first only to release, and to comment or message.
-# A row of the project's own, which no preset names, asks first in Careful and keeps its answer in the others: a
-# preset never makes a step nobody chose a step done alone.
+# The presets are the last bullet under the table (ALL, BALANCED and HANDSOFF below). A row of the project's own,
+# which no preset names, asks first in Careful and keeps its answer in the others: a preset never makes a step nobody
+# chose a step done alone.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #

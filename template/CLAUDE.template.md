@@ -61,6 +61,10 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.
+- **A question to the owner** is in plain words: no file, table or setting name, and each choice says what it does.
+  Free text is asked in the chat. A question where several can be picked has "None of these": with nothing picked, it
+  returns no answer at all, which reads as a skip. A question that fails, or comes back unanswered, is asked again in
+  the chat; never answer for the owner.
 - <!-- FILL: project rules: what Claude must always or never do here (an architecture choice, a file never to touch,
   how a change is verified). None is fine: delete this line, and add rules as the project meets them. -->
 

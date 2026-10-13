@@ -17,7 +17,7 @@ by repo, state and date: `/board` (`.claude/skills/session-start/board.sh`); a h
 
 **Lessons** learned in this project, loaded every session: @notes/lessons.md
 
-This setup comes from the workflow repo (`.claude/workflow-version` names the commit). When a
+This setup comes from the workflow repo (`.claude/workflow-version` names the release). When a
 session improves a generic piece (a skill, the ground-truth script), port that part back there.
 
 ## What Claude does alone
@@ -44,8 +44,8 @@ docs", on any branch, the default one included.
 | Comment, or message anyone | ask first |
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
-- The owner changes a row at any time ("from now on, push the docs without asking"): edit the row here, at once; it
-  holds from the next action on.
+- The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,
+  which shows the steps to pick: edit the row here, at once; it holds from the next action on.
 - An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
   its ask-first steps in one question.
 - Presets, for setup or a reset: **Careful** asks first on every row. **Balanced** asks first to start the day's
@@ -59,6 +59,10 @@ docs", on any branch, the default one included.
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.
+- **A question to the owner** is in plain words: no file, table or setting name, and each choice says what it does.
+  Free text is asked in the chat. A question where several can be picked has "None of these": with nothing picked, it
+  returns no answer at all, which reads as a skip. A question that fails, or comes back unanswered, is asked again in
+  the chat; never answer for the owner.
 - The API stores metric quantities only (questions.md Q-2 The API stores metric only).
 - Every schema change ships with an Alembic migration and its downgrade, both run by the gate.
 

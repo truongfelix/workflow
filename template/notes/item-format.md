@@ -56,7 +56,8 @@ A whole project in this shape: the workflow repo's `example/BACKLOG.md`, `exampl
 
 **Giving an id.** Take the number in `next id`, then raise it and name yourself in the same edit:
 `next id: B-14 (last given to claude@<session>)`. The agent is who writes the item (`claude`, a subagent's name,
-`owner`); the session is the worktree's folder name, unless the owner names it. Commit both with the new item. Until
+`owner`); the session is the worktree's folder name, unless the owner names it, as for its handoff (a claim names the
+running session instead: Claims). Commit both with the new item. Until
 that commit is pushed, the id is provisional: use it in nothing outside the trackers (no branch name, no commit
 message elsewhere).
 
@@ -77,9 +78,9 @@ silently, leaving two items numbered B-13.
 | questions | 🟢 | ruling in force |
 | questions | ⏸️ | deferred: the trigger is in `waits:` |
 
-A lesson has no state. "In progress" and "done" are never written by hand: an item in progress is still 🔲 open, with
-a `claimed:` line that names who works on it (Claims, below), and a finished item is deleted (git keeps it). So a state can never disagree with the facts
-behind it.
+A lesson has no state. "In progress" and "done" are never written by hand: an item in progress is still 🔲 open, with a
+`claimed:` line that names who works on it (Claims, below), and a finished item is deleted (git keeps it). So a state
+can never disagree with the facts behind it.
 
 ## Fields
 
@@ -126,18 +127,17 @@ bash .claude/skills/session-start/claim.sh B-12 feat/B-12-offline-list
 It adds `claimed: <agent>@<session> on <branch> at <machine>` under the item's heading, in a commit of its own
 (`claim B-12`) on the remote's default branch, and pushes it.
 - **agent:** who does the work: `claude`, a subagent's name, `owner`.
-- **session:** the name other sessions message it by (`ListAgents`: "This session is workflow-dev-64"), so Claude
-  knows at once which session works on what; the worktree's folder name where there is none. Claude passes it as
-  the third argument, `claude@<name>`.
+- **session:** the running session, by the name other sessions message it by (`ListAgents`: "This session is
+  pantry-12"), so Claude knows at once which session works on what; the worktree's folder name where there is none.
+  Claude passes it as the third argument, `claude@<name>`. A new session in the same worktree has a new name: it
+  takes a claim its handoff kept over with `--from` (below).
 - **branch:** where the work goes: the fact behind the claim, which the ground truth follows.
 - **machine:** where the branch's commits are until they are pushed: this machine's name (`uname -n`), `cloud` in a
   Claude Code cloud session, or `CLAIM_MACHINE` when set. Written once: the machine a session runs on does not change.
 
-The push is the lock. When another session pushed first, git refuses the push; the script reads the item again
-from the new tip, then claims it there, or exits 1 and names who has it: pick another item. The claim is built on
-the remote's tip, never on the files here, so it works from any branch or worktree. An item that is not on the
-remote yet is pushed before it is claimed: its id is final then, and it shows in git even if it is finished the same
-day.
+The push is the lock: of two sessions claiming one item, the second is refused and told who has it (how: the
+header of `claim.sh`). An item that is not on the remote yet is pushed before it is claimed: its id is final then,
+and it shows in git even if it is finished the same day. An item waiting for its trigger (⏸️) is not claimed.
 
 The ground truth lists every claim with its branch: the repo it is in, its last commit, pushed or not. It reports a
 claim not pushed (no other session sees it), a branch that is gone, and a branch with no commit for
@@ -146,10 +146,8 @@ older): its session may have stopped without a handoff. A branch claimed on anot
 is not called gone: its commits may be on that machine alone. Only the owner releases another session's claim.
 
 Where the work is, is never written in the item: a status written there drifts (a PR merged on GitHub, a push from
-another machine). The board computes it at each build, in its "Where" column: the branch pushed or not, an open PR
-(with its CI, when GitHub CI checks the repo), a merged one (the item can be deleted), or the machine where the
-commits are. Its "Gate" column, when the project has a gate (`/checks`), says whether the branch passed it on this
-machine: passed or failed on its last commit, not run on the last commits, not run here, or no gate for its repo.
+another machine). The board computes it at each build, in its "Where" column (and "Gate", in a project with a gate):
+the board below.
 
 Releasing: when the work lands, the item is deleted, claim and all. When a session stops before that, `/handoff`
 keeps the claim with its branch pushed and named under "Unfinished", or deletes the line, and the docs push frees
@@ -163,25 +161,16 @@ line, each place they depart from this format: a `###` heading that does not mat
 a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without
 `Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
 `YYYY-MM-DD`, a `claimed:` line not in the shape `<agent>@<session> on <branch> at <machine>` (` at <machine>` may
-be missing in a claim made before it was written), a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot
-be read: never a silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example. It checks
+be missing in a claim made before it was written), a lesson with a state, a lesson left as a bullet, with no id.
+Exit 0 when every item follows the format; 2 when one does not, or when a file cannot be read: never a silent
+pass. Fenced code and HTML comments are skipped, so a tracker can show an example. It checks
 the handoffs too (`notes/handoff-format.md`, "The check").
 
 ## The board
 
-`bash .claude/skills/session-start/board.sh` writes both trackers, the lessons and the handoffs as one page, a tab each,
-and opens it: the repos and their count, every item with its state (and in the backlog, who claimed it), repos and dates, filters by repo (one, several, or
-the items that span more than one), state, date (added, last changed, closed, ruled) and text, each item's history from
-git, and the handoffs that name it. Each commit opens to its whole message and the files it changed; a commit hash
-quoted anywhere (an item, a handoff, a commit message, a PR) links to that commit in whichever repo of
-`.claude/ground-truth.conf` holds it, and so do the commits that name an item by its id. PRs come from GitHub, read by
-`gh` when the page is built: a PR that names an item (title, description, branch) and a PR an item names (`#41`) show
-with the item, with their description and merge commit. Without `gh`, or with `--offline`, the page says the PRs were
-not read. Closed items come back from git: a deleted item as "closed", a deleted ruling as "archived", a deleted
-lesson as "dropped", a replaced handoff as "replaced". Handoffs written before they had ids (one `notes/handoff.md`)
-are shown by their date. An id that git shows given twice is a problem, and its row has a ⚠; a shallow clone says from
-which date the history is known. The page is read-only and rebuilt at each run (no server, nothing to install): run
-the script again to refresh it. An item the parser cannot read shows in the problems box as written, never dropped.
+`/board` (`board.sh`) shows both trackers, the lessons and the handoffs as one page: each item with its history, its
+commits and PRs, the closed ones included (from git), and an item the parser cannot read as written, never dropped.
+What it shows, and how it stays current: the header of `board.sh`.
 
 ## Moving a project to it
 

@@ -8,7 +8,7 @@ Read in this order:
 
 1. [`notes/handoff/pantry.md`](notes/handoff/pantry.md): what Friday's `/handoff` wrote at 18:40, the handoff H-9.
 2. [`ground-truth-output.txt`](ground-truth-output.txt): what `ground-truth.sh` found on Monday.
-3. [`session-start-brief.md`](session-start-brief.md): what Claude told the owner.
+3. [What it looks like](../README.md#what-it-looks-like), in the workflow's README: what Claude told the owner.
 
 Between Friday evening and Monday, three things happened that the handoff could not know: the backfill job ran out
 of disk at 01:12 on Saturday, the owner kept working after the handoff and committed twice without pushing, and CI
@@ -23,9 +23,10 @@ The other files are the trackers as they stand:
 | [`notes/lessons.md`](notes/lessons.md) | lessons promoted from earlier handoffs, each with its id; the handoff cites one |
 | [`notes/handoff/README.md`](notes/handoff/README.md) | the handoffs' folder: one file per session (Pantry has one), and the next handoff id. Thursday's handoff, H-8, is in git: Friday's replaced it after its "Learned" line went into `lessons.md` as L-3 |
 | [`CLAUDE.example.md`](CLAUDE.example.md) | the template's `CLAUDE.md`, filled in (renamed here, so that Claude Code does not load Pantry's rules in a session working on the workflow) |
-| [`.claude/ground-truth.conf`](.claude/ground-truth.conf) | the two repos, and the branch kept local on purpose |
+| [`.claude/ground-truth.conf`](.claude/ground-truth.conf) | the two repos, the branch kept local on purpose, and how the code is checked before a merge |
 
 The skills, the script and `notes/item-format.md` are the template's, unchanged, so they are not repeated here.
 
-The ground-truth output is real: it comes from repos built to match this story. Only the open-PR lines and the
-background unit were written by hand, in the script's format, because they need GitHub and systemd.
+The ground-truth output is real: it comes from repos built to match this story. Only the open-PR lines, the CI of
+each default branch and the background unit were written by hand, in the script's format, because they need GitHub
+and systemd.

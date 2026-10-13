@@ -4,6 +4,10 @@ The queue of **open** work. Owner decisions and deliberate non-fixes are not her
 is in flight today (running jobs, the task of the day) is in the handoffs, `notes/handoff/`.
 
 **Rules**
+- **Only approved items are built.** A new idea, an extra or a bug met on the way becomes an item here first, and is
+  built once the owner approved it: with a yes when it is added or when its work starts (`CLAUDE.md`, the rows "Add
+  an item to the backlog" and "Start the day's task after the brief"). So nothing is built that this file does not
+  show, and it stays the whole list of the work.
 - **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading
   as authoritative. The commit that deletes it says where it landed (a commit hash, a PR number), so the board leads
   from the closed item to the work. Measured results go to `notes/`.
@@ -31,13 +35,13 @@ next id: B-17 (last given to claude@pantry)
 ## api
 
 ### 🔲 B-7 Unit conversion on import
-claimed: claude@pantry-12 on fix/unit-conversion
+claimed: claude@pantry-12 on fix/unit-conversion at laptop
 Recipes imported from US sites keep cups and ounces, so the shopping list cannot add them up. PR #41, branch
 `fix/unit-conversion`.
 Done when: an imported recipe stores grams and millilitres only, and #41 is merged.
 
 ### 🔲 B-15 Import rejects recipes with no yield
-claimed: claude@api-yield-3 on fix/yield-default
+claimed: claude@api-yield-3 on fix/yield-default at laptop
 About 4% of imports fail with `yield is required` (the backfill's log).
 Done when: a missing yield defaults to 1 serving and the recipe page flags it.
 
@@ -54,7 +58,7 @@ Done when: a search answers in under 100 ms on the full set.
 ## web
 
 ### 🔲 B-12 Shopping list works offline
-claimed: claude@pantry-12 on feat/offline-list
+claimed: claude@pantry-12 on feat/offline-list at laptop
 Edits made in a shop with no signal are lost. Worktree `web-offline/`.
 Done when: an edit made in airplane mode syncs on reconnect, conflicts resolved last-write-wins per item, tested on
 a phone.

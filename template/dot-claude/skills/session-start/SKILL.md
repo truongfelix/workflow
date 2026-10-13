@@ -41,17 +41,17 @@ open that already shipped, "done" items whose code changed since).
      the handoff does not mention goes in the brief: work that exists only on this disk.
    - **Each item in "Running"** → the background section. If it finished, read the last lines of its log and note
      the outcome: done, failed, timed out. Analyze results only once the user picks that task.
-   - **Failing CI** (`CI RED`) → `gh pr checks <n> -R <owner/repo>` for the failing job.
+   - **Failing CI** (`CI red`) → `gh pr checks <n> -R <owner/repo>` for the failing job.
    - **Today's date and time** against deadlines (expiries, scheduled jobs, events). Anything due within a day goes
      first.
    - Before proposing a `BACKLOG.md` item, re-confirm it in the code: is it still broken or missing? If it is done
      already, say so and delete it at the handoff. A fix you *depend on*: spot-check that it still holds.
-   - **Claims** → the claims section (`notes/item-format.md`, Claims), with the sessions running now: `ListAgents`
-     says this session's name ("This session is <name>") and lists the others. A claim names its session by that
-     name, so Claude sees at once who works on what: a claim whose session is listed is work in flight there. A
-     claim kept by this session's handoff ("Unfinished") names the session before this one: this session takes it
-     over when it goes on with that work (step 5). An item another session claimed is not proposed: it is taken. A
-     claim marked ⚠ STALE, GONE or NOT PUSHED goes in the brief: only the owner releases another session's claim.
+   - **Claims** → the claims section (`notes/item-format.md`, Claims), with the sessions running now: `ListAgents` says
+     this session's name ("This session is <name>") and lists the others. A claim names its session by that name, so
+     Claude sees at once who works on what: a claim whose session is listed is work in flight there. A claim kept by
+     this session's handoff ("Unfinished") names the session before this one: this session takes it over when it goes on
+     with that work (step 5). An item another session claimed is not proposed: it is taken. A claim marked ⚠ STALE,
+     GONE, NOT HERE or NOT PUSHED goes in the brief: only the owner releases another session's claim.
    - **The checks** → the checks section: a ⚠ NO RECEIPT or a CI not green (the rule "merge": a default branch not
      checked since it last changed) or a ⚠ NO HOOK (the rule "receipt") goes in the brief, with the command the
      section names.
@@ -76,8 +76,8 @@ open that already shipped, "done" items whose code changed since).
    from `ListAgents` (the worktree's folder name where there is none). The branch is where the work goes
    (`feat/B-12-offline-list`, or the branch an earlier session pushed). Going on with a claim the handoff kept: add
    `--from <its agent@session>` to take it over. Exit 0: the item is yours, say so. Exit 1: another session claimed
-   it first, or the item is not on the remote yet (push a new item first, the row "Add an item to the backlog"):
-   tell the user, and propose another. Exit 2: nothing was claimed, say why.
+   it first, the item is not on the remote yet (push a new item first, the row "Add an item to the backlog"), or it
+   waits for its trigger (⏸️): tell the user, and propose another. Exit 2: nothing was claimed, say why.
 6. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
    release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
    day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
@@ -88,8 +88,8 @@ open that already shipped, "done" items whose code changed since).
 
 ## Notes
 
-- The brief is for a person: plain sentences. Every item, question, lesson or handoff it mentions is named by its id
-  and title (`B-10 Questions trim pass`), here and in every later answer, so the user can follow it on the board.
+- The brief is for a person: plain sentences. Every item, question, lesson or handoff it mentions is named by its id and
+  title (`B-12 Shopping list works offline`), here and in every later answer, so the user can follow it on the board.
 - If the ground truth contradicts the handoff (a job that failed, a branch never pushed), put it first and fix the
   handoff's claim when the session ends.
 - Work started after the brief is recorded at the end of the session with `/handoff`.

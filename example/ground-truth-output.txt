@@ -8,7 +8,7 @@ GROUND TRUTH — 2026-10-12 09:14 CEST
   branches with no worktree, not in origin/main:
     local/family-recipes: local only BY RULE, never push
   open PRs (example-org/pantry-api):
-    #41 [fix/unit-conversion] CI RED: Convert recipe units to grams on import
+    #41 [fix/unit-conversion] CI red: Convert recipe units to grams on import
 
 == web (web)
   origin/main: 44a421b 10-07 11:30 Recipe page: print layout (#17)
@@ -23,11 +23,11 @@ GROUND TRUTH — 2026-10-12 09:14 CEST
   c44efa9 10-09 18:42: ahead 0 / behind 0 of origin/main, 0 uncommitted
 
 == claims (BACKLOG.md, shared on origin/main)
-  B-7 Unit conversion on import: claude@pantry-12 on fix/unit-conversion
+  B-7 Unit conversion on import: claude@pantry-12 on fix/unit-conversion at laptop
       api: last commit 10-09 17:55, = origin/fix/unit-conversion
-  B-15 Import rejects recipes with no yield: claude@api-yield-3 on fix/yield-default
+  B-15 Import rejects recipes with no yield: claude@api-yield-3 on fix/yield-default at laptop
       api: last commit 10-01 16:40, = origin/fix/yield-default, ⚠ STALE: no commit for 10 days
-  B-12 Shopping list works offline: claude@pantry-12 on feat/offline-list
+  B-12 Shopping list works offline: claude@pantry-12 on feat/offline-list at laptop
       web: last commit 10-09 19:20, ahead 2 / behind 0 of origin/feat/offline-list
 
 == checks (rules kept: receipt regression merge = Production)

@@ -11,10 +11,8 @@ passed), by GitHub CI (`GITHUB_CI`: the repos whose CI on GitHub counts), both, 
 rules kept (`GATE_RULES`) hold for whichever checks a repo, and the board shows only what applies. This skill shows
 those lines and changes them with the owner's answers.
 
-Talk to the owner in plain words: name no file or setting, and say what each choice does. The gate is "the check
-that says the code is ready" (its tests), never a bare "gate". A question that fails, or a free-text one left
-unanswered, is asked again in the chat; never pick for the owner. A question where several can be picked has "None
-of these": with nothing picked, it returns no answer at all, which reads as a skip.
+Ask as `CLAUDE.md`'s rule "A question to the owner" says. The gate is "the check that says the code is ready" (its
+tests), never a bare "gate".
 
 ## Steps
 

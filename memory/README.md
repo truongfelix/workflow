@@ -10,10 +10,7 @@ Memory is split two ways: by **time** (what is live, what is past, what was lear
 | **Git** | every earlier handoff, closed item and dropped lesson, word for word | never whole; searched by id when something points there |
 | **Distilled** | `notes/lessons.md`, memories, topic notes, CLAUDE.md, gate scripts | where each lesson acts |
 
-`/handoff` replaces the session's live file each time, and distils it first: each lesson that still holds is
-promoted to where it acts, each still-live item (a deadline, an owed step) is carried into the new live file. Only
-then is the old file replaced; git keeps it. An append-only log that skips the distilling grows until nobody reads it, with its
-lessons buried inside.
+`/handoff` distils the live file before it replaces it (its step 2); why: `PRINCIPLES.md`, "Live, git, distilled".
 
 ## By reach: repo or machine
 
@@ -67,6 +64,6 @@ repo; memory holds only what makes a session work BETTER. Never link from a trac
 - **Private stays private.** Memory is a good place for things that must never be committed (undisclosed security
   issues, personal context), precisely because it does not travel. Keep it that way: never copy such a memory into
   a tracked file.
-- **Promote what every session needs.** A memory that every session of the project needs (a tool quirk, a git
-  habit) becomes a lesson in `notes/lessons.md` (`### L-<n> <title>`), which travels with the repo; once it is there, delete the memories
-  it fully covers, so it does not load twice.
+- **Promote what every session needs.** A memory that every session of the project needs (a tool quirk, a git habit)
+  becomes a lesson in `notes/lessons.md` (`### L-<n> <title>`), which travels with the repo; once it is there, delete
+  the memories it fully covers, so it does not load twice.

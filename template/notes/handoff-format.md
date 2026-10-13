@@ -23,7 +23,7 @@ what is unfinished, what was done and learned. `/handoff` writes it in this shap
 continues: H-11
 
 ## Next
-1. B-12 Shopping list works offline: <why now>, <where to start: file, branch, command>.
+1. B-12 Shopping list works offline [web]: <why now>, <where to start: file, branch, command>, <done when>.
 
 ## Waiting for the user
 - Q-3 Metric only on the shopping list?: blocks the totals row.

@@ -22,17 +22,20 @@
 #                   it): the line is replaced only while the remote still has that claim
 #   The remote and the default branch: the entry of .claude/ground-truth.conf for the project root, else origin and
 #   its HEAD (main, master).
-#   The machine: where the branch's commits are until they are pushed. CLAIM_MACHINE when set, else "cloud" in a
-#   Claude Code cloud session (CLAUDE_CODE_REMOTE=true), else this machine's name (uname -n, up to its first dot).
+#   The machine: where the branch's commits are until they are pushed (lib.sh, machine_name: CLAIM_MACHINE, "cloud"
+#   in a cloud session, else this machine's name).
 # Exit 0 = the claim is on the remote: the item is yours (or was already). Exit 1 = refused: another session
-# claimed it first (or holds it, for --from another one), or the item is not open on the remote (push a new item before claiming it). Exit 2 = nothing was
-# claimed: a usage error, no remote, a push that failed for another reason, an unreadable BACKLOG.md (UNKNOWN).
+# claimed it first (or holds it, for --from another one), the item is not open on the remote (push a new item before
+# claiming it), or it waits for its trigger (⏸️). Exit 2 = nothing was claimed: a usage error, no remote, a push that
+# failed for another reason, an unreadable BACKLOG.md (UNKNOWN).
 
 set -uo pipefail
 
 usage() { echo "usage: $0 <B-id> <branch> [<agent>@<session>] [--from <agent>@<session>]" >&2; exit 2; }
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 ROOT=$(cd "$DIR/../../.." && pwd)
+# shellcheck source=lib.sh
+. "$DIR/lib.sh" || { echo "UNKNOWN: no $DIR/lib.sh (upgrade the skill's scripts together); nothing claimed"; exit 2; }
 from="" args=()
 while [ $# -gt 0 ]; do
   case $1 in
@@ -47,10 +50,7 @@ id=${args[0]} branch=${args[1]} who=${args[2]:-claude@$(basename "$ROOT")}
 [[ $branch =~ ^[^[:space:]]+$ ]] || { echo "a branch name has no space: $branch" >&2; usage; }
 [[ $who =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $who" >&2; usage; }
 [ -z "$from" ] || [[ $from =~ ^[^[:space:]@]+@[^[:space:]@]+$ ]] || { echo "not <agent>@<session>: $from" >&2; usage; }
-machine=${CLAIM_MACHINE:-}
-[ -z "$machine" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && machine=cloud
-[ -z "$machine" ] && machine=$(uname -n 2>/dev/null) && machine=${machine%%.*}
-machine=${machine//[[:space:]]/-}
+machine=$(machine_name)
 line="claimed: $who on $branch at ${machine:-unknown}"
 
 fail() { echo "UNKNOWN: $*; nothing claimed"; exit 2; }

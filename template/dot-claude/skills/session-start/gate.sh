@@ -47,6 +47,8 @@ fail() { echo "UNKNOWN: $*"; exit 2; }
 DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 SELF="$DIR/gate.sh"
 ROOT=$(cd "$DIR/../../.." && pwd)
+# shellcheck source=lib.sh
+. "$DIR/lib.sh" || { echo "UNKNOWN: no $DIR/lib.sh (upgrade the skill's scripts together)"; exit 2; }
 REPOS=("$(basename "$ROOT")|.|origin||")
 GATES=()
 GATE_PASS=()
@@ -55,13 +57,6 @@ GATE_RULES=""
 # shellcheck source=/dev/null
 [ -f "$ROOT/.claude/ground-truth.conf" ] && . "$ROOT/.claude/ground-truth.conf"
 
-common_dir() { # <dir>: the git directory that the worktrees of its repo share, as a physical path
-  local top d
-  top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
-  d=$(git -C "$top" rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] || return 1
-  case $d in /* | [A-Za-z]:*) ;; *) d="$top/$d" ;; esac
-  (cd "$d" && pwd -P)
-}
 in_list() { # <name> <name>...: 0 when the first is one of the others
   local n=$1 x
   shift
@@ -78,11 +73,7 @@ R_NAME=() R_DIR=() R_GH=()
 for r in ${REPOS[@]+"${REPOS[@]}"}; do
   IFS='|' read -r n d rem _ gh <<<"$r"
   case $d in /*) ;; *) d="$ROOT/$d" ;; esac
-  if [ -z "$gh" ]; then
-    gh=$(git -C "$d" remote get-url "${rem:-origin}" 2>/dev/null |
-      sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
-    gh=${gh%.git}
-  fi
+  [ -n "$gh" ] || gh=$(github_repo "$d" "${rem:-origin}")
   R_NAME+=("$n") R_DIR+=("$d") R_GH+=("$gh")
 done
 repo_of() { # <name>: sets ri, its index in REPOS; 1 when REPOS has none of that name
@@ -123,10 +114,11 @@ ci_of() { # <GitHub owner/repo> <commit>: its CI on GitHub in a few words (GitHu
 # The hook runs inside the repo being pushed: the rule, then what checks this repo (its entry in REPOS).
 if [ "$cmd" = pre-push ]; then
   case " $GATE_RULES " in *" receipt "*) ;; *) cat >/dev/null; exit 0 ;; esac
-  here=$(common_dir .) || { cat >/dev/null; echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1; }
+  here=$(git_common_dir .) ||
+    { cat >/dev/null; echo "gate.sh pre-push: not in a git checkout: push refused" >&2; exit 1; }
   name="" gh=""
   for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
-    [ "$(common_dir "${R_DIR[$i]}")" = "$here" ] && name=${R_NAME[$i]} gh=${R_GH[$i]}
+    [ "$(git_common_dir "${R_DIR[$i]}")" = "$here" ] && name=${R_NAME[$i]} gh=${R_GH[$i]}
   done
   if [ -z "$name" ]; then
     cat >/dev/null
@@ -168,7 +160,7 @@ pass_of() { # <name>: the pattern its output must match to pass (GATE_PASS), or 
   local p
   for p in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do [ "${p%%|*}" = "$1" ] && echo "${p#*|}"; done
 }
-here=$(common_dir "$PWD" || true)
+here=$(git_common_dir "$PWD" || true)
 pick() { # <gate|ci|any> [<name>]: sets g, the index in REPOS of a repo of GATES, of GITHUB_CI, or of either: the one
   # named, else the one holding the current directory, else the only one
   local kind=$1 n list=GATES none="no gate set"
@@ -189,7 +181,7 @@ pick() { # <gate|ci|any> [<name>]: sets g, the index in REPOS of a repo of GATES
     repo_of "$n"
     if [ -n "${1:-}" ]; then
       [ "$n" = "$1" ] && g=$ri
-    elif [ -n "$here" ] && [ "$(common_dir "${R_DIR[$ri]}")" = "$here" ]; then
+    elif [ -n "$here" ] && [ "$(git_common_dir "${R_DIR[$ri]}")" = "$here" ]; then
       g=$ri
     fi
   done
@@ -199,7 +191,7 @@ pick() { # <gate|ci|any> [<name>]: sets g, the index in REPOS of a repo of GATES
   fail "which repo? name one of $list: ${names[*]}"
 }
 worktree() { # the worktree of repo g to work in: the current one when it belongs to that repo, else its folder
-  if [ -n "$here" ] && [ "$(common_dir "${R_DIR[$g]}")" = "$here" ]; then git rev-parse --show-toplevel
+  if [ -n "$here" ] && [ "$(git_common_dir "${R_DIR[$g]}")" = "$here" ]; then git rev-parse --show-toplevel
   else echo "${R_DIR[$g]}"; fi
 }
 rev_args() { # <gate|ci> [<repo>] [<rev>]: picks the repo, and sets rev (empty: the commit checked out)
@@ -251,7 +243,7 @@ case $cmd in
     fi
     [ -z "$pat" ] || rm -f "$log" "$log.plain"
     if [ -n "$why" ]; then
-      failures="$(common_dir .)/gate-failures"
+      failures="$(git_common_dir .)/gate-failures"
       { mkdir -p "$failures" &&
         printf 'commit: %s\nrepo: %s\ngate: %s\nfailed: %s\nexit: %s\nwhy: %s\nhost: %s\n' "$sha" "$name" \
           "$gcmd" "$(date '+%Y-%m-%d %H:%M %Z')" "$rc" "$why" "$(hostname 2>/dev/null || uname -n)" \
@@ -266,12 +258,12 @@ case $cmd in
         "run it again on a clean commit"
       exit 1
     fi
-    receipts="$(common_dir .)/gate-receipts"
+    receipts="$(git_common_dir .)/gate-receipts"
     mkdir -p "$receipts" || fail "cannot write $receipts"
     printf 'commit: %s\nrepo: %s\ngate: %s\npassed: %s\nhost: %s\n' "$sha" "$name" "$gcmd" \
       "$(date '+%Y-%m-%d %H:%M %Z')" "$(hostname 2>/dev/null || uname -n)" >"$receipts/$sha" ||
       fail "cannot write $receipts/$sha"
-    rm -f "$(common_dir .)/gate-failures/$sha"
+    rm -f "$(git_common_dir .)/gate-failures/$sha"
     echo "RECEIPT: $short passed the gate of $name"
     ;;
   check)
@@ -280,7 +272,7 @@ case $cmd in
     wt=$(worktree)
     sha=$(git -C "$wt" rev-parse -q --verify "${rev:-HEAD}^{commit}") || fail "no commit ${rev:-HEAD} in $wt"
     short=$(git -C "$wt" rev-parse --short "$sha")
-    receipt="$(common_dir "$wt")/gate-receipts/$sha"
+    receipt="$(git_common_dir "$wt")/gate-receipts/$sha"
     if [ -f "$receipt" ]; then
       echo "RECEIPT: $short passed the gate of ${R_NAME[$g]} on $(sed -n 's/^passed: //p' "$receipt")"
       exit 0

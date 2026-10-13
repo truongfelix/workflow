@@ -27,38 +27,41 @@ This template keeps a project going across sessions, machines and weeks with fiv
 - **`/checks`** shows how the code is checked before a merge (its own check, such as its tests; GitHub CI; both; or
   nothing yet) and the rules kept, such as "a release needs a pass on its exact commit", and changes them.
 
-The handoff is a claim; the script is the fact. Both skills run the same script, so the session that writes the
-note and the session that reads it look at the same picture.
+The handoff is a claim; the script is the fact. `/session-start` and `/handoff` run the same script, so the session
+that writes the note and the session that reads it look at the same picture.
 
 ## What it looks like
 
-Monday morning, `/session-start` on a project whose last session ended on Friday:
+Monday morning, `/session-start` on a project whose last session ended on Friday. It ran the ground truth, read
+Friday's handoff, checked each claim it was about to repeat (the failed unit's log, the two commits not pushed, the
+red CI job), and answered:
 
 ```text
 Since last session (Fri 9 Oct, 18:40)
-- ⚠ The ingredient backfill failed on Saturday at 01:12, at batch 212 of 340: "No space left on
-  device" on /var/lib/pantry. The handoff expected it to finish around 03:00.
-- ⚠ web: feat/offline-list has 2 commits that were never pushed (Fri 19:05 and 19:20, after the
-  handoff). The handoff calls the branch pushed and the edit queue "not started": those commits
-  are the queue and its replay.
+- ⚠ B-16 Backfill ingredients on staging: the backfill failed on Saturday at 01:12, at batch 212
+  of 340: "No space left on device" on /var/lib/pantry. The handoff expected it to end by 03:00.
+- ⚠ B-12 Shopping list works offline: feat/offline-list has 2 commits that were never pushed
+  (Fri 19:05 and 19:20, after the handoff). The handoff calls the branch pushed and the edit
+  queue "not started": those commits are the queue and its replay.
 - ⚠ web: spike/pwa-cache exists only on this laptop, and no note mentions it.
-- api: PR #41 (unit conversion) is CI RED: test_round_to_5g, a pinch of salt rounds to 0 g.
+- B-7 Unit conversion on import: PR #41 is CI red: test_round_to_5g, a pinch of salt rounds
+  to 0 g.
 - #39 (search by ingredient) is merged, as the handoff says.
 
 Today
-1. [api] Fix the rounding in #41 so small quantities keep at least 1 g. Thursday's release needs
-   it. Done when CI is green and you have merged it.
-2. [ops] Free space on /var/lib/pantry and resume the backfill from batch 212. Done when the
-   unit exits 0 and 20 recipes check out on staging.
-3. [web] Push the 2 commits, then finish "Shopping list works offline": conflict handling and
-   the phone test are left.
+1. B-7 Unit conversion on import [api]: fix the rounding in #41 so small quantities keep at
+   least 1 g. Thursday's release needs it. Done when CI is green and you have merged it.
+2. B-16 Backfill ingredients on staging [ops]: free space on /var/lib/pantry and resume from
+   batch 212. Done when the unit exits 0 and 20 recipes check out on staging.
+3. B-12 Shopping list works offline [web]: push the 2 commits, then finish it: conflict
+   handling and the phone test are left.
 
 Waiting for you
-- "Metric only on the shopping list?" I recommend metric only: it matches #41, and a switch can
-  come later.
+- Q-3 Metric only on the shopping list? I recommend metric only: it matches #41, and a switch
+  can come later.
 - spike/pwa-cache: push it, keep it local on purpose, or delete it?
-- "Import rejects recipes with no yield" was claimed on 1 Oct by another session (api-yield-3),
-  and its branch has had no commit since: release it, so a session can take it?
+- B-15 Import rejects recipes with no yield was claimed on 1 Oct by another session
+  (api-yield-3), and its branch has had no commit since: release it, so a session can take it?
 
 I'd start with 1: it is small, and the release waits on it. Which one?
 ```
@@ -107,11 +110,12 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
-It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
-its own at the root. How Claude Code's machine-local memory fits next to these files: [`memory/README.md`](memory/README.md).
+It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of its
+own at the root. How Claude Code's machine-local memory fits next to these files:
+[`memory/README.md`](memory/README.md).
 
 ## The ideas behind it
 
@@ -155,12 +159,10 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` for the second shape). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
 4. **Fill**, in this order. The owner has not read these files: all the setup says or writes for the owner (its
-   questions, its summary at the end, the items it adds) is in plain words, with no file, table, setting or preset
-   name, and a question says what each choice does. Free text (what the project is, its rules) is asked in the chat,
-   as an open question: never an option that only says "I'll type it", which returns no text when picked. A question
-   that fails, or a free-text one left unanswered, is asked again in the chat: never write an answer the owner did
-   not give (a folder's name is not what the project is). A question where the owner can pick several has an option
-   "None of these": with nothing picked, it returns no answer at all, which reads as a skip.
+   questions, its summary at the end, the items it adds) is in plain words, with no preset name either, and each
+   question follows `CLAUDE.md`'s rule "A question to the owner". Free text (what the project is, its rules) is an
+   open question in the chat, never an option that only says "I'll type it", which returns no text when picked; a
+   folder's name is not what the project is.
    - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Follow the `/autonomy` skill
      (`.claude/skills/autonomy/SKILL.md`): the owner picks a preset, with each step listed in plain words, then keeps
      it or picks the steps to switch. Its script sets the rows and deletes the FILL comment.
@@ -202,8 +204,8 @@ project's content and the template's structure.
 ## Upgrade a project from here
 
 `bin/adopt.sh <project-root>` again lists every skipped file with its `diff -u` command against the current
-template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` records which release
-the project last took, as the releases page names it: `v1.0.0`, or `v1.0.0-3-gabc1234` three commits after it.
+template. Merge the generic parts; keep the project's FILL answers. `.claude/workflow-version` names the release
+`adopt.sh` last ran from, as the releases page names it: `v1.0.0`, or `v1.0.0-3-gabc1234` three commits after it.
 
 From 1.x: the trackers' items and the lessons moved from bullets cited by title to one shape with ids, and the one
 `notes/handoff.md` with its archive became one handoff per session, with git as the archive
@@ -220,6 +222,9 @@ lines when the line is missing): merge the skill by hand, and add the line to se
 The gate became one way among others to check the code before a merge, beside GitHub CI (`/checks`): the ground
 truth's section `== gate` is `== checks`, and `ground-truth.conf` gained `GITHUB_CI`, the repos whose GitHub CI
 counts (none when the line is missing). Merge the comments above `GATES` from the template, then run `/checks`.
+
+`/autonomy`, `/checks` and the setup ask the owner as the rule "A question to the owner" in `CLAUDE.md` says: copy
+that bullet from the template's Rules. The skill scripts share `session-start/lib.sh`: upgrade them together.
 
 ## Improve the workflow
 
@@ -239,15 +244,16 @@ template/                     copied into a project's root by bin/adopt.sh
   dot-claude/                 installed as .claude/
     ground-truth.conf         what the ground truth looks at: the project's repos, and how their code is checked
     settings.json             the hook that rebuilds the board after each change
-    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,gate.sh,board.sh}
+    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,gate.sh,board.sh,lib.sh}
     skills/handoff/SKILL.md
     skills/board/SKILL.md
     skills/autonomy/{SKILL.md,autonomy.sh}
     skills/checks/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
-example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, gate.sh, board.sh, autonomy.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
+example/                      a filled-in project: the files behind the brief in "What it looks like"
+test/run.sh                   tests adopt.sh, the skills' scripts and the table "What Claude does alone"; CI runs it
+                              on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used

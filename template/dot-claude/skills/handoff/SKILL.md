@@ -5,10 +5,10 @@ description: End-of-session handoff. Distils the session's previous handoff, rec
 
 # Handoff
 
-The next session starts with an empty context. It sees only CLAUDE.md, the memory index and whatever
-`/session-start` reads (the handoffs in `notes/handoff/` first). Anything not written down is lost, so the goal is a short, exact
-record of the present state, not a diary. A change is not done when it merges or deploys; it is done when the next
-session can find out what happened and why.
+The next session starts with an empty context. It sees only CLAUDE.md, the memory index and whatever `/session-start`
+reads (the handoffs in `notes/handoff/` first). Anything not written down is lost, so the goal is a short, exact record
+of the present state, not a diary. A change is not done when it merges or deploys; it is done when the next session can
+find out what happened and why.
 
 ## One place for each kind of information
 
@@ -29,7 +29,7 @@ session can find out what happened and why.
 1. **Gather facts from the machine, not from recollection.** The conversation may have been compacted, and things
    said earlier can be stale. Run `bash .claude/skills/session-start/ground-truth.sh`: the same script
    `/session-start` runs, so the next session checks your handoff against the picture you wrote it from. For a
-   `CI RED` PR, add `gh pr checks <n> -R <owner/repo>`.
+   `CI red` PR, add `gh pr checks <n> -R <owner/repo>`.
    - **Nothing may exist only on this disk without being named.** Every uncommitted worktree, LOCAL ONLY commit and
      unpushed branch that this session touched is either committed (a `wip:` commit whose body says what is
      unfinished and which tests fail, if any) and pushed, or listed under "Unfinished" with its path and what it
@@ -43,7 +43,7 @@ session can find out what happened and why.
      not yet a lesson, and each ⚠ in it: if it still holds, it goes where it acts (a lesson in `notes/lessons.md`, a
      memory, a topic note, CLAUDE.md, a gate script); if it is stale, it is dropped. Anything still LIVE in it (a
      deadline, an owed step, a running job) is carried into the new file.
-   - **Write the new file** in the shape of `notes/handoff-format.md`, with the template below: a new id from
+   - **Write the new file** in the shape of `notes/handoff-format.md` (its example, its rules): a new id from
      `notes/handoff/README.md` (take `next id`, raise it and name this session in the same edit), `continues:` the
      handoff it replaces. Every task in Next and Waiting for the user names a B- or Q- id: a task without one becomes
      a BACKLOG item (or a question) first. Absolute dates, times with their zone. Name exact paths, branches, units
@@ -67,7 +67,7 @@ session can find out what happened and why.
      landed is deleted, claim and all. Work that stops before that keeps its claim only with its branch pushed and
      named under "Unfinished", for the next session to take over (`claim.sh --from`); otherwise delete the `claimed:`
      line, and the docs push (step 7) frees the item. A
-     ⚠ STALE or GONE claim of another session goes under "Waiting for the user": only the owner releases it.
+     ⚠ STALE, GONE or NOT HERE claim of another session goes under "Waiting for the user": only the owner releases it.
    - **The rule "regression"**, when the ground truth's checks section lists it: each bug fix that landed this
      session names, in its Done line, the check it added and that the check failed without the fix. A fix that
      landed without one goes under "Waiting for the user", with a BACKLOG item for its check.
@@ -108,32 +108,3 @@ session can find out what happened and why.
    a handoff that did not happen. Never commit secrets: if a secret is needed, write THAT it is needed, never its
    value.
 8. **Tell the user in a few lines:** where the state is written, the next task, and what waits for them.
-
-## Template for notes/handoff/<session>.md
-
-```markdown
-# H-<n> YYYY-MM-DD HH:MM <zone> · <agent>@<session>
-continues: H-<n>
-
-## Next
-1. <id> <title> [<repo or area>]: <why now>, <where to start: file, branch, command>, <done when ...>
-
-## Waiting for the user
-- <Q- id and title that block the Next list; a new question goes into questions.md first>
-
-## Running
-| What | Unit / process | Ends | Check | Stop |
-|---|---|---|---|---|
-
-## Unfinished
-- <repo>: <worktree / branch>, <uncommitted, LOCAL ONLY or pushed>, <what is left>, <its B- id: claim kept or released>
-
-## Done
-- <id> <title>: <commit or PR, where it landed, CI>; a bug fix: the check it added (rule "regression")
-
-## Learned
-- <L- ids added or changed>; <a fact the next session needs that is not a lesson>
-```
-
-An empty section says `None.`; a missing section is an error. Keep it under about 60 lines. If something needs more
-space, it belongs in a topic note with a link from here.

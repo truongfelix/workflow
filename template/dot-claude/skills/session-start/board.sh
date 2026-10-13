@@ -52,6 +52,8 @@ set -uo pipefail
 
 usage() { echo "usage: $0 [--out <file>] [--no-open] [--offline] [--text] [--hook] [<project dir>]" >&2; exit 1; }
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib.sh
+. "$HERE/lib.sh" || { echo "UNKNOWN: no $HERE/lib.sh (upgrade the skill's scripts together)"; exit 2; }
 SH=${BASH:-bash}
 out="" open=1 offline=0 text=0 hook=0 queue="" dir=""
 while [ $# -gt 0 ]; do
@@ -201,51 +203,22 @@ awk '{ print "P\t\t0\t" $0 }' "$T/now.err" >>"$T/now" # its own complaints: no f
 
 # The repos: each entry of ground-truth.conf that is a git repo here (name, path, GitHub repo), then this project's own
 # repo when no entry is it.
-TIMEOUT_CMD=""
-for t in timeout gtimeout; do
-  command -v "$t" >/dev/null && "$t" 1 true </dev/null >/dev/null 2>&1 && { TIMEOUT_CMD=$t; break; }
-done
-with_timeout() { # <seconds> <command...>: as in ground-truth.sh
-  local secs=$1 pid n=0
-  shift
-  if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$secs" "$@"; return; fi
-  "$@" &
-  pid=$!
-  while kill -0 "$pid" 2>/dev/null; do
-    if [ "$n" -ge $((secs * 10)) ]; then kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null; return 124; fi
-    sleep 0.1
-    n=$((n + 1))
-  done
-  wait "$pid"
-}
 : >"$T/repos"
 self=$(git rev-parse --show-toplevel 2>/dev/null)
 self_name=""
 while IFS='|' read -r name path remote def gh_repo; do
   [ -n "$name" ] && [ -n "$path" ] && git -C "$path" rev-parse --git-dir >/dev/null 2>&1 || continue
-  if [ -z "$gh_repo" ]; then
-    gh_repo=$(git -C "$path" remote get-url "${remote:-origin}" 2>/dev/null |
-      sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
-    gh_repo=${gh_repo%.git}
-  fi
+  [ -n "$gh_repo" ] || gh_repo=$(github_repo "$path" "${remote:-origin}")
   [ -n "$self" ] && [ "$(git -C "$path" rev-parse --show-toplevel 2>/dev/null)" = "$self" ] && self_name=$name
   printf '%s\t%s\t%s\n' "$name" "$path" "$gh_repo" >>"$T/repos"
 done <"$T/conf"
 if [ -n "$self" ] && [ -z "$self_name" ]; then
   self_name=$(basename "$self")
-  gh_repo=$(git remote get-url origin 2>/dev/null | sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
-  printf '%s\t%s\t%s\n' "$self_name" . "${gh_repo%.git}" >>"$T/repos"
+  printf '%s\t%s\t%s\n' "$self_name" . "$(github_repo . origin)" >>"$T/repos"
 fi
 
 # The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does. Those
 # read are kept for the next --offline build, with the time they were read.
-CI_JQ='def verdict: [ .statusCheckRollup[]?
-    | if (.status // "COMPLETED") != "COMPLETED" then "PENDING" else (.conclusion // .state // "PENDING") end ]
-  | if length == 0 then "no CI"
-    elif any(.[]; IN("FAILURE","CANCELLED","TIMED_OUT","ERROR","ACTION_REQUIRED","STARTUP_FAILURE")) then "CI red"
-    elif any(.[]; IN("PENDING","EXPECTED","QUEUED","IN_PROGRESS","")) then "CI running"
-    else "CI green" end;
-  .[] | "\(.number)\t\(verdict)"'
 : >"$T/prs" && : >"$T/prs-read" && : >"$T/read-now"
 cut -f3 "$T/repos" | grep -v '^$' | awk '!seen[$0]++' >"$T/ghs"
 while IFS= read -r gh_repo; do
@@ -265,9 +238,9 @@ while IFS= read -r gh_repo; do
     >"$T/pr" 2>"$T/pr.err" </dev/null; then
     st="ok"
     [ "$(wc -l <"$T/pr" | tr -d ' ')" -ge 500 ] && st="ok: the 500 latest only"
-    # The CI of each open PR, in a word as in ground-truth.sh, as a last field: empty for a PR that is not open, or
-    # when gh could not tell.
-    with_timeout 30 gh pr list -R "$gh_repo" --state open --limit 100 --json number,statusCheckRollup --jq "$CI_JQ" \
+    # The CI of each open PR (lib.sh), as a last field: empty for a PR that is not open, or when gh could not tell.
+    with_timeout 30 gh pr list -R "$gh_repo" --state open --limit 100 --json number,statusCheckRollup \
+      --jq "$PR_CI_JQ"' .[] | "\(.number)\t\(pr_verdict)"' \
       >"$T/ci" 2>/dev/null </dev/null || : >"$T/ci"
     awk -F '\t' -v cfile="$T/ci" 'BEGIN { while ((getline l < cfile) > 0) { split(l, c, "\t"); ci[c[1]] = c[2] } }
       { print $0 "\t" ci[$1] }' "$T/pr" >"$T/pr2" && mv -f "$T/pr2" "$T/pr"
@@ -291,10 +264,7 @@ fi
 # item, where it would drift. Its branch in the first repo that has it, here or on the repo's remote; the PR of that
 # branch, open (with its CI) or merged; else the machine it was claimed on, where commits not pushed are. This
 # machine's name is the one claim.sh writes; "cloud" is never this one. One "<id>\t<text>" line per claimed item.
-MACHINE=${CLAIM_MACHINE:-}
-[ -z "$MACHINE" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && MACHINE=cloud
-[ -z "$MACHINE" ] && MACHINE=$(uname -n 2>/dev/null) && MACHINE=${MACHINE%%.*}
-MACHINE=${MACHINE//[[:space:]]/-}
+MACHINE=$(machine_name)
 : >"$T/where"
 grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
 # The gate of each claimed item, as this clone ran it (gate.sh: a receipt per commit that passed, a record per commit
@@ -302,13 +272,6 @@ grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
 # one, else not run here; "no gate" for a repo GATES does not name; nothing when the project has no gate. One
 # "<id>\t<text>" line in $T/gate.
 : >"$T/gate"
-git_common() { # <dir>: the git directory its worktrees share, as a full path (as gate.sh finds it)
-  local top d
-  top=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] || return 1
-  d=$(git -C "$top" rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] || return 1
-  case $d in /* | [A-Za-z]:*) ;; *) d="$top/$d" ;; esac
-  (cd "$d" && pwd -P)
-}
 while IFS="$tab" read -r id sec f; do
   c=${f#*claimed: } c=${c%%\\n*} # "<agent>@<session> on <branch>[ at <machine>]"
   b=${c#* on } m=""
@@ -366,7 +329,7 @@ while IFS="$tab" read -r id sec f; do
   printf '%s\t%s: %s\n' "$id" "$b" "$w" >>"$T/where"
   [ -n "$rname" ] && [ -s "$T/gates" ] || continue # no branch here, or no gate: no gate to read
   if ! grep -qxF "$rname" "$T/gates"; then printf '%s\tno gate\n' "$id" >>"$T/gate"; continue; fi
-  gd=$(git_common "$rpath") || continue
+  gd=$(git_common_dir "$rpath") || continue
   gt="not run here" k=0
   for cm in $(git -C "$rpath" rev-list --max-count=100 "$ref" 2>/dev/null); do
     pass="$gd/gate-receipts/$cm" failed="$gd/gate-failures/$cm"
@@ -783,7 +746,7 @@ function prsOf(it) { // PRs that name the item, and PRs the item names by #numbe
   return out;
 }
 
-// Which handoffs name each item: the "continuous" link from a handoff back to the work it ordered.
+// Which handoffs name each item: from a handoff back to the work it ordered.
 var citedBy = {};
 D.items.forEach(function (it) {
   if (it.kind !== "H") return;
@@ -975,7 +938,7 @@ function render() {
     }).join("") + "</tbody></table>";
   document.getElementById("list").innerHTML = h;
   document.getElementById("foot").textContent = rows.length + " of " + tabItems.length + " " + KINDS[S.tab].toLowerCase() +
-    " shown. Built from " + FILES[S.tab] + " and its git history by board.sh: run it again to refresh.";
+    " shown. Built from " + FILES[S.tab] + " and its git history by board.sh, again after each change: an open page reloads itself.";
   panel();
 }
 

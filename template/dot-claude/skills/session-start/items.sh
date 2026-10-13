@@ -3,13 +3,13 @@
 # items.sh — the parser of BACKLOG.md, questions.md and notes/lessons.md, which follow the item format
 # (notes/item-format.md), and of the handoffs in notes/handoff/ (notes/handoff-format.md).
 #
-# The trackers are read by a person, written by Claude and parsed by scripts, so every item has one shape:
-# `### <state> [⚠ ]<id> <title>`, its fields, a body, and in BACKLOG `Done when:`; a lesson has no state,
-# `### L-<n> <title>`. `check` lists each place a tracker departs from it, with its file and line: /session-start
-# runs it after the ground truth, /handoff before committing the trackers. A handoff is checked for its heading,
-# its six sections in order, and the B- or Q- id that each task in Next and Waiting for the user starts with: an id
-# that is in no tracker read in the same run is reported. `list` prints the items themselves, for the board
-# (board.sh). `show` prints one item, live or deleted, from the files and git: a session finds it without the board.
+# The trackers are read by a person, written by Claude and parsed by scripts, so every item has one shape: `### <state>
+# [⚠ ]<id> <title>`, its fields, a body, and in BACKLOG `Done when:`; a lesson has no state, `### L-<n> <title>`.
+# `check` lists each place a tracker departs from it, with its file and line: /session-start runs it after the ground
+# truth, /handoff before committing the trackers. A handoff is checked for its heading, its six sections in order, and
+# the B- or Q- id that each task in Next and Waiting for the user starts with: an id that is in no tracker read in the
+# same run is reported. `list` prints the items themselves, for board.sh, ground-truth.sh and claim.sh. `show` prints
+# one item, live or deleted, from the files and git: a session finds it without the board.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -224,9 +224,10 @@ if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; t
 
 # One pass per file. An item runs from its `###` heading to the next heading of any level, a `---` line, or the end
 # of the file. Fenced code and multi-line HTML comments are skipped: they hold examples, not items. A state is kept
-# by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation
-# finds all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never
-# skipped. A handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so that awk failing on its own (exit 2) reads as UNKNOWN.
+# by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation finds
+# all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never skipped. A
+# handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so that awk
+# failing on its own (exit 2) reads as UNKNOWN.
 awk -v mode="$mode" '
 function problem(ln, msg) {
   problems++

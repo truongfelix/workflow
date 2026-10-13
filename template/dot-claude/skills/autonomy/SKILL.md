@@ -9,9 +9,8 @@ The table "What Claude does alone" in `CLAUDE.md` answers, for each step where a
 first** or **do, then tell**. This skill shows it and changes it with the owner's picks. `autonomy.sh` reads and
 writes the rows, so nothing else in `CLAUDE.md` moves.
 
-Talk to the owner in plain words: name no file, table or setting, and say what each choice does. The owner may never
-have opened `CLAUDE.md`. A question tool cannot show a box already ticked, and a question where several can be picked
-returns no answer at all when nothing is picked, which reads as a skip: every such question has "None of these".
+Ask as `CLAUDE.md`'s rule "A question to the owner" says: the owner may never have opened `CLAUDE.md`. A question
+tool cannot show a box already ticked, so each step's question says its answer now.
 
 ## Steps
 
@@ -40,8 +39,7 @@ returns no answer at all when nothing is picked, which reads as a skip: every su
      at once, then the fifth; a row of the project's own (`show` names them) goes in a sixth. Then
      `autonomy.sh ask <step>...` for the picked steps that did not ask first, and `autonomy.sh tell <step>...` for
      those that did: a step by its text, as `show` prints it.
-   - **Keep it**, "None of these" in every question, or no answer at all: nothing changes. Ask again in the chat when
-     a question failed; never pick for the owner.
+   - **Keep it**, or "None of these" in every question: nothing changes.
 5. **Say what changed**, a line per step ("Commit code: now does it, then tells you"), or that nothing did, and that
    it holds from the next action on. Plain words still work later too: "from now on, push the docs without asking".
 6. **Commit `CLAUDE.md`** as its row "Commit the docs" now says, and push as "Push the docs" says: ask first, or do it

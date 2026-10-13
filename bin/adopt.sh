@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# adopt.sh — install the workflow skeleton into a project, never overwriting a file that is already there.
+# adopt.sh — install the workflow skeleton into a project, never overwriting a template file that is already there.
 #
 # Usage: bin/adopt.sh <project-root> [--workspace]
 #   --workspace  the root is a multi-repo workspace: also install workspace/gitignore as its .gitignore (if absent),

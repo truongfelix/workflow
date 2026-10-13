@@ -9,9 +9,9 @@
 # Generic (from the workflow repo): WHAT to look at lives in .claude/ground-truth.conf. Upgrade this file from the
 # workflow repo; never put project data in it.
 #
-# Read-only, apart from `git fetch` of the remotes named in the config and of the remotes that local branches track
-# (so "pushed" means pushed). --no-fetch skips it. Exit 0 = every probe answered. Exit 2 = at least one probe failed: its section says UNKNOWN, never "clean".
-# A claim that is stale, gone or not pushed is a finding, not a failure.
+# Read-only, apart from `git fetch` of the remotes named in the config and of the remotes that local branches track (so
+# "pushed" means pushed). --no-fetch skips it. Exit 0 = every probe answered. Exit 2 = at least one probe failed: its
+# section says UNKNOWN, never "clean". A claim that is stale, gone or not pushed is a finding, not a failure.
 #
 # Usage: bash .claude/skills/session-start/ground-truth.sh [--no-fetch]
 
@@ -22,6 +22,9 @@ set -uo pipefail
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd -P)
 ROOT_TYPED=$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)
 CONF="$ROOT/.claude/ground-truth.conf"
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# shellcheck source=lib.sh
+. "$HERE/lib.sh" || { echo "UNKNOWN: no $HERE/lib.sh (upgrade the skill's scripts together)"; exit 2; }
 
 # Defaults, overridden by the config: the project root itself is the one repo.
 REPOS=("$(basename "$ROOT")|.|origin||")
@@ -51,30 +54,6 @@ relpath() { # <path from git>: relative to ROOT when inside it, else as given
     case $p in */*) ;; *) break ;; esac
   done
   echo "$1"
-}
-
-# A probe must not hang the session. GNU `timeout` or Homebrew's `gtimeout` if it works (on Windows, System32's
-# unrelated timeout.exe can come first on the PATH), else poll and kill (stock macOS).
-TIMEOUT_CMD=""
-for t in timeout gtimeout; do
-  command -v "$t" >/dev/null && "$t" 1 true </dev/null >/dev/null 2>&1 && { TIMEOUT_CMD=$t; break; }
-done
-with_timeout() { # <seconds> <command...>
-  local secs=$1 pid n=0
-  shift
-  if [ -n "$TIMEOUT_CMD" ]; then "$TIMEOUT_CMD" "$secs" "$@"; return; fi
-  "$@" &
-  pid=$!
-  while kill -0 "$pid" 2>/dev/null; do
-    if [ "$n" -ge $((secs * 10)) ]; then
-      kill "$pid" 2>/dev/null
-      wait "$pid" 2>/dev/null
-      return 124
-    fi
-    sleep 0.1
-    n=$((n + 1))
-  done
-  wait "$pid"
 }
 
 echo "GROUND TRUTH — $(date '+%Y-%m-%d %H:%M %Z')"
@@ -115,10 +94,7 @@ for spec in "${REPOS[@]}"; do
     else
       echo "  ⚠ '$remote' has no default branch yet: nothing is pushed"
     fi
-    if [ -z "$gh_repo" ]; then
-      gh_repo=$(git -C "$repo" remote get-url "$remote" | sed -nE 's#^(git@|ssh://git@|https://)github\.com[:/]([^/]+/[^/]+)$#\2#p')
-      gh_repo=${gh_repo%.git}
-    fi
+    [ -n "$gh_repo" ] || gh_repo=$(github_repo "$repo" "$remote")
   fi
   R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def") R_GH+=("$gh_repo")
   [ "$repo" -ef "$ROOT" ] && DOCS_BASE=$base
@@ -132,7 +108,7 @@ for spec in "${REPOS[@]}"; do
         unknown "git fetch $r failed: the branches that track $r compare against a STALE $r"
     done
   fi
-  upstream() { # <branch>: the remote branch it tracks ("dev/v2"), when there is one; empty otherwise
+  upstream() { # <branch>: the remote branch it tracks ("me/feat"), when there is one; empty otherwise
     local u
     u=$(git -C "$repo" for-each-ref --format='%(upstream)' "refs/heads/$1")
     case $u in refs/remotes/*) git -C "$repo" rev-parse -q --verify "$u" >/dev/null && echo "${u#refs/remotes/}" ;; esac
@@ -216,20 +192,14 @@ for spec in "${REPOS[@]}"; do
     printf '%s' "$others"
   fi
 
-  # Open PRs with a one-word CI verdict. An empty rollup is "no CI", never "green".
+  # Open PRs with their CI in a few words (lib.sh).
   if [ -z "$gh_repo" ]; then
-    echo "  open PRs: not a GitHub repo (set gh_repo in the config to check)"
+    echo "  open PRs: not a GitHub repo (set its GitHub owner/repo in REPOS to check)"
   elif ! command -v gh >/dev/null; then
     unknown "gh is not installed: open PRs and CI not checked"
   elif ! prs=$(with_timeout 60 gh pr list -R "$gh_repo" --state open --limit 30 \
-    --json number,title,headRefName,isDraft,statusCheckRollup --jq '
-      def verdict: [ .statusCheckRollup[]?
-                     | if (.status // "COMPLETED") != "COMPLETED" then "PENDING" else (.conclusion // .state // "PENDING") end ]
-        | if length == 0 then "no CI"
-          elif any(.[]; IN("FAILURE","CANCELLED","TIMED_OUT","ERROR","ACTION_REQUIRED","STARTUP_FAILURE")) then "CI RED"
-          elif any(.[]; IN("PENDING","EXPECTED","QUEUED","IN_PROGRESS","")) then "CI running"
-          else "CI green" end;
-      .[] | "    #\(.number) [\(.headRefName)]\(if .isDraft then " draft" else "" end) \(verdict): \(.title)"' 2>&1); then
+    --json number,title,headRefName,isDraft,statusCheckRollup --jq "$PR_CI_JQ"'
+      .[] | "    #\(.number) [\(.headRefName)]\(if .isDraft then " draft" else "" end) \(pr_verdict): \(.title)"' 2>&1); then
     unknown "gh pr list -R $gh_repo failed: $prs"
   elif [ -z "$prs" ]; then
     echo "  open PRs ($gh_repo): none"
@@ -246,7 +216,7 @@ if [ "$root_listed" = 0 ]; then
   echo "== workspace docs (.)"
   top=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)
   if [ -z "$top" ] || ! [ "$top" -ef "$ROOT" ]; then
-    echo "  ⚠ not a git repo: tracker history is lost at every rewrite (workflow README, 'Adopt in a new project', step 5)"
+    echo "  ⚠ not a git repo: tracker history is lost at every rewrite (workflow README, 'Adopt in a new project', step 1)"
   else
     if [ "$FETCH" = 1 ] && git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
       with_timeout 60 git -C "$ROOT" fetch --quiet origin 2>/dev/null || unknown "git fetch origin failed (workspace docs)"
@@ -275,8 +245,7 @@ fi
 # gone, or has had no commit for CLAIM_STALE_DAYS days (counted from the claim when the branch is older), holds an
 # item for a session that may have stopped. A branch claimed on another machine (`at <machine>`; "cloud" is never
 # this one) and found nowhere here is not gone: its commits may be there alone, not pushed. This machine's name is
-# the one claim.sh writes. Parsed in bash, not awk: titles hold emoji (macOS awk, notes/lessons.md).
-HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+# the one claim.sh writes. Parsed in bash, not awk: titles hold emoji, and macOS awk compares them with strcoll.
 claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed item
   local rec f kv c r
   "${BASH:-bash}" "$HERE/items.sh" list "$1" 2>"$CT/err" | grep "^I$(printf '\t')" | grep -F 'claimed: ' |
@@ -296,10 +265,7 @@ claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed it
       printf '%s\t%s\t%s\t%s\n' "$(printf '%s\n' "$rec" | cut -f4)" "$c" "$r" "$(printf '%s\n' "$rec" | cut -f8)"
     done
 }
-MACHINE=${CLAIM_MACHINE:-}
-[ -z "$MACHINE" ] && [ "${CLAUDE_CODE_REMOTE:-}" = true ] && MACHINE=cloud
-[ -z "$MACHINE" ] && MACHINE=$(uname -n 2>/dev/null) && MACHINE=${MACHINE%%.*}
-MACHINE=${MACHINE//[[:space:]]/-}
+MACHINE=$(machine_name)
 echo
 echo "== claims (BACKLOG.md${DOCS_BASE:+, shared on $DOCS_BASE})"
 CT=$(mktemp -d "${TMPDIR:-/tmp}/ground-truth.XXXXXX") || { unknown "mktemp failed: claims not read"; CT=""; }
@@ -427,15 +393,13 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
   [ -n "$gcmd" ] && what="gate: $gcmd${gpat:+, passes on a line matching: $gpat}"
   [ "$ci" = 1 ] && what="$what${what:+; }CI: ${R_GH[$i]:-no GitHub repo}"
   gdir=${R_DIR[$i]} gbase=${R_BASE[$i]}
-  gtop=$(git -C "$gdir" rev-parse --show-toplevel 2>/dev/null)
   if [ -z "$gbase" ]; then
     st="no default branch on its remote"
   else
     gsha=$(git -C "$gdir" rev-parse "$gbase")
     st="$gbase at ${gsha:0:7}"
     if [ -n "$gcmd" ]; then
-      gcommon=$(git -C "$gtop" rev-parse --git-common-dir 2>/dev/null)
-      case $gcommon in /* | [A-Za-z]:*) ;; *) gcommon="$gtop/$gcommon" ;; esac
+      gcommon=$(git_common_dir "$gdir")
       if [ -f "$gcommon/gate-receipts/$gsha" ]; then
         st="$st, receipt of $(sed -n 's/^passed: //p' "$gcommon/gate-receipts/$gsha")"
       elif [ "$m" = 1 ]; then
@@ -459,6 +423,7 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
     fi
   fi
   if [ "$r" = 1 ]; then
+    gtop=$(git -C "$gdir" rev-parse --show-toplevel 2>/dev/null)
     ghooks=$(cd "$gtop" 2>/dev/null && git rev-parse --git-path hooks 2>/dev/null)
     case $ghooks in /* | [A-Za-z]:*) ;; *) ghooks="$gtop/$ghooks" ;; esac
     grep -qF "gate.sh\" pre-push" "$ghooks/pre-push" 2>/dev/null ||
