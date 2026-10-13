@@ -1303,6 +1303,67 @@ check "rules per repo: a repo REPOS does not name, and a word that is no rule, a
     has "$T/rr-gt2.txt" "  ⚠ unknown rule(s) in REPO_RULES for api: recipt"'
 cd "$T" || exit 1
 
+# The Gate column also says where the CI of the branch's last commit stands: green, red, running with the jobs done,
+# not read; --offline shows the verdict last read of that commit, with the time. A repo checked by CI alone, or by a
+# gate alone, shows only what applies.
+cd "$T" || exit 1
+git_q init --bare remote-c51.git && git_q init --bare remote-c51-docs.git
+mkdir c51 && cd c51 || exit 1
+git_q init && git symbolic-ref HEAD refs/heads/main && git remote add origin "$T/remote-c51-docs.git"
+git_q clone "$T/remote-c51.git" app && (cd app && git symbolic-ref HEAD refs/heads/main && git_q commit --allow-empty -m first &&
+  git_q push -u origin main && git remote set-head origin main &&
+  git_q checkout -b feat/one && git_q commit --allow-empty -m one && git_q push -u origin feat/one)
+"$SH" "$WF/bin/adopt.sh" "$T/c51" --workspace >/dev/null 2>&1
+conf51() { # <GATES> <GITHUB_CI>: the project's checks
+  printf '%s\n' 'REPOS=("app|app|origin|main|demo/app")' 'UNITS=0' "GATES=($1)" "GITHUB_CI=($2)" >.claude/ground-truth.conf
+}
+conf51 '"app|true"' '"app"'
+mkdir -p app/.git/gate-receipts && echo "passed: now" >"app/.git/gate-receipts/$(git -C app rev-parse feat/one)"
+printf '%s\n' '# Demo — Backlog' '' 'next id: B-2 (last given to claude@s1)' '' '## app' '' '### 🔲 B-1 First' \
+  'claimed: claude@s1 on feat/one at laptop' 'Done when: done.' >BACKLOG.md
+git add .gitignore CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs
+mkdir "$T/fakebin51" && cat >"$T/fakebin51/gh" <<'EOF'
+#!/usr/bin/env bash
+T=${C51_DIR:?}
+case "$*" in
+  "api graphql"*)
+    v=$(cat "$T/c51-verdict")
+    [ "$v" = down ] && { echo "error connecting to api.github.com" >&2; exit 1; }
+    echo "$v" ;;
+  "api repos/demo/app/commits/"*"/check-runs"*) cat "$T/c51-runs" ;;
+  *) echo "HTTP 404: Not Found" >&2; exit 1 ;;
+esac
+EOF
+chmod +x "$T/fakebin51/gh"
+c51() { # <verdict> [<jobs done/all>] [board.sh options...]: build the board with GitHub saying that; data in $T/c51.html
+  echo "$1" >"$T/c51-verdict" && echo "${2:-0/0}" >"$T/c51-runs"
+  C51_DIR=$T CLAIM_MACHINE=laptop PATH="$T/fakebin51:$PATH" "$SH" .claude/skills/session-start/board.sh --no-open \
+    --out "$T/c51.html" "${@:3}" "$T/c51" >"$T/c51.txt" 2>&1
+}
+ci51() { grep -qF "\"ci\":{\"B-1\":\"$1\"}" "$T/c51.html"; } # <text>: the CI map of the data
+c51 PENDING 2/3
+check "board, CI: running, with the jobs done" ci51 "CI running (2/3 done)"
+check "board, CI: beside the gate, which still says passed" has "$T/c51.html" "\"gate\":{\"B-1\":\"passed ($(git -C app rev-parse --short=7 feat/one))\"}"
+c51 SUCCESS; check "board, CI: green" ci51 "CI green"
+c51 FAILURE; check "board, CI: red" ci51 "CI red"
+c51 down; check "board, CI: GitHub that cannot be read is not read, never green" ci51 "CI not read"
+c51 SUCCESS
+c51 FAILURE 0/0 --offline
+check "board --offline, CI: the verdict last read of that commit, with when" has "$T/c51.html" '"ci":{"B-1":"CI green, as read 20'
+git -C app commit -q --allow-empty -m two && git -C app push -q origin feat/one
+c51 SUCCESS 0/0 --offline
+check "board --offline, CI: a commit never read is not read, not green" ci51 "CI not read: --offline"
+c51 SUCCESS 0/0 --text
+check "board --text, CI: under the item" has "$T/c51.txt" "        CI: CI green (of the last commit of its branch)"
+conf51 '' '"app"'
+c51 PENDING 1/4
+check "board, CI: a repo checked by CI alone shows the CI, no gate text" \
+  eval 'has "$T/c51.html" "\"gated\":true," && has "$T/c51.html" "\"gate\":{}," && ci51 "CI running (1/4 done)"'
+conf51 '"app|true"' ''
+c51 SUCCESS
+check "board, CI: a repo checked by a gate alone shows no CI" eval 'has "$T/c51.html" "\"ci\":{}," && has "$T/c51.html" "\"B-1\":\"not run on the last commit; passed at "'
+cd "$T" || exit 1
+
 echo
 if [ "$failures" -gt 0 ]; then
   echo "$failures check(s) FAILED"

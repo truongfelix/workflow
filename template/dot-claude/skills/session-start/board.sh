@@ -32,8 +32,11 @@
 # branch (open, with its CI, read with the PRs; merged: the item can be deleted), else the machine it was claimed on.
 # Gate: for each claimed item, the project's own check (gate.sh) on its branch, as run in this clone: passed or
 # failed on its last commit, not run on the last N commits (and the result before them), not run here, or no gate.
-# Only what checks the project's code is shown (/checks): the Gate column when it has a gate (GATES), the CI of a PR
-# when GitHub CI checks its repo (GITHUB_CI).
+# Beside it, for a repo whose GitHub CI counts (GITHUB_CI), the CI verdict of the branch's last commit: green, red, running
+# (with the jobs done), not read. It is read with the PRs when the page is built; an --offline build shows the verdict
+# last read of that commit, with the time (<page>-ci.tsv).
+# Only what checks the project's code is shown (/checks): the Gate column when it has a gate (GATES) or GitHub CI, the
+# CI of a PR when GitHub CI checks its repo (GITHUB_CI).
 # Settings, a tab of its own: what Claude does alone (the table in CLAUDE.md, as autonomy.sh reads it) and how the code
 # is checked before a merge (each repo's gate and GitHub CI, the rules kept), as .claude/ground-truth.conf sets them.
 #
@@ -110,6 +113,7 @@ browser=$(xdg-mime query default text/html 2>/dev/null) # a snap's: "<snap>_<app
 case $browser in *_*.desktop) [ -d "$HOME/snap/${browser%%_*}/common" ] && pagedir="$HOME/snap/${browser%%_*}/common" ;; esac
 [ -n "$out" ] || out="$pagedir/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
 cache="${out%.html}-prs.tsv" # the PRs last read, for an --offline build
+cicache="${out%.html}-ci.tsv" # the CI verdicts last read ("<GitHub repo> <commit> <verdict> <time>"), likewise
 
 # One rebuild at a time (--queue, from the hook): a call that finds one running leaves its mark, and the running one
 # builds again, so the last change is always in the page.
@@ -323,7 +327,26 @@ grep "^I$tab" "$T/now" | cut -f4,7,9 | grep -F 'claimed: ' >"$T/claims"
 # that failed, in the git directory its worktrees share): on its branch's last commit, else on the nearest older
 # one, else not run here; "no gate" for a repo GATES does not name; nothing when the project has no gate. One
 # "<id>\t<text>" line in $T/gate.
-: >"$T/gate"
+: >"$T/gate" && : >"$T/gci" && : >"$T/ci-now"
+ci_of_branch() { # <repo name> <GitHub repo> <commit>: its CI verdict, read now or, --offline, as last read; sets cit
+  local v rc n now
+  if [ "$offline" = 1 ]; then
+    v=$(awk -F '\t' -v g="$2" -v c="$3" '$1 == g && $2 == c { print $3 "\t" $4; exit }' "$cicache" 2>/dev/null)
+    if [ -n "$v" ]; then cit="${v%%"$tab"*}, as read ${v#*"$tab"}"; else cit="CI not read: --offline"; fi
+    return
+  fi
+  if ! command -v gh >/dev/null 2>&1; then cit="CI not read: gh is not installed"; return; fi
+  v=$(with_timeout 60 "$SH" "$HERE/gate.sh" ci "$1" "$3" 2>&1 </dev/null) && rc=0 || rc=$?
+  if [ "$rc" -gt 1 ]; then cit="CI not read"; return; fi # 2: UNKNOWN, 124: timed out
+  cit=${v%%: *}
+  if [ "$cit" = "CI running" ]; then # how far it is: the jobs done of those GitHub lists so far
+    n=$(with_timeout 30 gh api "repos/$2/commits/$3/check-runs" \
+      --jq '"\([.check_runs[] | select(.status == "completed")] | length)/\(.total_count)"' 2>/dev/null </dev/null) || n=""
+    case $n in [0-9]*/[0-9]*) [ "${n#*/}" != 0 ] && cit="CI running ($n done)" ;; esac
+  fi
+  now=$(date '+%Y-%m-%d %H:%M')
+  printf '%s\t%s\t%s\t%s\n' "$2" "$3" "$cit" "$now" >>"$T/ci-now"
+}
 while IFS="$tab" read -r id sec f; do
   c=${f#*claimed: } c=${c%%\\n*} # "<agent>@<session> on <branch>[ at <machine>]"
   b=${c#* on } m=""
@@ -379,8 +402,18 @@ while IFS="$tab" read -r id sec f; do
   [ "${ahead:-0}" -gt 1 ] && w="$w, $ahead commits not pushed"
   [ "${ahead:-0}" = 1 ] && w="$w, 1 commit not pushed"
   printf '%s\t%s: %s\n' "$id" "$b" "$w" >>"$T/where"
-  [ -n "$rname" ] && [ -s "$T/gates" ] || continue # no branch here, or no gate: no gate to read
-  if ! grep -qxF "$rname" "$T/gates"; then printf '%s\tno gate\n' "$id" >>"$T/gate"; continue; fi
+  [ -n "$rname" ] && { [ -s "$T/gates" ] || [ -s "$T/cis" ]; } || continue # no branch here, or no check at all
+  if grep -qxF "$rname" "$T/cis"; then # GitHub CI counts for this repo: the verdict on the branch's last commit
+    cgh=$(awk -F '\t' -v n="$rname" '$1 == n { print $3; exit }' "$T/repos")
+    csha=$(git -C "$rpath" rev-parse -q --verify "$ref^{commit}" 2>/dev/null)
+    cit="CI not read: no GitHub repo"
+    [ -n "$cgh" ] && [ -n "$csha" ] && ci_of_branch "$rname" "$cgh" "$csha"
+    printf '%s\t%s\n' "$id" "$cit" >>"$T/gci"
+  fi
+  if ! grep -qxF "$rname" "$T/gates"; then
+    grep -qxF "$rname" "$T/cis" || printf '%s\tno gate\n' "$id" >>"$T/gate"
+    continue
+  fi
   gd=$(git_common_dir "$rpath") || continue
   gt="not run here" k=0
   for cm in $(git -C "$rpath" rev-list --max-count=100 "$ref" 2>/dev/null); do
@@ -395,6 +428,12 @@ while IFS="$tab" read -r id sec f; do
   done
   printf '%s\t%s\n' "$id" "$gt" >>"$T/gate"
 done <"$T/claims"
+if [ -s "$T/ci-now" ]; then # keep what was read now, and what earlier builds read of other commits (the latest 200)
+  { cat "$T/ci-now"
+    if [ -f "$cicache" ]; then # a missing file would fail the awk, and pipefail the whole pipeline
+      awk -F '\t' 'NR == FNR { now[$1 "\t" $2] = 1; next } !(($1 "\t" $2) in now)' "$T/ci-now" "$cicache"
+    fi; } | head -n 200 >"$T/ci-cache" && mv -f "$T/ci-cache" "$cicache"
+fi
 
 # The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
 # described once, in the first repo that has it.
@@ -537,8 +576,8 @@ END {
 # The commits, the PRs and whether each repo's PRs could be read, where the work of each claimed item is, and this
 # machine's name. A PR's text comes escaped by @tsv: quotes only.
 gated=false
-[ -s "$T/gates" ] && gated=true
-awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v gfile="$T/gate" \
+{ [ -s "$T/gates" ] || [ -s "$T/cis" ]; } && gated=true
+awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v gfile="$T/gate" -v cifile="$T/gci" \
   -v sfile="$T/settings" -v gated="$gated" -v machine="$MACHINE" '
 function swap(s, a, b,   out, i) {
   out = ""
@@ -578,6 +617,11 @@ BEGIN {
   }
   printf "},\n\"gate\":{"; sep = ""
   while ((getline rec < gfile) > 0) {
+    i = index(rec, "\t")
+    printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
+  }
+  printf "},\n\"ci\":{"; sep = ""
+  while ((getline rec < cifile) > 0) {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
@@ -662,7 +706,7 @@ td.title { min-width: 14em; }
 td .cut { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 td.who .cut { max-width: 8em; }
 td.where .cut { max-width: 10em; }
-td.gate .cut { max-width: 7em; }
+td.gate .cut { max-width: 16em; }
 td.gate.failed { color: var(--warn); font-weight: 600; }
 .tag { display: inline-block; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; margin: 0 3px 2px 0;
   font-size: 12px; white-space: nowrap; }
@@ -778,6 +822,7 @@ D.items.forEach(function (it) {
   // Where its work is: computed by board.sh from git and the PRs at each build, never written in the item.
   it.where = it.claimedBy && D.where ? D.where[it.id] || "" : "";
   it.gate = it.claimedBy && D.gate ? D.gate[it.id] || "" : ""; // the gate of its branch, as run on this machine
+  it.ci = it.claimedBy && D.ci ? D.ci[it.id] || "" : ""; // the CI of its branch's last commit, on GitHub
   it.old = it.id.indexOf("H~") === 0; // a handoff written before handoffs had ids
   it.num = it.old ? 0 : parseInt(it.id.slice(2), 10);
   it.ruled = it.f.ruled || "";
@@ -937,7 +982,10 @@ function claimCell(it) {
     "<td class=\"who muted\">None</td>";
 }
 function whereCell(it) { return cutCell("where", it.where, it.where); }
-function gateCell(it) { return cutCell("gate" + (/^failed/.test(it.gate) ? " failed" : ""), it.gate, it.gate); }
+function gateCell(it) { // the gate, then the CI verdict of the branch's last commit: "passed (ce8526d); CI running (2/3 done)"
+  var t = [it.gate, it.ci].filter(Boolean).join("; ");
+  return cutCell("gate" + (/^failed|CI red/.test(t) ? " failed" : ""), t, t);
+}
 function chip(label, n, on, attrs) {
   return "<button class=\"chip" + (on ? " on" : "") + "\" " + attrs + ">" + esc(label) +
     (n === null ? "" : "<span class=\"n\">" + n + "</span>") + "</button>";
@@ -1026,7 +1074,7 @@ function render() {
     return S.sort === "new" ? b.num - a.num || -byAdded : a.num - b.num || byAdded;
   });
   h = !rows.length ? "<div class=\"empty\">No item matches these filters.</div>" :
-    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th>" + (D.gated ? "<th title=\"the project's own check, as run on this machine\">Gate</th>" : "") : "") +
+    "<table><thead><tr><th>Id</th><th>State</th>" + (S.tab === "B" ? "<th>Claimed</th><th>Where</th>" + (D.gated ? "<th title=\"the project's own check, as run on this machine, and the CI of the branch's last commit on GitHub\">Gate</th>" : "") : "") +
     "<th>Title</th><th>Repos</th><th class=\"hide-s\">Added</th>" +
     "<th class=\"hide-s\">" + (S.dk === "ruled" ? "Ruled" : "Changed") + "</th></tr></thead><tbody>" +
     rows.map(function (it) {
@@ -1144,6 +1192,7 @@ function panel() {
   Object.keys(it.f).forEach(function (k) { h += "<dt>" + esc(k) + "</dt><dd>" + fmt(it.f[k]) + "</dd>"; });
   if (it.where) h += "<dt>where</dt><dd>" + esc(it.where) + "</dd>";
   if (it.gate) h += "<dt>gate</dt><dd>" + esc(it.gate) + " <span class=\"muted\">(on this machine)</span></dd>";
+  if (it.ci) h += "<dt>CI</dt><dd>" + esc(it.ci) + " <span class=\"muted\">(of its branch's last commit)</span></dd>";
   h += "</dl><div class=\"body\">" + fmtBody(it.body) + "</div>";
   var ps = prsOf(it);
   if (ps.length) h += "<b>Pull requests</b><div class=\"body\">" + ps.map(prLine).join("\n") + "</div>";
@@ -1263,10 +1312,11 @@ fi
 
 if [ "$text" = 1 ]; then
   echo
-  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" -v wfile="$T/where" -v gfile="$T/gate" '
+  awk -F '\t' -v project="$project" -v built="$(date '+%Y-%m-%d %H:%M')" -v wfile="$T/where" -v gfile="$T/gate" -v cifile="$T/gci" '
 BEGIN {
   while ((getline l < wfile) > 0) { i = index(l, "\t"); where[substr(l, 1, i - 1)] = substr(l, i + 1) }
   while ((getline l < gfile) > 0) { i = index(l, "\t"); gate[substr(l, 1, i - 1)] = substr(l, i + 1) }
+  while ((getline l < cifile) > 0) { i = index(l, "\t"); ci[substr(l, 1, i - 1)] = substr(l, i + 1) }
 }
 function unesc(s) { gsub(/\\n/, " · ", s); gsub(/\\t/, " ", s); gsub(/\\\\/, "\\", s); return s }
 function mark(st) {
@@ -1282,6 +1332,7 @@ k == "B" {
   if ($9 != "") line = line "  (" unesc($9) ")"
   if ($4 in where) line = line "\n        where: " where[$4]
   if ($4 in gate) line = line "\n        gate: " gate[$4] " (on this machine)"
+  if ($4 in ci) line = line "\n        CI: " ci[$4] " (of the last commit of its branch)"
   items[sec] = items[sec] line "\n"; next
 }
 k == "Q" { if ($5 == "ruling") rulings++; else { nq++; qs = qs "  " mark($5) " " $4 "  " $8 "\n" }; next }
