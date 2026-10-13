@@ -129,7 +129,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
 `PRINCIPLES.md` first; then:
 
 1. **Get the workflow:** a clone of this repo on the machine.
-2. **Choose the shape.**
+2. **Choose the shape.** Ask the owner which one, as a multiple-choice question that recommends neither: both are
+   valid, and the owner knows what the folder holds or will hold.
    - *One repo:* the project root is the repo; the trackers are committed with the code.
    - *Multi-repo workspace:* a folder holding several code repos (forks, an app, a backend). The root becomes a
      docs-only repo of its own (CLAUDE.md, trackers, `notes/`, `.claude/`), with a whitelist `.gitignore` so the
