@@ -112,9 +112,15 @@ check "autonomy: a row answered neither way is UNKNOWN (exit 2), nothing written
   eval '[ $? = 2 ] && has "$T/au3.txt" "UNKNOWN: the row \"Commit code\" answers \"maybe\"" && cmp -s "$T/au3.md" "$T/au3.bak"'
 "$SH" "$AU" show -f "$T/nowhere.md" >/dev/null 2>&1
 check "autonomy: no CLAUDE.md is UNKNOWN (exit 2)" [ $? = 2 ]
-tr -d '\r' <"$CT" | awk '{ printf "%s\r\n", $0 }' >"$T/au4.md" # a Windows checkout may hold CRLF already
+while IFS= read -r l; do printf '%s\r\n' "$l"; done < <(tr -d '\r' <"$CT") >"$T/au4.md" # not awk: see autonomy.sh
 "$SH" "$AU" preset balanced -f "$T/au4.md" >/dev/null 2>&1
-check "autonomy: a CRLF file keeps CRLF" [ "$(tr -cd '\r' <"$T/au4.md" | wc -c | tr -d ' ')" = "$(wc -l <"$T/au4.md" | tr -d ' ')" ]
+crlf() { [ "$(tr -cd '\r' <"$1" | wc -c | tr -d ' ')" = "$(wc -l <"$1" | tr -d ' ')" ]; } # <file>: a CR on each line
+check "autonomy: a CRLF file keeps CRLF" crlf "$T/au4.md"
+crlf "$T/au4.md" || od -c "$T/au4.md" | sed -n '1,6p' | sed 's/^/      | /'
+{ printf '%s\n' '## What Claude does alone' '' '| Step | Here |' '|---|---|'; printf '%s' '| Commit code | ask first |'; } >"$T/au5.md"
+"$SH" "$AU" preset balanced -f "$T/au5.md" >/dev/null 2>&1
+check "autonomy: a last row with no newline is set, and keeps none" \
+  eval '[ $? = 0 ] && [ "$(tail -c 31 "$T/au5.md")" = "| Commit code | do, then tell |" ] && [ "$(tail -c 1 "$T/au5.md")" = "|" ]'
 
 # The workspace: ws/ is the docs repo, ws/api a code repo, ws/api-feat its worktree.
 cd "$T" || exit 1

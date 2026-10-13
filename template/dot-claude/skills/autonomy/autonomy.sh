@@ -132,24 +132,24 @@ find_step() { # <number, text or start of text>: the row's index; 1 when none, o
   [ -n "$hit" ] && echo "$hit"
 }
 
-write() { # the rows as answers[] says, the FILL comment and the blank line after it gone; CRLF kept
-  local tmp i
+write() { # the rows as answers[] says, the FILL comment and the blank line after it gone; CRLF kept. In bash, not
+  # awk: Git for Windows' awk may change line endings.
+  local tmp i n=0 l rc cr gone=0
   tmp=$(mktemp "${TMPDIR:-/tmp}/autonomy.XXXXXX") || { echo "UNKNOWN: mktemp failed: nothing written"; exit 2; }
-  for i in "${!steps[@]}"; do printf '%s\t| %s | %s |\n' "${lns[$i]}" "${steps[$i]}" "${answers[$i]}"; done >"$tmp.map"
-  if awk -v mf="$tmp.map" -v from="$fill_from" -v to="$fill_to" '
-    BEGIN { while ((getline l < mf) > 0) { i = index(l, "\t"); m[substr(l, 1, i - 1)] = substr(l, i + 1) } }
-    { cr = sub(/\r$/, "") ? "\r" : "" }
-    from > 0 && FNR >= from && FNR <= to { gone = 1; next }
-    gone == 1 && $0 == "" { gone = 2; next }
-    (FNR "") in m { print m[FNR ""] cr; next }
-    { print $0 cr }' "$file" >"$tmp"; then
-    cat "$tmp" >"$file"
-  else
-    rm -f "$tmp" "$tmp.map"
-    echo "UNKNOWN: the table could not be written: nothing written"
-    exit 2
-  fi
-  rm -f "$tmp" "$tmp.map"
+  while IFS= read -r l; rc=$?; [ "$rc" = 0 ] || [ -n "$l" ]; do
+    n=$((n + 1)) cr=""
+    case $l in *$'\r') cr=$'\r' l=${l%$'\r'} ;; esac
+    if [ "$fill_from" -gt 0 ] && [ "$n" -ge "$fill_from" ] && [ "$n" -le "$fill_to" ]; then gone=1; continue; fi
+    if [ "$gone" = 1 ]; then
+      gone=2
+      [ -z "$l" ] && continue
+    fi
+    for i in "${!lns[@]}"; do [ "${lns[$i]}" = "$n" ] && l="| ${steps[$i]} | ${answers[$i]} |"; done
+    printf '%s%s' "$l" "$cr"
+    if [ "$rc" = 0 ]; then printf '\n'; fi # a last line with no newline keeps none
+  done <"$file" >"$tmp" || { rm -f "$tmp"; echo "UNKNOWN: the table could not be written: nothing written"; exit 2; }
+  cat "$tmp" >"$file"
+  rm -f "$tmp"
 }
 
 case $cmd in
