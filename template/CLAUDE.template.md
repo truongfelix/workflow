@@ -16,8 +16,7 @@ by repo, state and date: `/board` (`.claude/skills/session-start/board.sh`); a h
 
 **Lessons** learned in this project, loaded every session: @notes/lessons.md
 
-This setup comes from the workflow repo (`.claude/workflow-version` names the release). When a
-session improves a generic piece (a skill, the ground-truth script), port that part back there.
+This setup comes from the workflow repo (`.claude/workflow-version` names the release).
 
 ## What Claude does alone
 

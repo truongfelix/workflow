@@ -78,7 +78,11 @@ fi
 echo
 # The markers of every template file in the project, copied now or already there: the setup runs this script again
 # after the user did, and that run must still say what is left.
-installed=(${copied[@]+"${copied[@]}"} ${skipped[@]+"${skipped[@]}"})
+# The scripts (*.sh) are not filled in: they only mention the marker.
+installed=()
+for f in ${copied[@]+"${copied[@]}"} ${skipped[@]+"${skipped[@]}"}; do
+  case $f in *.sh) ;; *) installed+=("$f") ;; esac
+done
 fills=""
 [ ${#installed[@]} -gt 0 ] && fills=$(cd "$dst" && grep -Hn 'FILL' "${installed[@]}" 2>/dev/null || true)
 if [ -n "$fills" ]; then

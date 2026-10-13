@@ -159,6 +159,23 @@ check "adopt.sh installs the workspace .gitignore" [ -f .gitignore ]
 check "adopt.sh lists what is left to FILL" has "$T/adopt.txt" "CLAUDE.md:1:"
 check "adopt.sh lists the table of what Claude does alone as left to FILL" has "$T/adopt.txt" \
   "FILL: ask the owner for a preset"
+check "adopt.sh lists no FILL marker of a script (B-52)" lacks "$T/adopt.txt" ".sh:"
+# B-53: nothing in a new project describes the workflow's own repo or a sample of another project.
+check "adopt.sh: the lessons hold no sample lesson" lacks notes/lessons.md "Stacked PRs"
+check "adopt.sh: CLAUDE.md does not send improvements back to the workflow repo" lacks CLAUDE.md "port that part back"
+check "adopt.sh: BACKLOG.md has no placeholder for a second repo" lacks BACKLOG.md "second repo"
+# B-54: a config still holding its FILL lines is a finding in the ground truth, until the lines are gone.
+mkdir "$T/fresh" && (cd "$T/fresh" && git_q init -b main && "$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1)
+(cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
+check "ground truth: an unfilled config exits 0 and says so in a section" \
+  eval 'has "$T/fresh-gt.txt" "== setup" && has "$T/fresh-gt.txt" "still has its FILL lines"'
+check "ground truth: an unfilled config does not end with a plain complete" \
+  eval 'tail -n 1 "$T/fresh-gt.txt" | grep -q "^GROUND TRUTH: complete, but the setup is not"'
+grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
+  cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
+(cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
+check "ground truth: a filled config ends with a plain complete, no setup section" \
+  eval 'tail -n 1 "$T/fresh-gt.txt" | grep -qx "GROUND TRUTH: complete" && lacks "$T/fresh-gt.txt" "== setup"'
 "$SH" "$WF/bin/adopt.sh" "$T/ws" --workspace >"$T/adopt2.txt" 2>&1
 check "adopt.sh run again exits 0" [ $? = 0 ]
 check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (identical)"

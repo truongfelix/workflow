@@ -34,5 +34,3 @@ next id: B-1 (none given yet)
 ## <!-- FILL: first repo or file tree -->
 
 <!-- FILL: the items, each in the shape of notes/item-format.md -->
-
-## <!-- FILL: second repo or file tree -->
