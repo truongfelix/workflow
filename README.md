@@ -137,11 +137,17 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      nested repos, data and keys stay out, and a PRIVATE remote.
 3. **Install:** `bin/adopt.sh <project-root>` (add `--workspace` for the second shape). It copies only missing files,
    prints the ones it skipped with a diff command, and lists the FILL markers.
-4. **Fill**, in this order:
-   - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset
-     (Careful, Balanced or Hands-off, as its last bullet defines them) as a multiple-choice question. Then show the
-     table with that preset and ask which rows to change; the owner names them, or none. Set the rows, then
-     delete its FILL comment.
+4. **Fill**, in this order. The owner answers each question without having read these files: a question names no
+   file, table or setting, and says in plain words what each choice does.
+   - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset as a
+     multiple-choice question, and list in it the steps the preset decides: start the day's task, commit the docs
+     (the notes and trackers), push them, add an item to the backlog, claim one, commit code, push a work branch,
+     open a pull request, merge one (or push code to the default branch), delete a branch whose work has landed,
+     stop a background job it started, release, comment or message anyone. Each option says which of them Claude
+     asks about first and which it does, then tells: **Careful** asks first for every one; **Balanced** asks first
+     to start the day's task, to open or merge a pull request, to release, and to comment or message; **Hands-off**
+     asks first only to release, and to comment or message. Then show each step with that preset's answer and ask
+     which to change; the owner names them, or none. Set the table's rows, then delete its FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.

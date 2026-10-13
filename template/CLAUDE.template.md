@@ -26,8 +26,9 @@ and wait for a yes. **do, then tell**: do it, then say so in your next message, 
 the handoffs, the trackers, `notes/`, this file and `.claude/`: a push whose new commits hold only docs is "Push the
 docs", on any branch, the default one included.
 
-<!-- FILL: ask the owner for a preset (the last bullet below), then show the rows and ask which to change; set them,
-then delete this comment. Until then every row is Careful. -->
+<!-- FILL: ask the owner for a preset (the last bullet below), listing the steps in plain words and naming no file
+(README, "Adopt in a new project", step 4), then show each step with its answer and ask which to change; set the
+rows, then delete this comment. Until then every row is Careful. -->
 
 | Step | Here |
 |---|---|
