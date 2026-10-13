@@ -360,13 +360,13 @@ fi
 # each default branch on its remote needs a receipt and green CI, since a merge makes a commit that no check has
 # seen. The rule "receipt": each of those repos needs the pre-push hook that refuses a release tag without them.
 echo
-r=0 g=0 m=0 bad=""
+r=0 m=0 bad=""
 for w in $GATE_RULES; do
-  case $w in receipt) r=1 ;; regression) g=1 ;; merge) m=1 ;; *) bad="$bad $w" ;; esac
+  case $w in receipt) r=1 ;; regression) ;; merge) m=1 ;; *) bad="$bad $w" ;; esac
 done
-case "$r$g$m" in
-  111) preset=" = Production" ;; 011) preset=" = Steady" ;; 000) preset=" = Prototype" ;; *) preset=", no preset" ;;
-esac
+preset=$(rules_preset "$GATE_RULES")
+preset=${preset:+ = $preset}
+preset=${preset:-, no preset}
 rules=$(echo $GATE_RULES)
 echo "== checks (rules kept: ${rules:-none}$preset)"
 [ -n "$bad" ] && echo "  ⚠ unknown rule(s) in GATE_RULES:$bad (the rules: receipt, regression, merge)"

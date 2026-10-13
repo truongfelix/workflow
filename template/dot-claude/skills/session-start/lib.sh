@@ -58,3 +58,18 @@ PR_CI_JQ='def pr_verdict: [ .statusCheckRollup[]?
     elif any(.[]; IN("FAILURE","CANCELLED","TIMED_OUT","ERROR","ACTION_REQUIRED","STARTUP_FAILURE")) then "CI red"
     elif any(.[]; IN("PENDING","EXPECTED","QUEUED","IN_PROGRESS","")) then "CI running"
     else "CI green" end;'
+
+# The rules a project keeps on its checks (GATE_RULES): each in plain words, as /checks asks it and the board shows it,
+# and the preset a set of them makes, as the ground truth and the board name it.
+rule_text() { # <rule>: the rule in plain words; nothing for a word that is not a rule
+  case $1 in
+    receipt) echo "A release needs the checks to have passed on its exact commit" ;;
+    regression) echo "Each bug fix comes with a check that fails without the fix" ;;
+    merge) echo "After a merge, the checks run again on the main branch" ;;
+  esac
+}
+rules_preset() { # <rules, space-separated>: Production, Steady or Prototype; nothing when they make no preset
+  local r=0 g=0 m=0 w
+  for w in $1; do case $w in receipt) r=1 ;; regression) g=1 ;; merge) m=1 ;; esac; done
+  case "$r$g$m" in 111) echo Production ;; 011) echo Steady ;; 000) echo Prototype ;; esac
+}

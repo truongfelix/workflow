@@ -1,6 +1,6 @@
 ---
 name: board
-description: Open the board, the trackers (BACKLOG.md, questions.md), the lessons and the handoffs as one page, with filters by repo, state, date and text, the closed items, and the commits and PRs behind each item. Where no browser can show it (a cloud session, SSH, no display), print the open items as text instead. Use it when the user asks for the board, or to see the backlog, the open items or what is in flight at a glance ("show the board", "open the backlog", "what's open").
+description: Open the board, the trackers (BACKLOG.md, questions.md), the lessons and the handoffs as one page, with filters by repo, state, date and text, the closed items, and the commits and PRs behind each item, and a Settings tab (what Claude does alone, how the code is checked). Where no browser can show it (a cloud session, SSH, no display), print the open items as text instead. Use it when the user asks for the board, or to see the backlog, the open items or what is in flight at a glance ("show the board", "open the backlog", "what's open").
 ---
 
 # Board

@@ -20,7 +20,8 @@ This template keeps a project going across sessions, machines and weeks with fiv
   rulings with you: keep, shorten, move to its doc, or delete (git keeps it).
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history, and for
   each claimed item where its work is (on which machine, pushed or not, in an open PR with its CI, or merged) and
-  whether it passed the project's own check on this machine. A hook rebuilds it after each change, and an open tab
+  whether it passed the project's own check on this machine; an id shows its item's title on hover. Its Settings tab
+  shows what Claude does alone and how the code is checked. A hook rebuilds it after each change, and an open tab
   updates itself. Where no browser can show it (a cloud session, SSH), it prints the open items instead.
 - **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
   release, …), and changes it: a preset, or the steps you pick from a list.
@@ -110,8 +111,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
 | `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
-| `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
+| `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers, the settings or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of its
 own at the root. How Claude Code's machine-local memory fits next to these files:

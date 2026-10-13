@@ -10,8 +10,8 @@
 # library, no network.
 #
 # Always current: the project's Claude Code hook (.claude/settings.json) runs `board.sh --hook` after each tool call
-# that edits a tracker, a lesson or a handoff, runs git (commit, pull, merge, rebase, push...) or claims an item,
-# and the page is rebuilt, offline, with the PRs last read. An open page reloads itself when its file changes: its
+# that edits a tracker, a lesson, a handoff or a setting, runs git (commit, pull, merge, rebase, push...) or claims an
+# item, and the page is rebuilt, offline, with the PRs last read. An open page reloads itself when its file changes: its
 # first lines, read as JavaScript, set the build's stamp (the rest of the file is a comment then), so the page loads
 # its own file as a script every 2 s and compares. It keeps its filters (in its address), its scroll and the search
 # being typed.
@@ -34,6 +34,8 @@
 # failed on its last commit, not run on the last N commits (and the result before them), not run here, or no gate.
 # Only what checks the project's code is shown (/checks): the Gate column when it has a gate (GATES), the CI of a PR
 # when GitHub CI checks its repo (GITHUB_CI).
+# Settings, a tab of its own: what Claude does alone (the table in CLAUDE.md, as autonomy.sh reads it) and how the code
+# is checked before a merge (each repo's gate and GitHub CI, the rules kept), as .claude/ground-truth.conf sets them.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -70,13 +72,13 @@ while [ $# -gt 0 ]; do
 done
 [ -n "$out" ] && case $out in /*) ;; *) out="$(pwd)/$out" ;; esac
 
-# The hook: Claude Code passes the tool call as JSON. A path or a command that names a tracker, a lesson or a handoff,
-# a git command that moves a branch, a `gh pr` call (a PR opened, merged or closed), or a claim (claim.sh), rebuilds
-# the page; a push or a `gh pr` also reads the PRs again. A false match costs one rebuild. Quiet, and never an error:
-# a hook that fails would show in every session.
+# The hook: Claude Code passes the tool call as JSON. A path or a command that names a tracker, a lesson, a handoff or a
+# setting (CLAUDE.md, ground-truth.conf, autonomy.sh), a git command that moves a branch, a `gh pr` call (a PR opened,
+# merged or closed), or a claim (claim.sh), rebuilds the page; a push or a `gh pr` also reads the PRs again. A false
+# match costs one rebuild. Quiet, and never an error: a hook that fails would show in every session.
 if [ "$hook" = 1 ]; then
   input=$(cat)
-  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|claim\.sh|gh pr |git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
+  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|CLAUDE\.md|ground-truth\.conf|autonomy\.sh|claim\.sh|gh pr |git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
     exit 0
   want=offline
   printf '%s' "$input" | grep -Eq 'git [^|;&]{0,80}push|gh pr ' && want=online
@@ -121,14 +123,17 @@ if [ -n "$queue" ]; then
   exit 0
 fi
 
-# The config: each entry of REPOS, and the names of the repos a gate (GATES) or GitHub CI (GITHUB_CI) checks.
-: >"$T/conf" && : >"$T/gates" && : >"$T/cis"
+# The config: each entry of REPOS, GATES ("<repo>|<command>"), GATE_PASS and GITHUB_CI, a line each, and GATE_RULES.
+: >"$T/conf" && : >"$T/gate-cmds" && : >"$T/pass" && : >"$T/cis" && : >"$T/rules"
 if [ -f .claude/ground-truth.conf ]; then
-  (REPOS=(); GATES=(); GITHUB_CI=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
+  (REPOS=(); GATES=(); GATE_PASS=(); GITHUB_CI=(); GATE_RULES=""; . ./.claude/ground-truth.conf >/dev/null 2>&1
     for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done >"$T/conf"
-    for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "${g%%|*}"; done >"$T/gates"
-    for c in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do printf '%s\n' "$c"; done >"$T/cis")
+    for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "$g"; done >"$T/gate-cmds"
+    for g in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do printf '%s\n' "$g"; done >"$T/pass"
+    for c in ${GITHUB_CI[@]+"${GITHUB_CI[@]}"}; do printf '%s\n' "$c"; done >"$T/cis"
+    echo $GATE_RULES >"$T/rules")
 fi
+cut -d '|' -f1 "$T/gate-cmds" >"$T/gates" # the repos that have a gate
 repos=$(cut -d '|' -f1 "$T/conf" | tr '\n' ' ')
 
 # Every version of each file in git, oldest first, then what is on disk when it differs from the last commit. A file
@@ -216,6 +221,40 @@ if [ -n "$self" ] && [ -z "$self_name" ]; then
   self_name=$(basename "$self")
   printf '%s\t%s\t%s\n' "$self_name" . "$(github_repo . origin)" >>"$T/repos"
 fi
+
+# The settings: what Claude does alone, as autonomy.sh reads the table in CLAUDE.md ("A\t<step>\t<answer>", its preset
+# "AP", the project's own rows "AO", or why it could not be read "AE"), and how the code is checked before a merge:
+# each repo with its gate, the line its gate passes on and its GitHub CI ("G"), each rule, kept or not, in plain words
+# ("R"), their preset ("RP") and the words of GATE_RULES that are no rule ("RX"). One record per line in $T/settings.
+au="$HERE/../autonomy/autonomy.sh"
+{
+  if [ ! -f CLAUDE.md ]; then printf 'AE\tno CLAUDE.md in %s\n' "$(pwd)"
+  elif [ ! -f "$au" ]; then printf 'AE\tno %s (the /autonomy skill)\n' "$au"
+  elif au_out=$("$SH" "$au" show -f "$(pwd)/CLAUDE.md" 2>&1); then
+    printf '%s\n' "$au_out" | while IFS= read -r l; do
+      case $l in
+        "preset: "*) printf 'AP\t%s\n' "${l#preset: }" ;;
+        "the project's own rows"*) printf 'AO\t%s\n' "${l#*: }" ;;
+        *"$tab"*) printf 'A\t%s\n' "${l#*"$tab"}" ;;
+      esac
+    done
+  else printf 'AE\t%s\n' "$(printf '%s\n' "$au_out" | head -n 1)"; fi
+  while IFS="$tab" read -r name _ gh_repo; do
+    gcmd="" pat="" ci=""
+    while IFS= read -r g; do [ "${g%%|*}" = "$name" ] && gcmd=${g#*|}; done <"$T/gate-cmds"
+    while IFS= read -r g; do [ "${g%%|*}" = "$name" ] && pat=${g#*|}; done <"$T/pass"
+    grep -qxF "$name" "$T/cis" && ci=${gh_repo:-no GitHub repo}
+    printf 'G\t%s\t%s\t%s\t%s\n' "$name" "$gcmd" "$pat" "$ci"
+  done <"$T/repos"
+  kept=$(cat "$T/rules") no_rule=""
+  for w in receipt regression merge; do
+    case " $kept " in *" $w "*) k=1 ;; *) k=0 ;; esac
+    printf 'R\t%s\t%s\t%s\n' "$w" "$k" "$(rule_text "$w")"
+  done
+  for w in $kept; do [ -n "$(rule_text "$w")" ] || no_rule="$no_rule${no_rule:+ }$w"; done
+  printf 'RP\t%s\n' "$(rules_preset "$kept")"
+  [ -z "$no_rule" ] || printf 'RX\t%s\n' "$no_rule"
+} >"$T/settings"
 
 # The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does. Those
 # read are kept for the next --offline build, with the time they were read.
@@ -487,7 +526,7 @@ END {
 gated=false
 [ -s "$T/gates" ] && gated=true
 awk -v cfile="$T/commits" -v pfile="$T/prs" -v rfile="$T/prs-read" -v wfile="$T/where" -v gfile="$T/gate" \
-  -v gated="$gated" -v machine="$MACHINE" '
+  -v sfile="$T/settings" -v gated="$gated" -v machine="$MACHINE" '
 function swap(s, a, b,   out, i) {
   out = ""
   while ((i = index(s, a)) > 0) { out = out substr(s, 1, i - 1) b; s = substr(s, i + length(a)) }
@@ -529,7 +568,22 @@ BEGIN {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
-  printf "},\n\"gated\":%s,\n\"machine\":%s}\n", gated, js(machine)
+  steps = ""; checks = ""; rules = ""; ap = ""; ao = ""; ae = ""; rp = ""; rx = ""
+  while ((getline rec < sfile) > 0) {
+    split(rec, F, "\t")
+    if (F[1] == "A") steps = steps (steps == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "]"
+    else if (F[1] == "AP") ap = F[2]
+    else if (F[1] == "AO") ao = F[2]
+    else if (F[1] == "AE") ae = F[2]
+    else if (F[1] == "G") checks = checks (checks == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "," js(F[4]) "," js(F[5]) "]"
+    else if (F[1] == "R") rules = rules (rules == "" ? "" : ",") "[" js(F[2]) "," (F[3] == 1 ? "true" : "false") "," js(F[4]) "]"
+    else if (F[1] == "RP") rp = F[2]
+    else if (F[1] == "RX") rx = F[2]
+  }
+  printf "},\n\"gated\":%s,\n\"settings\":{\"steps\":[%s],\"autoPreset\":%s,\"autoOwn\":%s,\"autoError\":%s,", \
+    gated, steps, js(ap), js(ao), js(ae)
+  printf "\"repos\":[%s],\"rules\":[%s],\"rulesPreset\":%s,\"rulesUnknown\":%s},\n\"machine\":%s}\n", \
+    checks, rules, js(rp), js(rx), js(machine)
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
 
 # The build's stamp: the data without the time it was built, so a rebuild that changes nothing leaves an open page
@@ -617,6 +671,15 @@ pre.files { white-space: pre-wrap; font: 12px ui-monospace, SFMono-Regular, Menl
 .problems pre { white-space: pre-wrap; margin: 6px 0; }
 .empty { padding: 24px 16px; color: var(--muted); }
 footer { padding: 8px 16px 20px; color: var(--muted); font-size: 12px; }
+[hidden] { display: none !important; }
+.settings { padding: 4px 16px 8px; max-width: 980px; }
+.settings h2 { font-size: 16px; margin: 14px 0 6px; }
+.settings h3 { font-size: 14px; margin: 12px 0 4px; }
+.settings table { margin: 6px 0; }
+.settings td.ask { font-weight: 600; }
+.settings td.tell { color: var(--muted); }
+.settings ul.rules { list-style: none; padding: 0; margin: 4px 0; }
+.settings ul.rules li { margin: 3px 0; }
 @media (max-width: 760px) {
   .main.open { grid-template-columns: minmax(0, 1fr); }
   aside { position: fixed; inset: 0; height: auto; z-index: 2; border-left: none; }
@@ -633,7 +696,7 @@ footer { padding: 8px 16px 20px; color: var(--muted); font-size: 12px; }
 <div class="bar" id="repos"></div>
 <nav class="tabs" id="tabs"></nav>
 <div class="bar" id="states"></div>
-<div class="bar">
+<div class="bar" id="filters">
   <b>Date</b>
   <select id="dk"></select>
   <label>from <input type="date" id="from"></label>
@@ -666,6 +729,7 @@ try { D = JSON.parse(document.getElementById("data").textContent); }
 catch (e) { document.body.textContent = "The board data could not be read: " + e; throw e; }
 
 var KINDS = { B: "Backlog", Q: "Questions", L: "Lessons", H: "Handoffs" };
+var SETTINGS = "S"; // the tab with no items: what Claude does alone, how the code is checked
 var FILES = { B: "BACKLOG.md", Q: "questions.md", L: "notes/lessons.md", H: "notes/handoff" };
 var STATES = {
   B: [["open", "🔲", "open"], ["waiting", "⏸️", "waiting"], ["closed", "✓", "closed"]],
@@ -769,7 +833,7 @@ function load() {
   S = defaults();
   try {
     var h = new URLSearchParams(location.hash.slice(1));
-    if (h.get("tab") in KINDS) S.tab = h.get("tab");
+    if (h.get("tab") in KINDS || h.get("tab") === SETTINGS) S.tab = h.get("tab");
     if (h.has("repos")) S.repos = h.get("repos").split(",").filter(Boolean);
     Object.keys(KINDS).forEach(function (k) { if (h.has("st" + k)) S.st[k] = h.get("st" + k).split(",").filter(Boolean); });
     ["dk", "from", "to", "q", "sort", "sel", "back"].forEach(function (k) { if (h.has(k)) S[k] = h.get(k); });
@@ -810,6 +874,11 @@ function shown(it, skip) {
 function esc(s) {
   return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]; });
 }
+function idLink(id, label) { // a link to an item, its title shown on hover
+  var it = byId[id];
+  return "<a href=\"#\" data-id=\"" + esc(id) + "\" title=\"" + esc(it.title + (it.closed ? " (" + stateOf(it) + ")" : "")) +
+    "\">" + esc(label || id) + "</a>";
+}
 function fmt(s) { // the little markdown the trackers use: `code`, **bold**; ids, commit hashes and #PRs as links
   return esc(s).replace(/`([^`\n]+)`/g, "<code>$1</code>").replace(/[*][*]([^*\n]+)[*][*]/g, "<b>$1</b>")
     .replace(/\b[0-9a-f]{7,40}\b/g, function (m) {
@@ -820,7 +889,7 @@ function fmt(s) { // the little markdown the trackers use: `code`, **bold**; ids
       var l = prByNum[n] || [];
       return l.length === 1 ? pre + "<a href=\"#\" data-pr=\"" + esc(l[0].key) + "\">#" + n + "</a>" : m;
     })
-    .replace(IDS, function (m) { return byId[m] ? "<a href=\"#\" data-id=\"" + m + "\">" + m + "</a>" : m; });
+    .replace(IDS, function (m) { return byId[m] ? idLink(m) : m; });
 }
 function fmtBody(s) { // a line wrapped in the markdown joins the one before, as markdown renders it
   var out = "", fence = false, joinable = false;
@@ -884,7 +953,17 @@ function render() {
     h += "<button class=\"tab" + (S.tab === k ? " on" : "") + "\" data-tab=\"" + k + "\">" + KINDS[k] +
       " <span class=\"muted\">" + n + "</span></button>";
   });
+  h += "<button class=\"tab" + (S.tab === SETTINGS ? " on" : "") + "\" data-tab=\"" + SETTINGS + "\">Settings</button>";
   document.getElementById("tabs").innerHTML = h;
+  var set = S.tab === SETTINGS;
+  ["repos", "states", "filters", "problems", "prnote"].forEach(function (id) { document.getElementById(id).hidden = set; });
+  if (set) {
+    document.getElementById("list").innerHTML = settingsView();
+    document.getElementById("foot").textContent = "Built from CLAUDE.md and .claude/ground-truth.conf by board.sh, " +
+      "again after each change: an open page reloads itself.";
+    panel();
+    return;
+  }
 
   h = "<b>State</b>";
   STATES[S.tab].forEach(function (s) {
@@ -942,10 +1021,41 @@ function render() {
   panel();
 }
 
+function settingsView() { // what Claude does alone, and how the code is checked before a merge
+  var st = D.settings, h = "<div class=\"settings\"><h2>What Claude does alone</h2>";
+  if (st.autoError) h += "<div class=\"note\">Not read: " + esc(st.autoError) + "</div>";
+  else {
+    h += "<div class=\"muted\">Preset: " + esc(st.autoPreset) + "</div><table><thead><tr><th>Step</th><th>Here</th>" +
+      "</tr></thead><tbody>" + st.steps.map(function (r) {
+        return "<tr><td>" + esc(r[0]) + "</td><td class=\"" + (r[1] === "ask first" ? "ask" : "tell") + "\">" + esc(r[1]) +
+          "</td></tr>";
+      }).join("") + "</tbody></table>";
+    if (st.autoOwn) h += "<div class=\"muted\">The project's own steps, which no preset names: " + esc(st.autoOwn) + "</div>";
+  }
+  h += "<div class=\"muted\">Changed with /autonomy, or in words (\"from now on, push the docs without asking\").</div>" +
+    "<h2>How the code is checked before a merge</h2>";
+  var checked = st.repos.filter(function (r) { return r[1] || r[3]; }), kept = st.rules.filter(function (r) { return r[1]; });
+  h += !checked.length ? "<div>Nothing checks the code before a merge yet.</div>" :
+    "<table><thead><tr><th>Repo</th><th>Its own check (gate)</th><th>GitHub CI</th></tr></thead><tbody>" +
+    st.repos.map(function (r) {
+      return "<tr><td>" + esc(r[0]) + "</td><td>" + (r[1] ? "<code>" + esc(r[1]) + "</code>" + (r[2] ?
+        " <span class=\"muted\">passes on a line matching</span> <code>" + esc(r[2]) + "</code>" : "") :
+        "<span class=\"muted\">none</span>") + "</td><td>" + (r[3] ? esc(r[3]) : "<span class=\"muted\">none</span>") +
+        "</td></tr>";
+    }).join("") + "</tbody></table>";
+  if (checked.length || kept.length) {
+    h += "<h3>Rules kept: " + esc(st.rulesPreset || "no preset") + "</h3><ul class=\"rules\">" + st.rules.map(function (r) {
+      return "<li" + (r[1] ? "" : " class=\"muted\"") + ">" + (r[1] ? "✓ " : "✗ ") + esc(r[2]) + "</li>";
+    }).join("") + "</ul>";
+    if (kept.length && !checked.length) h += "<div class=\"note\">The rules kept need a gate or GitHub CI.</div>";
+  }
+  if (st.rulesUnknown) h += "<div class=\"note\">Not a rule, in GATE_RULES: " + esc(st.rulesUnknown) + "</div>";
+  return h + "<div class=\"muted\">Changed with /checks.</div></div>";
+}
 function backLink() {
   var b = byId[S.back] ? S.back : "";
   return "<button class=\"chip close\" id=\"close\">Close</button>" +
-    (b ? "<a href=\"#\" data-id=\"" + esc(b) + "\">← " + esc(idOf(byId[b])) + "</a>" : "");
+    (b ? idLink(b, "← " + idOf(byId[b])) : "");
 }
 function prLine(pr) {
   var st = pr.merged ? "merged " + pr.merged : pr.state === "OPEN" ? "open" : "closed " + pr.closed;
@@ -966,7 +1076,7 @@ function commitView(c) {
   if (c.files) h += "<b>Files</b><pre class=\"files\">" + esc(c.files) + "</pre>";
   var its = idsIn(c.subject + "\n" + c.body).filter(function (id) { return byId[id]; });
   if (its.length) h += "<b>Items it names</b><div class=\"body\">" + its.map(function (id) {
-    return "<a href=\"#\" data-id=\"" + id + "\">" + esc(idOf(byId[id])) + "</a> " + esc(byId[id].title);
+    return idLink(id, idOf(byId[id])) + " " + esc(byId[id].title);
   }).join("\n") + "</div>";
   var merged = D.prs.filter(function (pr) { return pr.merge === c.sha; });
   if (merged.length) h += "<b>Merge of</b><div class=\"body\">" + merged.map(prLine).join("\n") + "</div>";
@@ -982,7 +1092,7 @@ function prView(pr) {
   if (mc) h += "<b>Merge commit</b><div class=\"body\">" + commitLine(commits[mc]) + "</div>";
   var its = pr.ids.filter(function (id) { return byId[id]; });
   if (its.length) h += "<b>Items it names</b><div class=\"body\">" + its.map(function (id) {
-    return "<a href=\"#\" data-id=\"" + id + "\">" + esc(idOf(byId[id])) + "</a> " + esc(byId[id].title);
+    return idLink(id, idOf(byId[id])) + " " + esc(byId[id].title);
   }).join("\n") + "</div>";
   return h;
 }
@@ -1010,7 +1120,7 @@ function panel() {
   if (ps.length) h += "<b>Pull requests</b><div class=\"body\">" + ps.map(prLine).join("\n") + "</div>";
   var by = (citedBy[it.id] || []).filter(function (x) { return x !== it; }).sort(newest);
   if (by.length) h += "<b>Named in handoffs</b><div class=\"body\">" + by.map(function (x) {
-    return "<a href=\"#\" data-id=\"" + esc(x.id) + "\">" + esc(idOf(x)) + "</a> " + esc(x.title) + (x.closed ? " (replaced)" : "");
+    return idLink(x.id, idOf(x)) + " " + esc(x.title) + (x.closed ? " (replaced)" : "");
   }).join("\n") + "</div>";
   h += "<b>History</b>" + (D.shallow ? "<div class=\"note\">A shallow clone: what came before " + esc(D.shallow) +
     " is UNKNOWN (git fetch --unshallow).</div>" : "");

@@ -34,10 +34,10 @@ tests), never a bare "gate".
    workflow never reads the script's own. A script that exits 0 once it has run, green or not (stages skipped, a
    partial run), says it passed in a line it prints: ask "How do I know it passed: its exit code, or a line it
    prints?", and set that line in `GATE_PASS`.
-4. **The rules** (not with nothing yet), one question where the owner picks any or "None of these", each rule a
-   plain sentence: "A release needs the checks to have passed on its exact commit" (`receipt`), "Each bug fix comes
-   with a check that fails without the fix" (`regression`), "After a merge, the checks run again on the main branch"
-   (`merge`). Name no preset: Production, Steady and Prototype are what the ground truth calls the result.
+4. **The rules** (not with nothing yet), one question where the owner picks any or "None of these", each rule
+   (`receipt`, `regression`, `merge`) in the plain words `rule_text` gives in `.claude/skills/session-start/lib.sh`,
+   as the board's Settings tab shows them. Name no preset: Production, Steady and Prototype are what the ground truth
+   and the board call the result.
 5. **Write** the four lines, each repo by its name in `REPOS`: `GATES=("api|make check")`, `GATE_PASS=("api|^All
    checks passed")`, `GITHUB_CI=("api")`, `GATE_RULES="receipt regression merge"`; nothing yet empties all four.
    With `receipt`, run `bash .claude/skills/session-start/gate.sh hook <repo>` for each repo checked. Exit 1: the repo

@@ -603,6 +603,55 @@ cat "$T/conf5" >.claude/ground-truth.conf
 CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --text --out "$T/board7.html" "$T/board5" >"$T/board7.txt" 2>&1
 check "board, gate: no column and no gate text in a project with no gate" \
   eval 'has "$T/board7.html" "\"gated\":false," && grep -q "^\"gate\":{}," "$T/board7.html" && lacks "$T/board7.txt" "gate:"'
+# Settings, a tab of its own: what Claude does alone, as autonomy.sh reads CLAUDE.md, and how the code is checked
+# before a merge, as the conf sets it: each repo, each rule in plain words, kept or not.
+cp "$WF/template/CLAUDE.template.md" CLAUDE.md && "$SH" "$AU" preset balanced -f CLAUDE.md >/dev/null
+printf '%s\n' 'GATES=("api|true")' 'GATE_PASS=("api|^ok$")' 'GITHUB_CI=("api")' 'GATE_RULES="receipt merge recipt"' \
+  >>.claude/ground-truth.conf
+CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --out "$T/board8.html" "$T/board5" >/dev/null 2>&1
+check "board, settings: each step with its answer, as autonomy.sh reads CLAUDE.md" \
+  has "$T/board8.html" '["Commit the docs","do, then tell"]'
+check "board, settings: the preset the steps make" has "$T/board8.html" '"autoPreset":"Balanced"'
+check "board, settings: a repo with its gate, the line it passes on, its GitHub CI" \
+  has "$T/board8.html" '["api","true","^ok$","demo/api"]'
+check "board, settings: a repo that nothing checks" has "$T/board8.html" '["docs","","",""]'
+check "board, settings: each rule in plain words, kept or not" \
+  has "$T/board8.html" '["regression",false,"Each bug fix comes with a check that fails without the fix"]'
+check "board, settings: the rules make no preset, and a word that is no rule" \
+  has "$T/board8.html" '"rulesPreset":"","rulesUnknown":"recipt"}'
+# The page's own script, run in node on a stand-in for the browser's document: page.js <page> <expression> prints
+# what the expression gives once the page has loaded. What the Settings tab shows, and an id's title on hover.
+cat >"$T/page.js" <<'JSEOF'
+var fs = require("fs"), vm = require("vm"), h = fs.readFileSync(process.argv[2], "utf8");
+var data = h.split("<script id=\"data\" type=\"application/json\">")[1].split("</script>")[0];
+var code = h.split("<script>\n")[1].split("</script>")[0], els = {};
+function el(id) {
+  return els[id] || (els[id] = { id: id, innerHTML: "", textContent: id === "data" ? data : "", value: "",
+    hidden: false, classList: { toggle: function () {} }, addEventListener: function () {} });
+}
+var c = { els: els, window: {}, URLSearchParams: URLSearchParams, setInterval: function () {},
+  location: { hash: "", href: "file:///board.html" }, history: { replaceState: function () {} },
+  sessionStorage: { getItem: function () { return null; }, setItem: function () {}, removeItem: function () {} },
+  document: { getElementById: el, addEventListener: function () {}, hidden: true, activeElement: null,
+    documentElement: { getAttribute: function () { return ""; } } } };
+console.log(String(vm.runInNewContext(code + "\n;(" + process.argv[3] + ")", c)));
+JSEOF
+if command -v node >/dev/null 2>&1; then
+  node "$T/page.js" "$T/board8.html" '(S.tab = "S", render(), els.list.innerHTML + "\nfilters hidden: " + els.filters.hidden)' \
+    >"$T/board8-settings.txt" 2>&1
+  check "board page, settings: what Claude does alone, a row per step" eval 'has "$T/board8-settings.txt" "<h2>What Claude does alone</h2>" &&
+    has "$T/board8-settings.txt" "<tr><td>Commit the docs</td><td class=\"tell\">do, then tell</td></tr>"'
+  check "board page, settings: each repo, its gate and its GitHub CI" has "$T/board8-settings.txt" \
+    '<tr><td>api</td><td><code>true</code> <span class="muted">passes on a line matching</span> <code>^ok$</code></td><td>demo/api</td></tr>'
+  check "board page, settings: a rule not kept" has "$T/board8-settings.txt" \
+    '<li class="muted">✗ Each bug fix comes with a check that fails without the fix</li>'
+  check "board page, settings: the filters, which no setting has, are hidden" has "$T/board8-settings.txt" "filters hidden: true"
+  node "$T/page.js" "$T/board8.html" 'fmt("see B-2, L-2 and B-99")' >"$T/board8-ids.txt" 2>&1
+  check "board page, ids: an item's title on hover" has "$T/board8-ids.txt" '<a href="#" data-id="B-2" title="Second">B-2</a>'
+  check "board page, ids: a closed item's title, and its state" \
+    eval 'grep -qE "data-id=\"L-2\" title=\"[^\"]+ \(✗ dropped\)\">L-2</a>" "$T/board8-ids.txt"'
+  check "board page, ids: an id of no item stays text" has "$T/board8-ids.txt" " and B-99"
+fi
 cd "$T/board2" || exit 1
 
 # Live: read as a script, the page sets its build's stamp and is a comment after that (the only "*/" is its last
@@ -683,6 +732,13 @@ check "hook: a claim rebuilds the page" has "$T/hook.html" '"id":"B-5",'
 printf '%s\n' '' '### 🔲 B-6 Sixth' 'Done when: done.' >>"$T/board/BACKLOG.md"
 hook '{"tool_name":"Bash","tool_input":{"command":"gh pr create --title \"B-6 Sixth\" --body x"}}'
 check "hook: a gh pr call alone (a PR opened) rebuilds the page" has "$T/hook.html" '"id":"B-6",'
+n=6
+for f in /p/CLAUDE.md /p/.claude/ground-truth.conf; do
+  n=$((n + 1))
+  printf '%s\n' '' "### 🔲 B-$n After $f" 'Done when: done.' >>"$T/board/BACKLOG.md"
+  hook "{\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$f\"}}"
+  check "hook: an edit of a setting ($f) rebuilds the page" has "$T/hook.html" "After $f"
+done
 for _ in 1 2 3 4; do hook '{"tool_name":"Write","tool_input":{"file_path":"/p/notes/lessons.md"}}' & done
 wait
 check "hook: calls at once leave no lock and no mark" [ ! -e "$T/hook.lock" -a ! -e "$T/hook.dirty" ]
