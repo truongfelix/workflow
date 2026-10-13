@@ -68,6 +68,9 @@ session can find out what happened and why.
      named under "Unfinished", for the next session to take over (`claim.sh --from`); otherwise delete the `claimed:`
      line, and the docs push (step 7) frees the item. A
      ⚠ STALE or GONE claim of another session goes under "Waiting for the user": only the owner releases it.
+   - **The gate rule "regression"**, when the ground truth's gate section lists it: each bug fix that landed this
+     session names, in its Done line, the gate check it added and that the check failed without the fix. A fix that
+     landed without one goes under "Waiting for the user", with a BACKLOG item for its check.
    - **Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`: the file is longer than
      `QUESTIONS_TRIM_LINES` in `.claude/ground-truth.conf`, a size the owner sets, and every session reads it. Go
      through the rulings in §2 with the owner, four at a time (one question each, in one AskUserQuestion), each with
@@ -126,7 +129,7 @@ continues: H-<n>
 - <repo>: <worktree / branch>, <uncommitted, LOCAL ONLY or pushed>, <what is left>, <its B- id: claim kept or released>
 
 ## Done
-- <id> <title>: <commit or PR, where it landed, CI>
+- <id> <title>: <commit or PR, where it landed, CI>; a bug fix: the gate check it added (rule "regression")
 
 ## Learned
 - <L- ids added or changed>; <a fact the next session needs that is not a lesson>

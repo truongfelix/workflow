@@ -98,8 +98,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, each repo's gate and the gate rules you keep |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session; `gate.sh`, which runs a repo's gate and keeps a receipt of each commit that passed it; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
@@ -142,6 +142,14 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
+   - The gate, in `.claude/ground-truth.conf`: `GATES`, each repo's gate command (the one whose exit code says
+     "ready": a test script, `make check`, what CI runs; none is fine). If a repo has one, ask the owner for a preset
+     of gate rules as a multiple-choice question: **Production** (a release tag needs a receipt of the gate, every
+     bug fix lands with a check, the default branch is gated again after a merge: code others clone, install or
+     deploy), **Steady** (the last two: a project in daily use, released informally) or **Prototype** (no rule: fast
+     iteration on something nobody depends on yet). Then show the three rules with that preset and ask which to turn
+     on or off. Set `GATE_RULES`; with the rule `receipt`, run `bash .claude/skills/session-start/gate.sh hook
+     <repo>` for each repo with a gate.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
@@ -199,15 +207,15 @@ template/                     copied into a project's root by bin/adopt.sh
   notes/item-format.md        the shape of a tracker item and its id
   notes/handoff-format.md     the shape of a handoff
   dot-claude/                 installed as .claude/
-    ground-truth.conf         what the ground truth looks at: the project's repos
+    ground-truth.conf         what the ground truth looks at: the project's repos, gates and gate rules
     settings.json             the hook that rebuilds the board after each change
-    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,board.sh}
+    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,gate.sh,board.sh}
     skills/handoff/SKILL.md
     skills/board/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, gate.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used

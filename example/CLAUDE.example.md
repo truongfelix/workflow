@@ -78,5 +78,7 @@ Staging runs on this machine: Postgres on the `/var/lib/pantry` volume (20 GB), 
 - api: `cd api && uv run pytest -q`; gate: `api/bin/gate` (lint, types, tests, migration up and down; exit 0 =
   ready).
 - web: `cd web && npm test`; gate: `web/bin/gate`.
+- The gate runs with `bash .claude/skills/session-start/gate.sh run api` (or `web`), which keeps a receipt of each
+  commit that passed it. Gate rules: Production (`.claude/ground-truth.conf`).
 - Backfill into staging, from the workspace root: `systemd-run --user --same-dir --unit pantry-backfill
   api/bin/backfill --from <batch>`.

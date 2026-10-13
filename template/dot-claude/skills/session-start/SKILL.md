@@ -15,7 +15,8 @@ open that already shipped, "done" items whose code changed since).
 
 1. **Ground truth first:** `bash .claude/skills/session-start/ground-truth.sh` (repos and their worktrees against
    the remote, LOCAL ONLY and uncommitted work, branches no worktree holds, open PRs with a CI verdict, the claims
-   on BACKLOG items and their branches, background jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2
+   on BACKLOG items and their branches, the gate rules kept and the receipt of each default branch, background
+   jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2
    means a probe failed: that section is UNKNOWN, never "clean". An open PR is usually the active thread.
    Then `bash .claude/skills/session-start/items.sh check`: the format of the trackers, the lessons and the
    handoffs (`notes/item-format.md`, `notes/handoff-format.md`). Exit 2
@@ -51,6 +52,8 @@ open that already shipped, "done" items whose code changed since).
      claim kept by this session's handoff ("Unfinished") names the session before this one: this session takes it
      over when it goes on with that work (step 5). An item another session claimed is not proposed: it is taken. A
      claim marked ⚠ STALE, GONE or NOT PUSHED goes in the brief: only the owner releases another session's claim.
+   - **The gate** → the gate section: a ⚠ NO RECEIPT (the rule "merge": a default branch not gated since it last
+     changed) or a ⚠ NO HOOK (the rule "receipt") goes in the brief, with the command the section names.
    - <!-- FILL: project-specific checks (a device, a server, a dashboard), and what is EXPECTED and not news
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
 4. **Brief the user** in under about 20 lines:
@@ -77,6 +80,9 @@ open that already shipped, "done" items whose code changed since).
 6. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
    release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
    day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
+   **The gate rules** the ground truth lists hold too: gate a commit with `bash .claude/skills/session-start/gate.sh
+   run <repo>`, which keeps its receipt; with "regression", a bug fix lands with a gate check that fails without
+   the fix (seen red once, then green with it); with "merge", gate the default branch again after a merge.
 
 ## Notes
 

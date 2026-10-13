@@ -29,6 +29,8 @@ KEEP_LOCAL=""
 UNITS=1
 CLAIM_STALE_DAYS=3
 QUESTIONS_TRIM_LINES=150
+GATES=()
+GATE_RULES=""
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
 
@@ -372,6 +374,57 @@ if [ -n "$CT" ]; then
     [ "$found" = 0 ] && echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
   done <"$CT/all"
 fi
+
+# The gate (gate.sh): each repo's gate command (GATES) and the gate rules the project keeps (GATE_RULES), with the
+# preset they make. A receipt is a commit that passed the gate on this machine, with nothing uncommitted. The rule
+# "merge": the last commit of each default branch on its remote needs one, since a merge makes a commit that no gate
+# has seen. The rule "receipt": each repo with a gate needs the pre-push hook that refuses a release tag without one.
+echo
+r=0 g=0 m=0 bad=""
+for w in $GATE_RULES; do
+  case $w in receipt) r=1 ;; regression) g=1 ;; merge) m=1 ;; *) bad="$bad $w" ;; esac
+done
+case "$r$g$m" in
+  111) preset=" = Production" ;; 011) preset=" = Steady" ;; 000) preset=" = Prototype" ;; *) preset=", no preset" ;;
+esac
+rules=$(echo $GATE_RULES)
+echo "== gate (rules kept: ${rules:-none}$preset)"
+[ -n "$bad" ] && echo "  ⚠ unknown rule(s) in GATE_RULES:$bad (the rules: receipt, regression, merge)"
+if [ -z "${GATES[*]+set}" ]; then
+  if [ -n "$rules" ]; then echo "  ⚠ no gate set (GATES in .claude/ground-truth.conf): the rules kept need one"
+  else echo "  no gate set (GATES in .claude/ground-truth.conf)"; fi
+fi
+for spec in ${GATES[@]+"${GATES[@]}"}; do
+  gname=${spec%%|*} gcmd=${spec#*|} gi=""
+  for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$gname" ] && gi=$i; done
+  if [ -z "$gi" ]; then
+    echo "  ⚠ $gname ($gcmd): not a repo of REPOS, or not a git checkout (above)"
+    continue
+  fi
+  gdir=${R_DIR[$gi]} gbase=${R_BASE[$gi]}
+  gtop=$(git -C "$gdir" rev-parse --show-toplevel 2>/dev/null)
+  gcommon=$(git -C "$gtop" rev-parse --git-common-dir 2>/dev/null)
+  case $gcommon in /* | [A-Za-z]:*) ;; *) gcommon="$gtop/$gcommon" ;; esac
+  if [ -z "$gbase" ]; then
+    st="no default branch on its remote"
+  else
+    gsha=$(git -C "$gdir" rev-parse "$gbase")
+    if [ -f "$gcommon/gate-receipts/$gsha" ]; then
+      st="$gbase at ${gsha:0:7}, receipt of $(sed -n 's/^passed: //p' "$gcommon/gate-receipts/$gsha")"
+    elif [ "$m" = 1 ]; then
+      st="$gbase at ${gsha:0:7}, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run $gname, on it)"
+    else
+      st="$gbase at ${gsha:0:7}, no receipt"
+    fi
+  fi
+  if [ "$r" = 1 ]; then
+    ghooks=$(cd "$gtop" 2>/dev/null && git rev-parse --git-path hooks 2>/dev/null)
+    case $ghooks in /* | [A-Za-z]:*) ;; *) ghooks="$gtop/$ghooks" ;; esac
+    grep -qF "gate.sh\" pre-push" "$ghooks/pre-push" 2>/dev/null ||
+      st="$st, ⚠ NO HOOK: a release tag would go out without a receipt (gate.sh hook $gname)"
+  fi
+  echo "  $gname ($gcmd): $st"
+done
 
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than
 # QUESTIONS_TRIM_LINES, it is flagged, and /handoff proposes a trim pass of its rulings (keep, shorten, move to its

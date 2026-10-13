@@ -72,3 +72,7 @@ then delete this comment. Until then every row is Careful. -->
 
 <!-- FILL: install, run, test, and the gate (the script whose exit code says "ready"). If a check must hold, it
 belongs in that gate, not in this file: a document is not a gate. -->
+
+The gate runs with `bash .claude/skills/session-start/gate.sh run <repo>`, which keeps a receipt of each commit that
+passed it. Each repo's gate command and the gate rules this project keeps (a preset: Production, Steady or
+Prototype) are in `.claude/ground-truth.conf` (`GATES`, `GATE_RULES`).

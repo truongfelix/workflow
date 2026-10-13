@@ -47,7 +47,7 @@ while IFS= read -r -d '' f; do
   install_file "$SRC/template/$f" "$(installed_name "$f")"
 done < <(cd "$SRC/template" && find . -type f -print0 | sort -z)
 [ "$workspace" = 1 ] && install_file "$SRC/workspace/gitignore" ".gitignore"
-chmod +x "$dst/.claude/skills/session-start/"{ground-truth,items,board,claim}.sh 2>/dev/null || true
+chmod +x "$dst/.claude/skills/session-start/"{ground-truth,items,board,claim,gate}.sh 2>/dev/null || true
 
 # The release taken, as on the releases page: its tag (v1.0.0), or the tag and the commits since (v1.0.0-3-gabc1234).
 # A clone with no tag: the commit and its date. No git checkout of the workflow itself (a downloaded archive, maybe
