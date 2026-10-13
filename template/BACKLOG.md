@@ -4,6 +4,10 @@ The queue of **open** work. Owner decisions and deliberate non-fixes are not her
 is in flight today (running jobs, the task of the day) is in the handoffs, `notes/handoff/`.
 
 **Rules**
+- **Only approved items are built.** A new idea, an extra or a bug met on the way becomes an item here first, and is
+  built once the owner approved it: with a yes when it is added or when its work starts (`CLAUDE.md`, the rows "Add
+  an item to the backlog" and "Start the day's task after the brief"). So nothing is built that this file does not
+  show, and it stays the whole list of the work.
 - **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading
   as authoritative. The commit that deletes it says where it landed (a commit hash, a PR number), so the board leads
   from the closed item to the work. Measured results go to `notes/`.

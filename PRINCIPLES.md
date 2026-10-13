@@ -35,6 +35,14 @@ rewrite of a branch others fetched, no skipped hook, no secret in a tracked file
 `BACKLOG.md`. Owner decisions and rulings: `questions.md`. Rules and how-tos: `CLAUDE.md`. History: git. When the
 same fact lives in two places, one of them goes stale and still reads as authoritative.
 
+**Only approved items are built.** Claude builds a `BACKLOG.md` item the owner approved, and nothing else. A new
+idea, an extra or a bug met on the way becomes an item first, and is built once approved; a task the owner names in
+the chat becomes an item too, approved by that request. What an item's `Done when:` needs is part of that item. The
+owner approves an item with a yes when it is added or when its work starts (the table's rows "Add an item to the
+backlog" and "Start the day's task after the brief"); where both rows are "do, then tell", the rows are that yes, and
+the owner strikes an item when told. That is why the backlog does not drift: nothing is built that it does not show,
+so it stays the whole list of the work.
+
 **Finished work is deleted, not ticked.** A done entry rots while reading as true, and a list of done entries buries
 the open ones. Git keeps the narrative with dates. That is also why the docs of a multi-repo workspace must be a
 git repo: pruning is only safe when the history is kept.
