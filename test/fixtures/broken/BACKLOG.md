@@ -31,3 +31,7 @@ Done when: it is done.
 Done when: it is done.
 
 More text.
+
+### 🔲 B-7 A claim with no branch
+claimed: claude@web
+Done when: it is done.

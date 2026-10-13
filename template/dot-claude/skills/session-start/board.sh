@@ -10,10 +10,11 @@
 # library, no network.
 #
 # Always current: the project's Claude Code hook (.claude/settings.json) runs `board.sh --hook` after each tool call
-# that edits a tracker, a lesson or a handoff, or runs git (commit, pull, merge, rebase, push...), and the page is
-# rebuilt, offline, with the PRs last read. An open page reloads itself when its file changes: its first lines, read
-# as JavaScript, set the build's stamp (the rest of the file is a comment then), so the page loads its own file as a
-# script every 2 s and compares. It keeps its filters (in its address), its scroll and the search being typed.
+# that edits a tracker, a lesson or a handoff, runs git (commit, pull, merge, rebase, push...) or claims an item,
+# and the page is rebuilt, offline, with the PRs last read. An open page reloads itself when its file changes: its
+# first lines, read as JavaScript, set the build's stamp (the rest of the file is a comment then), so the page loads
+# its own file as a script every 2 s and compares. It keeps its filters (in its address), its scroll and the search
+# being typed.
 # Where no browser can show the page (a cloud session, SSH, no display), it prints a text board instead of opening.
 #
 # Repos: the names in .claude/ground-truth.conf. An item's repos are its `repos:` line, else its section's first word
@@ -61,11 +62,11 @@ done
 [ -n "$out" ] && case $out in /*) ;; *) out="$(pwd)/$out" ;; esac
 
 # The hook: Claude Code passes the tool call as JSON. A path or a command that names a tracker, a lesson or a handoff,
-# or a git command that moves a branch, rebuilds the page; a push or a `gh pr` also reads the PRs again. A false
-# match costs one rebuild. Quiet, and never an error: a hook that fails would show in every session.
+# a git command that moves a branch, or a claim (claim.sh), rebuilds the page; a push or a `gh pr` also reads the
+# PRs again. A false match costs one rebuild. Quiet, and never an error: a hook that fails would show in every session.
 if [ "$hook" = 1 ]; then
   input=$(cat)
-  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
+  printf '%s' "$input" | grep -Eq 'BACKLOG\.md|questions\.md|lessons\.md|handoff[/\\]|claim\.sh|git [^|;&]{0,80}(commit|pull|merge|rebase|reset|revert|cherry-pick|checkout|switch|stash|push)' ||
     exit 0
   want=offline
   printf '%s' "$input" | grep -Eq 'git [^|;&]{0,80}push|gh pr ' && want=online

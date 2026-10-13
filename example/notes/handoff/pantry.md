@@ -18,7 +18,7 @@ continues: H-8
 | B-16: ingredient backfill, 340 batches into staging | `pantry-backfill.service` (systemd-run --user) | ~Sat 03:00 CEST | `journalctl --user -u pantry-backfill -n 20` | `systemctl --user stop pantry-backfill` |
 
 ## Unfinished
-- web: `web-offline/` [feat/offline-list], pushed, IndexedDB cache done, edit queue not started.
+- web: `web-offline/` [feat/offline-list], pushed, IndexedDB cache done, edit queue not started, B-12: claim kept.
 
 ## Done
 - B-11 Search recipes by ingredient: #39 merged.

@@ -22,6 +22,14 @@ GROUND TRUTH — 2026-10-12 09:14 CEST
 == workspace docs (.)
   c44efa9 10-09 18:42: ahead 0 / behind 0 of origin/main, 0 uncommitted
 
+== claims (BACKLOG.md, shared on origin/main)
+  B-7 Unit conversion on import: claude@pantry on fix/unit-conversion
+      api: last commit 10-09 17:55, = origin/fix/unit-conversion
+  B-15 Import rejects recipes with no yield: claude@api-yield on fix/yield-default
+      api: last commit 10-01 16:40, = origin/fix/yield-default, ⚠ STALE: no commit for 10 days
+  B-12 Shopping list works offline: claude@pantry on feat/offline-list
+      web: last commit 10-09 19:20, ahead 2 / behind 0 of origin/feat/offline-list
+
 == background (transient user units of this project)
   pantry-backfill.service: failed, since Sat 2026-10-10 01:12:44 CEST
 

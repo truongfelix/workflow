@@ -56,6 +56,11 @@ independent of any project, session, machine or owner.
 **Cut the backlog along file trees.** One section per repo or tree, so parallel sessions or worktrees each take a
 section and merge cleanly. An item that spans trees is marked ⚠ and runs alone, producer first.
 
+**A claim is a push.** A session takes an item before any work on it by pushing a line that names the item, the
+session and the branch. Git refuses the second of two pushes, and that refusal is the lock: no server and no lock
+file that could disagree with the remote. The ground truth follows the branch a claim names, so a claim whose
+session stopped shows as stale instead of holding its item forever.
+
 **Decisions are never self-serve.** An owner question carries the options and a recommendation, and names things by
 what the owner sees (a screen's title), not by a code name the owner never saw. A list of concrete choices gets
 answered; a vague "what do you think about X" does not.

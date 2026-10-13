@@ -10,8 +10,10 @@ believes them and builds on them.
 This template keeps a project going across sessions, machines and weeks with three skills and a script:
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
-  worktree against its remote, open PRs and their CI, background jobs. Then it reads the last handoff, reports
-  where the two disagree, proposes the day's task, and waits for you (or starts it, if you told it to).
+  worktree against its remote, open PRs and their CI, the items other sessions claimed and their branches,
+  background jobs. Then it reads the last handoff, reports where the two disagree, proposes the day's task, and
+  waits for you (or starts it, if you told it to). The task is claimed before any work on it: `claim.sh` pushes a
+  `claimed:` line, so two sessions in parallel never take the same item.
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
   decisions, lessons learned), and commits.
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history. A hook
@@ -48,6 +50,8 @@ Waiting for you
 - "Metric only on the shopping list?" I recommend metric only: it matches #41, and a switch can
   come later.
 - spike/pwa-cache: push it, keep it local on purpose, or delete it?
+- "Import rejects recipes with no yield" was claimed on 1 Oct by another session (api-yield),
+  and its branch has had no commit since: release it, so a session can take it?
 
 I'd start with 1: it is small, and the release waits on it. Which one?
 ```
@@ -92,8 +96,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, and branches that must never be pushed |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs; `claim.sh`, which takes an item for a session; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item), `/handoff` and `/board` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers or the git history |
 
 It fits a single repo, or a workspace folder holding several repos (a fork, an app, a backend) with a docs repo of
@@ -192,13 +196,13 @@ template/                     copied into a project's root by bin/adopt.sh
   dot-claude/                 installed as .claude/
     ground-truth.conf         what the ground truth looks at: the project's repos
     settings.json             the hook that rebuilds the board after each change
-    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,board.sh}
+    skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,board.sh}
     skills/handoff/SKILL.md
     skills/board/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh, claim.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used

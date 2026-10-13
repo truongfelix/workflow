@@ -27,7 +27,7 @@ echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 # A Windows checkout must still give bash LF scripts (.gitattributes).
 for f in bin/adopt.sh template/dot-claude/skills/session-start/ground-truth.sh \
   template/dot-claude/skills/session-start/items.sh template/dot-claude/skills/session-start/board.sh \
-  template/dot-claude/ground-truth.conf; do
+  template/dot-claude/skills/session-start/claim.sh template/dot-claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
 done
 
@@ -56,7 +56,7 @@ for f in "${SKILLS[@]}"; do
   check "${f#"$WF"/}: no rule of its own for asking" lacks "$f" "handoff rule"
 done
 for r in "Start the day's task after the brief" "Commit the docs" "Push the docs" "Add an item to the backlog" \
-  "Commit code" "Push a work branch" "Stop a background job this session started"; do
+  "Claim an item" "Commit code" "Push a work branch" "Stop a background job this session started"; do
   check "the row \"$r\", named by a skill, is in the table" \
     eval 'steps "$CT" | grep -q "^$r" && cat "${SKILLS[@]}" | grep -qF "\"$r\""'
 done
@@ -114,6 +114,35 @@ check "ground truth: a branch on no remote" has "$T/gt.txt" "    spike: LOCAL ON
 check "ground truth: a branch kept local by rule" has "$T/gt.txt" "    keepme: local only BY RULE, never push"
 check "ground truth: the docs repo, in sync" has "$T/gt.txt" "ahead 0 / behind 0 of origin/main, 0 uncommitted"
 check "ground truth: complete" has "$T/gt.txt" "GROUND TRUTH: complete"
+check "ground truth: no claim" eval 'grep -A1 "^== claims (BACKLOG.md, shared on origin/main)$" "$T/gt.txt" | grep -qx "  none"'
+
+# Claims: B-11 on a live branch, B-12 on a branch that is gone, B-13 on a branch with no commit since January (claimed
+# then too), B-14 claimed here and not pushed.
+old=$(GIT_COMMITTER_DATE=2026-01-02T10:00:00 git -C api commit-tree 'HEAD^{tree}' -p HEAD -m old)
+git -C api branch old "$old"
+cp BACKLOG.md "$T/ws-backlog.bak"
+claims_backlog() { # [<B-14's claim>]
+  printf '%s\n' '# Demo — Backlog' '' 'next id: B-15 (last given to claude@ws)' '' '## api' '' '### 🔲 B-11 Live' \
+    'claimed: claude@ws on feat' 'Done when: done.' '' '### 🔲 B-12 Gone' 'claimed: claude@other on feat/gone' \
+    'Done when: done.' '' '### 🔲 B-13 Old' 'claimed: claude@other on old' 'Done when: done.' '' '### 🔲 B-14 Mine' \
+    ${1:+"$1"} 'Done when: done.'
+}
+claims_backlog >BACKLOG.md
+git add BACKLOG.md && GIT_COMMITTER_DATE=2026-01-02T10:00:00 git_q commit -m claims && git_q push origin main
+claims_backlog 'claimed: claude@ws on spike' >BACKLOG.md
+"$SH" "$GT" >"$T/gt-claims.txt" 2>&1
+rc=$?
+sed 's/^/      | /' "$T/gt-claims.txt"
+check "ground truth, claims: exits 0, a stale claim is a finding" [ "$rc" = 0 ]
+check "ground truth, claims: a claim, its branch, its repo, pushed or not" \
+  eval 'has "$T/gt-claims.txt" "  B-11 Live: claude@ws on feat" && has "$T/gt-claims.txt" ", ahead 1 / behind 0 of origin/feat"'
+check "ground truth, claims: a branch that is gone" has "$T/gt-claims.txt" "      ⚠ GONE: no branch feat/gone in api"
+check "ground truth, claims: a stale claim" has "$T/gt-claims.txt" \
+  "      api: last commit 01-02 10:00, LOCAL ONLY: on no remote at all, ⚠ STALE: no commit for "
+check "ground truth, claims: a live claim is not stale" [ "$(grep -c STALE "$T/gt-claims.txt")" = 1 ]
+check "ground truth, claims: a claim not pushed" has "$T/gt-claims.txt" \
+  "  B-14 Mine: claude@ws on spike, ⚠ NOT PUSHED: no other session sees it"
+cp "$T/ws-backlog.bak" BACKLOG.md && git add BACKLOG.md && git_q commit -m "no claims" && git_q push origin main
 
 # A probe that fails is UNKNOWN, never clean.
 git -C api remote set-url origin "$T/nowhere.git"
@@ -194,7 +223,7 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'BACKLOG.md:15: B-2 is given twice' 'BACKLOG.md:19: B-4: unknown field `owner:`' \
   'BACKLOG.md:18: B-4: ⚠ without a `repos:` line' 'BACKLOG.md:24: `### Done:`: not a state' \
   'BACKLOG.md:27: `B-05` is not a B- id' 'BACKLOG.md:33: B-6: text after the `Done when:` paragraph' \
-  'BACKLOG.md:3: `next id` is B-3, not above the highest id here, B-6' 'questions.md:5: ⚠ marks a cross-repo' \
+  'BACKLOG.md:3: `next id` is B-3, not above the highest id here, B-7' 'questions.md:5: ⚠ marks a cross-repo' \
   'questions.md:10: Q-1: 🟢 without a `ruled:` line' 'questions.md:14: Q-2: `ruled:` is not a YYYY-MM-DD date' \
   'questions.md:1: no `next id: Q-<n>' 'lessons.md:8: L-1 is given twice' \
   'lessons.md:11: `### 🔲`: a lesson is `### L-<n> <title>`, with no state' 'lessons.md:16: a lesson without an id' \
@@ -204,6 +233,7 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
   'web.md:6: H-4: a task in Next without an id' 'web.md:7: H-4: B-99 is in no tracker' \
   'web.md:12: H-4: no `## Running` before `## Unfinished`' 'web.md:15: H-4: `## Done` is empty' \
   'web.md:17: H-4: `## Notes` is not a section of a handoff' 'web.md:18: H-4: no `## Learned` section' \
+  'BACKLOG.md:36: B-7: `claimed:` is not `<agent>@<session> on <branch>`: claude@web' \
   'handoff/README.md:3: `next id` is H-3, not above the highest handoff, H-4'; do
   check "items.sh reports ${problem#*: }" has "$T/it-broken.txt" "$problem"
 done
@@ -440,6 +470,9 @@ hook '{"tool_name":"Bash","tool_input":{"command":"ls -la"}}'
 check "hook: a command that touches neither builds nothing" lacks "$T/hook.html" '"id":"B-4",'
 hook '{"tool_name":"Bash","tool_input":{"command":"git add BACKLOG.md && git commit -q -m \"B-4 added\""}}'
 check "hook: a git commit rebuilds the page" has "$T/hook.html" '"id":"B-4",'
+printf '%s\n' '' '### 🔲 B-5 Fifth' 'Done when: done.' >>"$T/board/BACKLOG.md"
+hook '{"tool_name":"Bash","tool_input":{"command":"bash .claude/skills/session-start/claim.sh B-5 feat/five"}}'
+check "hook: a claim rebuilds the page" has "$T/hook.html" '"id":"B-5",'
 for _ in 1 2 3 4; do hook '{"tool_name":"Write","tool_input":{"file_path":"/p/notes/lessons.md"}}' & done
 wait
 check "hook: calls at once leave no lock and no mark" [ ! -e "$T/hook.lock" -a ! -e "$T/hook.dirty" ]
@@ -502,6 +535,58 @@ check "the control: the same next id line merges without a conflict" [ $? = 0 ]
 "$SH" "$ITS" check d/BACKLOG.md >"$T/it-dup.txt" 2>&1
 check "the control: the format check exits 2" [ $? = 2 ]
 check "the control: the format check names the id given twice" has "$T/it-dup.txt" "B-4 is given twice"
+
+# Claims (notes/item-format.md, Claims): two clones claim the same item; the one that pushes second is refused, even
+# when the other's push lands between its fetch and its push (a pre-push hook makes that happen).
+mkdir "$T/claims" && cd "$T/claims" || exit 1
+CL=.claude/skills/session-start/claim.sh
+git_q init --bare remote.git && git -C remote.git symbolic-ref HEAD refs/heads/main
+git_q clone remote.git a
+git -C a symbolic-ref HEAD refs/heads/main
+mkdir -p a/.claude/skills/session-start && cp "$ITS" "$WF/template/dot-claude/skills/session-start/claim.sh" a/.claude/skills/session-start/
+printf '%s\n' '# Backlog' '' 'next id: B-4 (last given to claude@a)' '' '## api' '' '### 🔲 B-1 First' 'Done when: done.' '' \
+  '### 🔲 B-2 Second' 'Done when: done.' '' '### ⏸️ B-3 Later' 'waits: the API' 'Done when: done.' >a/BACKLOG.md
+git -C a add -A && git_q -C a commit -m start && git_q -C a push origin main
+git_q clone remote.git b
+(cd a && "$SH" "$CL" B-1 feat/one) >"$T/claim-a.txt" 2>&1
+check "claim: exits 0" [ $? = 0 ]
+check "claim: says it is claimed" has "$T/claim-a.txt" "CLAIMED: B-1 First, by claude@a on feat/one (origin/main, "
+check "claim: the line is on the remote, under the heading" \
+  [ "$(git -C remote.git show main:BACKLOG.md | sed -n '7,8p' | tr -d '\r')" = "### 🔲 B-1 First"$'\n'"claimed: claude@a on feat/one" ]
+check "claim: one commit, BACKLOG.md alone" \
+  [ "$(git -C remote.git show --format=%s --name-only main | tr '\n' ' ')" = "claim B-1  BACKLOG.md " ]
+check "claim: the default branch here shows it" \
+  eval 'has a/BACKLOG.md "claimed: claude@a on feat/one" && [ -z "$(git -C a status --porcelain)" ]'
+"$SH" "$ITS" check a/BACKLOG.md >/dev/null 2>&1
+check "claim: the result passes the format check" [ $? = 0 ]
+(cd b && "$SH" "$CL" B-1 feat/mine claude@b) >"$T/claim-b.txt" 2>&1
+check "claim: an item claimed by another session is refused (exit 1)" [ $? = 1 ]
+check "claim: the refusal names who has it" has "$T/claim-b.txt" "REFUSED: B-1 First is claimed by claude@a on feat/one"
+check "claim: after a refusal, the default branch here shows the claim" has b/BACKLOG.md "claimed: claude@a on feat/one"
+(cd a && "$SH" "$CL" B-1 feat/one) >"$T/claim-again.txt" 2>&1
+check "claim: claiming one's own item again is fine" eval '[ $? = 0 ] && has "$T/claim-again.txt" "already claimed"'
+(cd a && "$SH" "$CL" B-3 feat/three) >"$T/claim-waits.txt" 2>&1
+check "claim: an item waiting for its trigger is refused" eval '[ $? = 1 ] && has "$T/claim-waits.txt" "waits for its trigger"'
+cp a/BACKLOG.md "$T/claims-backlog.bak"
+printf '%s\n' '' '### 🔲 B-4 Only here' 'Done when: done.' >>a/BACKLOG.md
+(cd a && "$SH" "$CL" B-4 feat/four) >"$T/claim-new.txt" 2>&1
+check "claim: an item not pushed yet is refused, and says to push it" \
+  eval '[ $? = 1 ] && has "$T/claim-new.txt" "it is only here; push it first"'
+cp "$T/claims-backlog.bak" a/BACKLOG.md
+# The race: b reads B-2 unclaimed, then a claims it and pushes before b does.
+printf '#!/bin/sh\nrm -f "$0"\ncd "%s" && "%s" "%s" B-2 feat/two-a >"%s" 2>&1\nexit 0\n' \
+  "$T/claims/a" "$SH" "$CL" "$T/claim-race-a.txt" >b/.git/hooks/pre-push
+chmod +x b/.git/hooks/pre-push
+(cd b && "$SH" "$CL" B-2 feat/two-b claude@b) >"$T/claim-race.txt" 2>&1
+check "claim, a race: the second push is refused (exit 1)" [ $? = 1 ]
+check "claim, a race: the first one won" has "$T/claim-race-a.txt" "CLAIMED: B-2 Second, by claude@a on feat/two-a"
+check "claim, a race: the refusal names the winner" has "$T/claim-race.txt" \
+  "REFUSED: B-2 Second is claimed by claude@a on feat/two-a"
+check "claim, a race: one claim per item on the remote" \
+  [ "$(git -C remote.git show main:BACKLOG.md | grep -c '^claimed: ')" = 2 ]
+(cd b && "$SH" "$CL" B-1 'two words') >"$T/claim-usage.txt" 2>&1
+check "claim: a usage error exits 2" [ $? = 2 ]
+check "adopt.sh installs claim.sh, executable" [ -x "$T/ws/$CL" ]
 
 echo
 if [ "$failures" -gt 0 ]; then

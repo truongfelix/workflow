@@ -107,7 +107,7 @@ function start_file() {
     return
   }
   read_kind[fk] = 1
-  if (fk == "B") { states = "🔲 ⏸️ ⏸"; names = "open waiting waiting"; shown = "🔲 ⏸️"; fields = " repos waits " }
+  if (fk == "B") { states = "🔲 ⏸️ ⏸"; names = "open waiting waiting"; shown = "🔲 ⏸️"; fields = " claimed repos waits " }
   else if (fk == "L") { states = ""; fields = " repos " }
   else {
     states = "💬 🟢 ⏸️ ⏸"; names = "question ruling waiting waiting"; shown = "💬 🟢 ⏸️"
@@ -188,6 +188,8 @@ function field(key, val) {
     problem(FNR, id ": `ruled:` is not a YYYY-MM-DD date: " val)
   } else if (key == "replaces" && val !~ ("^" fk "-[1-9][0-9]* +[^ ]")) {
     problem(FNR, id ": `replaces:` is not `<id> <title>`: " val)
+  } else if (key == "claimed" && val !~ /^[^ @]+@[^ @]+ on [^ ]+$/) {
+    problem(FNR, id ": `claimed:` is not `<agent>@<session> on <branch>`: " val)
   }
 }
 

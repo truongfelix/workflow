@@ -25,7 +25,8 @@ holds; one that no longer holds is deleted.
 ## web
 
 ### 🔲 B-12 Shopping list works offline
-Edits made in a shop with no signal are lost. Branch `feat/offline-list`, worktree `web-offline/`.
+claimed: claude@pantry on feat/offline-list
+Edits made in a shop with no signal are lost. Worktree `web-offline/`.
 Done when: an edit made in airplane mode syncs on reconnect, conflicts resolved last-write-wins per item, tested on
 a phone.
 
@@ -76,8 +77,9 @@ silently, leaving two items numbered B-13.
 | questions | 🟢 | ruling in force |
 | questions | ⏸️ | deferred: the trigger is in `waits:` |
 
-A lesson has no state. There is no "in progress" or "done" state: work in flight is in the handoff's Next list, and a
-finished item is deleted (git keeps it). So a state can never disagree with the facts behind it.
+A lesson has no state. "In progress" and "done" are never written by hand: an item in progress has a `claimed:`
+line (Claims, below), and a finished item is deleted (git keeps it). So a state can never disagree with the facts
+behind it.
 
 ## Fields
 
@@ -85,6 +87,7 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 
 | key | on | value |
 |---|---|---|
+| `claimed` | BACKLOG items | `<agent>@<session> on <branch>`: who works on it, and where (Claims, below) |
 | `repos` | ⚠ items | the repos in the order the work runs, producer first: `api → web` |
 | `repos` | questions, optional | the repos the decision is about: `api, web`; none = the whole project |
 | `repos` | lessons, optional | the repos the lesson is about; none = the whole project |
@@ -93,7 +96,8 @@ Lowercase `key: value` lines, right under the heading, before the first body lin
 | `ruled` | 🟢 rulings | `YYYY-MM-DD`, the date of the owner's words quoted in the body |
 | `replaces` | 🟢 rulings | `<id> <title>` of the ruling this one overrides |
 
-No date fields otherwise: when an item was added, changed or closed comes from the commits that touched its id.
+No date fields otherwise: when an item was added, changed, claimed or closed comes from the commits that touched its
+id.
 `ruled` is the exception because it dates the owner's words, not a commit.
 
 **An item's repos**, for the board: its `repos:` line, else its section when the section's title starts with a repo's
@@ -109,15 +113,47 @@ name from `.claude/ground-truth.conf` (`## api`), so a BACKLOG item rarely needs
   says, the old one is rewritten and keeps its id; when two lessons merge, one keeps its id, the other is deleted,
   and the commit says so (`L-4 merged into L-2`).
 
+## Claims
+
+Two sessions must not work on one item. A session takes an item before any work on it, as the row "Claim an item"
+in `CLAUDE.md` ("What Claude does alone") allows:
+
+```bash
+bash .claude/skills/session-start/claim.sh B-12 feat/B-12-offline-list
+```
+
+It adds `claimed: <agent>@<session> on <branch>` under the item's heading, in a commit of its own (`claim B-12`) on
+the remote's default branch, and pushes it.
+- **agent:** who does the work: `claude`, a subagent's name, `owner`.
+- **session:** the worktree's folder name, unless the owner names the session (a third argument,
+  `claude@<name>`).
+- **branch:** where the work goes: the fact behind the claim, which the ground truth follows.
+
+The push is the lock. When another session pushed first, git refuses the push; the script reads the item again
+from the new tip, then claims it there, or exits 1 and names who has it: pick another item. The claim is built on
+the remote's tip, never on the files here, so it works from any branch or worktree. An item that is not on the
+remote yet is pushed before it is claimed: its id is final then, and it shows in git even if it is finished the same
+day.
+
+The ground truth lists every claim with its branch: the repo it is in, its last commit, pushed or not. It reports a
+claim not pushed (no other session sees it), a branch that is gone, and a branch with no commit for
+`CLAIM_STALE_DAYS` days (`.claude/ground-truth.conf`, 3 by default; counted from the claim when the branch is
+older): its session may have stopped without a handoff. Only the owner releases another session's claim.
+
+Releasing: when the work lands, the item is deleted, claim and all. When a session stops before that, `/handoff`
+keeps the claim with its branch pushed and named under "Unfinished", or deletes the line, and the docs push frees
+the item.
+
 ## The check
 
 `bash .claude/skills/session-start/items.sh check` reads both trackers and the lessons, and lists, with its file and
 line, each place they depart from this format: a `###` heading that does not match the shape, an unknown state or field,
 a malformed or duplicate id, a missing `next id` line or one not above every id in its file, a BACKLOG item without
 `Done when:` as its last paragraph, ⚠ without `repos:`, ⏸️ without `waits:`, 🟢 without `ruled:` or with a date not in
-`YYYY-MM-DD`, a lesson with a state, a lesson left as a bullet, with no id. Exit 0 when every item follows the format; 2
-when one does not, or when a file cannot be read: never a silent pass. Fenced code and HTML comments are skipped, so a
-tracker can show an example. It checks the handoffs too (`notes/handoff-format.md`, "The check").
+`YYYY-MM-DD`, a `claimed:` line not in the shape `<agent>@<session> on <branch>`, a lesson with a state, a lesson
+left as a bullet, with no id. Exit 0 when every item follows the format; 2 when one does not, or when a file cannot
+be read: never a silent pass. Fenced code and HTML comments are skipped, so a tracker can show an example. It checks
+the handoffs too (`notes/handoff-format.md`, "The check").
 
 ## The board
 

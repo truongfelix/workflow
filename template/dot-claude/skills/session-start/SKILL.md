@@ -14,9 +14,9 @@ open that already shipped, "done" items whose code changed since).
 ## Steps
 
 1. **Ground truth first:** `bash .claude/skills/session-start/ground-truth.sh` (repos and their worktrees against
-   the remote, LOCAL ONLY and uncommitted work, branches no worktree holds, open PRs with a CI verdict, background
-   jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2 means a probe failed: that section is UNKNOWN,
-   never "clean". An open PR is usually the active thread.
+   the remote, LOCAL ONLY and uncommitted work, branches no worktree holds, open PRs with a CI verdict, the claims
+   on BACKLOG items and their branches, background jobs; what it looks at is in `.claude/ground-truth.conf`). Exit 2
+   means a probe failed: that section is UNKNOWN, never "clean". An open PR is usually the active thread.
    Then `bash .claude/skills/session-start/items.sh check`: the format of the trackers, the lessons and the
    handoffs (`notes/item-format.md`, `notes/handoff-format.md`). Exit 2
    lists each item that breaks it, with its line (a hand edit, or a merge that gave one id twice): that goes in the
@@ -44,6 +44,10 @@ open that already shipped, "done" items whose code changed since).
      first.
    - Before proposing a `BACKLOG.md` item, re-confirm it in the code: is it still broken or missing? If it is done
      already, say so and delete it at the handoff. A fix you *depend on*: spot-check that it still holds.
+   - **Claims** → the claims section (`notes/item-format.md`, Claims). This session's own claims (`<agent>@<session>`)
+     are its work in flight: their branch is where it goes on. An item another session claimed is not proposed: it
+     is taken. A claim marked ⚠ STALE, GONE or NOT PUSHED goes in the brief: only the owner releases another
+     session's claim.
    - <!-- FILL: project-specific checks (a device, a server, a dashboard), and what is EXPECTED and not news
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
 4. **Brief the user** in under about 20 lines:
@@ -52,13 +56,20 @@ open that already shipped, "done" items whose code changed since).
      line on why now, and what "done" looks like. Default order when the user has no preference: work in flight,
      bugs users hit, decided-but-not-done (🟢), then deferred work.
      Items in different repos or `BACKLOG.md` sections can run side by side (one session or worktree each). An item
-     marked ⚠ cross-repo runs alone, in its order (producer first, then each consumer).
+     marked ⚠ cross-repo runs alone, in its order (producer first, then each consumer). An item another session
+     claimed is not on the list.
    - **Waiting for you:** the `questions.md` §1 items that block today's work, each with a recommendation, named by
      what the user sees (a screen's title, a command), not by a code name. These are never self-serve.
    - The board's path in one line: `Board: <path> (/board opens it; an open board updates itself)`.
    - End by recommending one task and asking which to start; if the row "Start the day's task after the brief" in
      CLAUDE.md ("What Claude does alone") is "do, then tell", end by naming the task you start.
-5. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
+5. **Claim the task before any work on it**, once it is started (the user's yes, or the row "Start the day's task
+   after the brief"): `bash .claude/skills/session-start/claim.sh <B-id> <branch>`, as the row "Claim an item" in
+   CLAUDE.md allows. The branch is where the work goes (`feat/B-12-offline-list`, or the branch an earlier session
+   pushed); add `<agent>@<session>` when the owner named the session. Exit 0: the item is yours, say so. Exit 1:
+   another session claimed it first, or the item is not on the remote yet (push a new item first, the row "Add an
+   item to the backlog"): tell the user, and propose another. Exit 2: nothing was claimed, say why.
+6. **Follow "What Claude does alone"** in CLAUDE.md from here on: a row set to "ask first" (commit, push, PR, merge,
    release, comments, messages, …) waits for the user's yes. Reading and checking need no OK. The user decides the
    day's priorities, and the handoff can be stale: a task the user names comes before the Next list.
 

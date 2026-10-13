@@ -13,6 +13,8 @@ is in flight today (running jobs, the task of the day) is in the handoffs, `note
   `Done when:`. ⚠ marks a cross-repo item, which runs alone in the order of its `repos:` line, producer first; never
   inside one section's batch. ⏸️ marks an item waiting for the trigger in its `waits:` line.
 - **A new item takes the id in `next id`**; the same edit raises that line and names who took it.
+- **Claim an item before any work on it**: `claim.sh` pushes its `claimed:` line (`notes/item-format.md`, Claims),
+  so no other session takes it. An item another session claimed is theirs.
 - An item is what is wrong or missing, a pointer to the detail, and when it is **done**. How it was found goes in
   the commit message.
 - **Cite an item by its id** (with its title for the reader), never by a position: positions move, ids do not.
@@ -29,11 +31,13 @@ next id: B-17 (last given to claude@pantry)
 ## api
 
 ### 🔲 B-7 Unit conversion on import
+claimed: claude@pantry on fix/unit-conversion
 Recipes imported from US sites keep cups and ounces, so the shopping list cannot add them up. PR #41, branch
 `fix/unit-conversion`.
 Done when: an imported recipe stores grams and millilitres only, and #41 is merged.
 
 ### 🔲 B-15 Import rejects recipes with no yield
+claimed: claude@api-yield on fix/yield-default
 About 4% of imports fail with `yield is required` (the backfill's log).
 Done when: a missing yield defaults to 1 serving and the recipe page flags it.
 
@@ -50,7 +54,8 @@ Done when: a search answers in under 100 ms on the full set.
 ## web
 
 ### 🔲 B-12 Shopping list works offline
-Edits made in a shop with no signal are lost. Branch `feat/offline-list`, worktree `web-offline/`.
+claimed: claude@pantry on feat/offline-list
+Edits made in a shop with no signal are lost. Worktree `web-offline/`.
 Done when: an edit made in airplane mode syncs on reconnect, conflicts resolved last-write-wins per item, tested on
 a phone.
 

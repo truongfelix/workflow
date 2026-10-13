@@ -63,6 +63,10 @@ session can find out what happened and why.
      its title, state or section changes. If the push is rejected and the rebase conflicts on that line, keep the
      remote's line and renumber your new items from it.
    - Cite items by id with their title (`B-12 Shopping list works offline`), here and in the handoff.
+   - **This session's claims** (the ground truth's claims section, `notes/item-format.md`, Claims): an item that
+     landed is deleted, claim and all. Work that stops before that keeps its claim only with its branch pushed and
+     named under "Unfinished"; otherwise delete the `claimed:` line, and the docs push (step 7) frees the item. A
+     ⚠ STALE or GONE claim of another session goes under "Waiting for the user": only the owner releases it.
    - Then `bash .claude/skills/session-start/items.sh check`: it lists each item (lessons and handoffs included)
      that departs from its format, with its line. Fix them until it exits 0, before committing (step 7); write the
      handoff (step 2) before running it.
@@ -107,7 +111,7 @@ continues: H-<n>
 |---|---|---|---|---|
 
 ## Unfinished
-- <repo>: <worktree / branch>, <uncommitted, LOCAL ONLY or pushed>, <what is left>
+- <repo>: <worktree / branch>, <uncommitted, LOCAL ONLY or pushed>, <what is left>, <its B- id: claim kept or released>
 
 ## Done
 - <id> <title>: <commit or PR, where it landed, CI>

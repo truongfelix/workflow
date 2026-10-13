@@ -11,6 +11,7 @@
 #
 # Read-only, apart from `git fetch` of the remotes named in the config (so "pushed" means pushed). --no-fetch skips
 # it. Exit 0 = every probe answered. Exit 2 = at least one probe failed: its section says UNKNOWN, never "clean".
+# A claim that is stale, gone or not pushed is a finding, not a failure.
 #
 # Usage: bash .claude/skills/session-start/ground-truth.sh [--no-fetch]
 
@@ -26,6 +27,7 @@ CONF="$ROOT/.claude/ground-truth.conf"
 REPOS=("$(basename "$ROOT")|.|origin||")
 KEEP_LOCAL=""
 UNITS=1
+CLAIM_STALE_DAYS=3
 # shellcheck source=/dev/null
 [ -f "$CONF" ] && . "$CONF"
 
@@ -73,6 +75,8 @@ with_timeout() { # <seconds> <command...>
 echo "GROUND TRUTH — $(date '+%Y-%m-%d %H:%M %Z')"
 
 root_listed=0
+DOCS_BASE="" # where the claims are shared: the default branch of the docs repo on its remote
+R_NAME=() R_DIR=() R_REMOTE=() R_BASE=() R_DEF=()
 for spec in "${REPOS[@]}"; do
   IFS='|' read -r name dir remote def gh_repo <<<"$spec"
   case $dir in /*) repo=$dir ;; *) repo="$ROOT/$dir" ;; esac
@@ -111,6 +115,8 @@ for spec in "${REPOS[@]}"; do
       gh_repo=${gh_repo%.git}
     fi
   fi
+  R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def")
+  [ "$repo" -ef "$ROOT" ] && DOCS_BASE=$base
 
   # A commit our remote does not hold: is it at least on another remote, or only on this disk?
   elsewhere() {
@@ -222,6 +228,9 @@ if [ "$root_listed" = 0 ]; then
     last=$(git -C "$ROOT" log -1 --format='%h %cd' --date=format:'%m-%d %H:%M' 2>/dev/null)
     # for-each-ref, not `rev-parse @{upstream}`: with no commit yet, rev-parse echoes the literal "@{upstream}".
     up=$(git -C "$ROOT" for-each-ref --format='%(upstream:short)' "$(git -C "$ROOT" symbolic-ref -q HEAD)" 2>/dev/null)
+    for d in "$(git -C "$ROOT" symbolic-ref -q --short refs/remotes/origin/HEAD)" origin/main origin/master; do
+      [ -n "$d" ] && git -C "$ROOT" rev-parse -q --verify "refs/remotes/$d" >/dev/null && { DOCS_BASE=$d; break; }
+    done
     if [ -z "$last" ]; then
       echo "  no commit yet, $dirty uncommitted"
     elif [ -n "$up" ] && git -C "$ROOT" rev-parse -q --verify "$up" >/dev/null; then
@@ -231,6 +240,114 @@ if [ "$root_listed" = 0 ]; then
       echo "  $last: NO upstream (not pushed anywhere), $dirty uncommitted"
     fi
   fi
+fi
+
+# Claims (notes/item-format.md, Claims): each `claimed:` line of BACKLOG.md, as pushed to DOCS_BASE and as here, with
+# the branch it names in the item's repos (its `repos:` line, else its section's first word, as on the board; all
+# the repos when neither names one). A claim not pushed is no claim yet: no other session sees it. A branch that is
+# gone, or has had no commit for CLAIM_STALE_DAYS days (counted from the claim when the branch is older), holds an
+# item for a session that may have stopped. Parsed in bash, not awk: titles hold emoji (macOS awk, notes/lessons.md).
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed item
+  local rec f kv c r
+  "${BASH:-bash}" "$HERE/items.sh" list "$1" 2>"$CT/err" | grep "^I$(printf '\t')" | grep -F 'claimed: ' |
+    while IFS= read -r rec; do
+      f=$(printf '%s\n' "$rec" | cut -f9) c="" r="" # the fields: `key: value` lines joined by a literal \n
+      while [ -n "$f" ]; do
+        kv=${f%%\\n*}
+        if [ "$kv" = "$f" ]; then f=""; else f=${f#*\\n}; fi
+        case $kv in "claimed: "*) c=${kv#claimed: } ;; "repos: "*) r=${kv#repos: } ;; esac
+      done
+      [ -n "$c" ] || continue
+      if [ -n "$r" ]; then
+        r=${r//→/ } r=${r//->/ } r=${r//,/ }
+      else
+        r=$(printf '%s\n' "$rec" | cut -f7) r=${r%%[[:space:](:/]*}
+      fi
+      printf '%s\t%s\t%s\t%s\n' "$(printf '%s\n' "$rec" | cut -f4)" "$c" "$r" "$(printf '%s\n' "$rec" | cut -f8)"
+    done
+}
+echo
+echo "== claims (BACKLOG.md${DOCS_BASE:+, shared on $DOCS_BASE})"
+CT=$(mktemp -d "${TMPDIR:-/tmp}/ground-truth.XXXXXX") || { unknown "mktemp failed: claims not read"; CT=""; }
+if [ -n "$CT" ]; then
+  trap 'rm -rf "$CT"' EXIT
+  : >"$CT/here" && : >"$CT/there"
+  if [ -f "$ROOT/BACKLOG.md" ]; then
+    claims "$ROOT/BACKLOG.md" >"$CT/here"
+    grep -q UNKNOWN "$CT/err" && unknown "items.sh could not read BACKLOG.md: $(cat "$CT/err")"
+  fi
+  bpath="$(git -C "$ROOT" rev-parse --show-prefix 2>/dev/null)BACKLOG.md"
+  if [ -n "$DOCS_BASE" ] && git -C "$ROOT" show "$DOCS_BASE:$bpath" >"$CT/BACKLOG.md" 2>/dev/null; then
+    claims "$CT/BACKLOG.md" >"$CT/there"
+  fi
+  [ -z "$DOCS_BASE" ] && [ -s "$CT/here" ] && echo "  ⚠ the docs repo has no remote branch: these claims are seen here only"
+  # Each claim once: "both" (pushed and here), "there" (pushed, not pulled here), "here" (not pushed).
+  cut -f1,2 "$CT/here" >"$CT/here.keys"
+  cut -f1,2 "$CT/there" >"$CT/there.keys"
+  {
+    while IFS= read -r l; do
+      if grep -qxF "$(printf '%s\n' "$l" | cut -f1,2)" "$CT/here.keys"; then printf '%s\tboth\n' "$l"
+      else printf '%s\tthere\n' "$l"; fi
+    done <"$CT/there"
+    while IFS= read -r l; do
+      grep -qxF "$(printf '%s\n' "$l" | cut -f1,2)" "$CT/there.keys" || printf '%s\there\n' "$l"
+    done <"$CT/here"
+  } >"$CT/all"
+  [ -s "$CT/all" ] || echo "  none"
+  now=$(date +%s)
+  while IFS= read -r l; do
+    cid=$(printf '%s\n' "$l" | cut -f1) claim=$(printf '%s\n' "$l" | cut -f2) crepos=$(printf '%s\n' "$l" | cut -f3)
+    ctitle=$(printf '%s\n' "$l" | cut -f4) where=$(printf '%s\n' "$l" | cut -f5)
+    branch=${claim#* on }
+    case $where in
+      here) note="${DOCS_BASE:+, ⚠ NOT PUSHED: no other session sees it}"; claimed_at=$now ;;
+      *) [ "$where" = there ] && note=" (on $DOCS_BASE, not here yet: pull)" || note=""
+         claimed_at=$(git -C "$ROOT" log -1 --format=%ct -S"claimed: $claim" "$DOCS_BASE" -- "$bpath" 2>/dev/null)
+         claimed_at=${claimed_at:-$now} ;;
+    esac
+    echo "  $cid $ctitle: $claim$note"
+    # The candidate repos: those the item names, else all of them.
+    cands=()
+    for w in $crepos; do
+      for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do [ "${R_NAME[$i]}" = "$w" ] && cands+=("$i"); done
+    done
+    [ ${#cands[@]} = 0 ] && cands=(${R_NAME[@]+"${!R_NAME[@]}"})
+    found=0 names=""
+    for i in ${cands[@]+"${cands[@]}"}; do
+      r=${R_DIR[$i]} rem=${R_REMOTE[$i]} rbase=${R_BASE[$i]}
+      names="$names${names:+, }${R_NAME[$i]}"
+      if git -C "$r" rev-parse -q --verify "refs/heads/$branch" >/dev/null; then ref="refs/heads/$branch"
+      elif git -C "$r" rev-parse -q --verify "refs/remotes/$rem/$branch" >/dev/null; then ref="refs/remotes/$rem/$branch"
+      else ref=$(git -C "$r" for-each-ref --count=1 --format='%(refname)' "refs/remotes/*/$branch"); fi
+      [ -n "$ref" ] || continue
+      found=1
+      tip_at=$(git -C "$r" log -1 --format=%ct "$ref")
+      when=$(git -C "$r" log -1 --format=%cd --date=format:'%m-%d %H:%M' "$ref")
+      case $ref in
+        refs/heads/*)
+          up=$(git -C "$r" for-each-ref --format='%(upstream:short)' "$ref")
+          [ -n "$up" ] && ! git -C "$r" rev-parse -q --verify "$up" >/dev/null && up=""
+          [ -z "$up" ] && git -C "$r" rev-parse -q --verify "refs/remotes/$rem/$branch" >/dev/null && up="$rem/$branch"
+          if [ -n "$up" ]; then
+            st=$(git -C "$r" rev-list --left-right --count "$ref...$up" |
+              awk -v u="$up" '{ if ($1==0 && $2==0) print "= " u; else printf "ahead %d / behind %d of %s\n", $1, $2, u }')
+          else
+            other=$(git -C "$r" for-each-ref --count=1 --contains "$ref" --format='%(refname:short)' refs/remotes)
+            if [ -n "$other" ]; then st="not on $rem, only on $other"; else st="LOCAL ONLY: on no remote at all"; fi
+          fi ;;
+        *) st="no local branch, on ${ref#refs/remotes/}" ;;
+      esac
+      [ -n "$rbase" ] && [ "$branch" != "${R_DEF[$i]}" ] && git -C "$r" merge-base --is-ancestor "$ref" "$rbase" &&
+        st="$st, no commit of its own beyond $rbase (merged, or not started)"
+      since=$claimed_at
+      [ "$tip_at" -gt "$since" ] && since=$tip_at
+      days=$(((now - since) / 86400))
+      [ "$days" -ge "$CLAIM_STALE_DAYS" ] && st="$st, ⚠ STALE: no commit for $days days"
+      echo "      ${R_NAME[$i]}: last commit $when, $st"
+    done
+    [ "$found" = 0 ] && echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
+  done <"$CT/all"
 fi
 
 # Background work started with `systemd-run --user` is a TRANSIENT unit; keep the ones whose working directory or

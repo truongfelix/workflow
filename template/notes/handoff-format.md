@@ -32,7 +32,7 @@ continues: H-11
 None.
 
 ## Unfinished
-- web: `web-offline/` on `feat/B-12-offline-list`, pushed; the edit queue is not started.
+- web: `web-offline/` on `feat/B-12-offline-list`, pushed; the edit queue is not started; B-12: claim kept.
 
 ## Done
 - B-11 Search recipes by ingredient: #39 merged.
