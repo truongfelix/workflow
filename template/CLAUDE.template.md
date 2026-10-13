@@ -26,9 +26,8 @@ and wait for a yes. **do, then tell**: do it, then say so in your next message, 
 the handoffs, the trackers, `notes/`, this file and `.claude/`: a push whose new commits hold only docs is "Push the
 docs", on any branch, the default one included.
 
-<!-- FILL: ask the owner for a preset (the last bullet below), listing the steps in plain words and naming no file
-(README, "Adopt in a new project", step 4), then whether to keep it or change some steps, each step then an option
-to pick or not, with its answer; set the rows, then delete this comment. Until then every row is Careful. -->
+<!-- FILL: ask the owner for a preset with the /autonomy skill (.claude/skills/autonomy/SKILL.md), then whether to
+keep it or change some steps; it sets the rows and deletes this comment. Until then every row is Careful. -->
 
 | Step | Here |
 |---|---|
@@ -47,8 +46,8 @@ to pick or not, with its answer; set the rows, then delete this comment. Until t
 | Comment, or message anyone | ask first |
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
-- The owner changes a row at any time ("from now on, push the docs without asking"): edit the row here, at once; it
-  holds from the next action on.
+- The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,
+  which shows the steps to pick: edit the row here, at once; it holds from the next action on.
 - An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
   its ask-first steps in one question.
 - Presets, for setup or a reset: **Careful** asks first on every row. **Balanced** asks first to start the day's

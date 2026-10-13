@@ -7,7 +7,7 @@ end of the day and reads the next morning. It works until the notes are wrong: a
 reached the remote, a job "still running" that died at 1 a.m., a to-do that shipped last week. The next session
 believes them and builds on them.
 
-This template keeps a project going across sessions, machines and weeks with three skills and a script:
+This template keeps a project going across sessions, machines and weeks with four skills and a script:
 
 - **`/session-start`** runs `ground-truth.sh`, which reads the facts from git, GitHub and the machine: every repo and
   worktree against its remote (or the branch it tracks on another one), open PRs and their CI, the items other
@@ -22,6 +22,8 @@ This template keeps a project going across sessions, machines and weeks with thr
   each claimed item where its work is: on which machine, pushed or not, in an open PR with its CI, or merged. A hook
   rebuilds it after each change, and an open tab updates itself. Where no browser can show it (a cloud session,
   SSH), it prints the open items instead.
+- **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
+  release, …), and changes it: a preset, or the steps you pick from a list.
 
 The handoff is a claim; the script is the fact. Both skills run the same script, so the session that writes the
 note and the session that reads it look at the same picture.
@@ -81,8 +83,9 @@ Then open Claude Code in your project and ask:
 Claude first asks for your project's git remote, then what it may do without asking you (commit, push, open a PR,
 merge, …: a preset, then any change), then fills in the blanks (what the project is, its repos, its rules), runs
 the ground truth until it comes back clean, and runs `/handoff` once to write the first handoff. You change any of
-those answers whenever you want: "from now on, push the docs without asking". From then on: `/session-start` when
-you sit down, `/handoff` before you stop, `/board` whenever you want to see the work at a glance.
+those answers whenever you want, in words ("from now on, push the docs without asking") or with `/autonomy`. From
+then on: `/session-start` when you sit down, `/handoff` before you stop, `/board` whenever you want to see the work
+at a glance.
 
 ## What you get
 
@@ -157,21 +160,9 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    left unanswered, is asked again in the chat: never write an answer the owner did not give (a folder's name is not
    what the project is). A question where the owner can pick several has an option "None of these": with nothing
    picked, it returns no answer at all, which reads as a skip.
-   - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Ask the owner for a preset as a
-     multiple-choice question, and list in it the steps the preset decides: start the day's task, commit the docs
-     (the notes and trackers), push them, add an item to the backlog, claim one, commit code, push a work branch,
-     open a pull request, merge one (or push code to the default branch), delete a branch whose work has landed,
-     stop a background job it started, release, comment or message anyone. Each option says which of them Claude
-     asks about first and which it does, then tells: **Careful** asks first for every one; **Balanced** asks first
-     to start the day's task, to open or merge a pull request, to release, and to comment or message; **Hands-off**
-     asks first only to release, and to comment or message. Then ask whether to keep that preset as it is or to
-     change some steps, a question with these two options. Only on "change some steps", ask which, with one option
-     per step that the owner picks or not, each showing the preset's answer ("Commit code: does it, then tells
-     you"); a picked step takes the other answer. Five questions hold the steps, with at most three each next to
-     "None of these": the docs (commit them, push them), the backlog (add an item, claim one), code (commit code,
-     push a work branch, delete a branch whose work has landed), sharing (open a pull request, merge one, release),
-     and the rest (start the day's task, stop a background job, comment or message). Four are asked at once, then
-     the fifth. Set the table's rows, then delete its FILL comment.
+   - `CLAUDE.md`, **What Claude does alone**, first: the steps below follow it. Follow the `/autonomy` skill
+     (`.claude/skills/autonomy/SKILL.md`): the owner picks a preset, with each step listed in plain words, then keeps
+     it or picks the steps to switch. Its script sets the rows and deletes the FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
      upstream), and KEEP_LOCAL for branches that must never be pushed.
    - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
@@ -207,7 +198,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's
    task), `/handoff` before you stop or switch machines (it records where things stand, so the next session picks
    up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the
-   handoffs as one page).
+   handoffs as one page), `/autonomy` whenever you want Claude to ask you more or less often (it shows each step
+   and what Claude does there, and changes the ones you pick).
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
@@ -251,10 +243,11 @@ template/                     copied into a project's root by bin/adopt.sh
     skills/session-start/{SKILL.md,ground-truth.sh,items.sh,claim.sh,gate.sh,board.sh}
     skills/handoff/SKILL.md
     skills/board/SKILL.md
+    skills/autonomy/{SKILL.md,autonomy.sh}
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project, and the brief /session-start gave on it
-test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, gate.sh, board.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
+test/run.sh                   tests adopt.sh, ground-truth.sh, items.sh (show too), claim.sh, gate.sh, board.sh, autonomy.sh and the table "What Claude does alone"; CI runs it on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
 memory/README.md              how the memory layer is used

@@ -28,6 +28,7 @@ echo "bash $BASH_VERSION, $(uname -s), $(git --version)"
 for f in bin/adopt.sh template/dot-claude/skills/session-start/ground-truth.sh \
   template/dot-claude/skills/session-start/items.sh template/dot-claude/skills/session-start/board.sh \
   template/dot-claude/skills/session-start/claim.sh template/dot-claude/skills/session-start/gate.sh \
+  template/dot-claude/skills/autonomy/autonomy.sh \
   template/dot-claude/ground-truth.conf; do
   check "$f has LF line endings" lf_only "$WF/$f"
 done
@@ -61,6 +62,59 @@ for r in "Start the day's task after the brief" "Commit the docs" "Push the docs
   check "the row \"$r\", named by a skill, is in the table" \
     eval 'steps "$CT" | grep -q "^$r" && cat "${SKILLS[@]}" | grep -qF "\"$r\""'
 done
+
+# /autonomy (template/dot-claude/skills/autonomy): autonomy.sh reads and sets the table's rows, by a preset or step by
+# step, and deletes the setup's FILL comment once the owner has chosen. Its presets are the template's last bullet.
+AU="$WF/template/dot-claude/skills/autonomy/autonomy.sh"
+norm() { sed '/<!-- FILL: ask the owner for a preset/,/-->/d; s/| ask first |$/| ? |/; s/| do, then tell |$/| ? |/' "$1" | cat -s; }
+cp "$CT" "$T/au.md"
+"$SH" "$AU" show -f "$T/au.md" >"$T/au-show.txt" 2>&1
+check "autonomy show: the template's table is Careful, each step with its answer" \
+  eval '[ $? = 0 ] && has "$T/au-show.txt" "preset: Careful" &&
+    [ "$(grep -c "ask first$" "$T/au-show.txt")" = "$(rows "$CT" | wc -l | tr -d " ")" ]'
+"$SH" "$AU" preset balanced -f "$T/au.md" >"$T/au-bal.txt" 2>&1
+check "autonomy preset balanced: asks first to start the day's task, open or merge a PR, release, message" \
+  [ "$(rows "$T/au.md" | grep '| ask first |$' | sed 's/ | ask first |$//; s/^| //' | tr '\n' ';')" = \
+    "Start the day's task after the brief;Open a pull request;Merge a pull request, or push code to a default branch;Release: tag, publish;Comment, or message anyone;" ]
+check "autonomy preset balanced: does the rest, then tells" [ "$(rows "$T/au.md" | grep -c '| do, then tell |$')" = 8 ]
+check "autonomy preset: says the preset the rows make" has "$T/au-bal.txt" "preset: Balanced"
+check "autonomy preset: the setup's FILL comment is gone" lacks "$T/au.md" "FILL: ask the owner for a preset"
+check "autonomy: nothing but the rows and the FILL comment changes" [ "$(norm "$CT")" = "$(norm "$T/au.md")" ]
+"$SH" "$AU" ask "Commit code" -f "$T/au.md" >"$T/au-ask.txt" 2>&1
+check "autonomy ask: a step by its text, then the closest preset and what differs" \
+  eval '[ $? = 0 ] && has "$T/au.md" "| Commit code | ask first |" &&
+    has "$T/au-ask.txt" "preset: none, closest Balanced, 1 step(s) switched: Commit code"'
+"$SH" "$AU" tell 6 "claim an item" -f "$T/au.md" >/dev/null 2>&1
+check "autonomy tell: a step by its number, or the start of its text in any case" \
+  eval '[ $? = 0 ] && has "$T/au.md" "| Commit code | do, then tell |" &&
+    has "$T/au.md" "| Claim an item (commit and push its claim line) | do, then tell |"'
+cp "$T/au.md" "$T/au.bak"
+"$SH" "$AU" tell Push -f "$T/au.md" >/dev/null 2>&1
+check "autonomy: a step that is not one row exits 1 and changes nothing" eval '[ $? = 1 ] && cmp -s "$T/au.md" "$T/au.bak"'
+"$SH" "$AU" preset hands-off -f "$T/au.md" >/dev/null 2>&1
+check "autonomy preset hands-off: asks first only to release, and to comment or message" \
+  [ "$(rows "$T/au.md" | grep -c '| ask first |$')" = 2 ]
+"$SH" "$AU" preset Careful -f "$T/au.md" >/dev/null 2>&1
+check "autonomy preset careful: the template's rows again" [ "$(rows "$T/au.md")" = "$(rows "$CT")" ]
+"$SH" "$AU" show -f "$CE" >"$T/au-ex.txt" 2>&1
+check "autonomy show: the example is Careful but for the docs" \
+  has "$T/au-ex.txt" "preset: none, closest Careful, 2 step(s) switched: Commit the docs; Push the docs"
+printf '%s\n' '## What Claude does alone' '' '| Step | Here |' '|---|---|' '| Commit code | ask first |' \
+  '| Deploy to production | ask first |' '' '## Rules' >"$T/au2.md"
+"$SH" "$AU" preset balanced -f "$T/au2.md" >"$T/au2.txt" 2>&1
+check "autonomy: a preset never makes a row of the project's own a step done alone" \
+  eval 'has "$T/au2.md" "| Deploy to production | ask first |" && has "$T/au2.md" "| Commit code | do, then tell |" &&
+    has "$T/au2.txt" "own rows (no preset names them): Deploy to production"'
+printf '%s\n' '## What Claude does alone' '' '| Step | Here |' '|---|---|' '| Commit code | maybe |' >"$T/au3.md"
+cp "$T/au3.md" "$T/au3.bak"
+"$SH" "$AU" preset balanced -f "$T/au3.md" >"$T/au3.txt" 2>&1
+check "autonomy: a row answered neither way is UNKNOWN (exit 2), nothing written" \
+  eval '[ $? = 2 ] && has "$T/au3.txt" "UNKNOWN: the row \"Commit code\" answers \"maybe\"" && cmp -s "$T/au3.md" "$T/au3.bak"'
+"$SH" "$AU" show -f "$T/nowhere.md" >/dev/null 2>&1
+check "autonomy: no CLAUDE.md is UNKNOWN (exit 2)" [ $? = 2 ]
+awk '{ printf "%s\r\n", $0 }' "$CT" >"$T/au4.md"
+"$SH" "$AU" preset balanced -f "$T/au4.md" >/dev/null 2>&1
+check "autonomy: a CRLF file keeps CRLF" [ "$(tr -cd '\r' <"$T/au4.md" | wc -c | tr -d ' ')" = "$(wc -l <"$T/au4.md" | tr -d ' ')" ]
 
 # The workspace: ws/ is the docs repo, ws/api a code repo, ws/api-feat its worktree.
 cd "$T" || exit 1
@@ -797,6 +851,8 @@ check "claim, a race: one claim per item on the remote" \
 (cd b && "$SH" "$CL" B-1 'two words') >"$T/claim-usage.txt" 2>&1
 check "claim: a usage error exits 2" [ $? = 2 ]
 check "adopt.sh installs claim.sh, executable" [ -x "$T/ws/$CL" ]
+check "adopt.sh installs /autonomy, its script executable" \
+  [ -f "$T/ws/.claude/skills/autonomy/SKILL.md" -a -x "$T/ws/.claude/skills/autonomy/autonomy.sh" ]
 
 # gate.sh: a repo's gate, and a receipt for each commit that passed it on a clean tree. The gate rules a project keeps
 # (GATE_RULES) and what holds each: "receipt" the pre-push hook, "merge" the ground truth, "regression" /handoff.
