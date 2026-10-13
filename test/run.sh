@@ -176,6 +176,12 @@ check "adopt.sh: BACKLOG.md does not carry the rules, the item format does" \
   eval 'lacks BACKLOG.md "Only approved items are built" && has notes/item-format.md "Only approved items are built"'
 check "adopt.sh: questions.md does not carry the rules, and points to the item format" \
   eval 'lacks questions.md "moves to §2 as" && has questions.md "The rules of the two trackers"'
+# B-57: an item is done when its work has landed, said the same way in the item format and both skills.
+check "adopt.sh: the item format says the owner never has to say done" has notes/item-format.md "the owner never has to say \"done\""
+check "adopt.sh: /handoff deletes a landed item without the owner's word" \
+  eval 'tr -s "\n " "  " <.claude/skills/handoff/SKILL.md | grep -qF "word \"done\" is not needed"'
+check "adopt.sh: /session-start deletes landed work and does not ask" \
+  eval 'tr -s "\n " "  " <.claude/skills/session-start/SKILL.md | grep -qF "the owner is not asked whether it is done"'
 # B-54: a config still holding its FILL lines is a finding in the ground truth, until the lines are gone.
 mkdir "$T/fresh" && (cd "$T/fresh" && git_q init -b main && "$SH" "$WF/bin/adopt.sh" . >/dev/null 2>&1)
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)

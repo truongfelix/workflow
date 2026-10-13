@@ -163,9 +163,12 @@ the item. A new session has a new name: going on with a claim its handoff kept, 
   once the owner approved it: with a yes when it is added or when its work starts (`CLAUDE.md`, the rows "Add an item
   to the backlog" and "Start the day's task after the brief"). So nothing is built that the file does not show, and it
   stays the whole list of the work.
-- **No finished work.** When an item lands, delete it; git has the history. A done entry rots while still reading as
-  authoritative. The commit that deletes it says where it landed (a commit hash, a PR number), so the board leads from
-  the closed item to the work. Measured results go to `notes/`.
+- **No finished work.** An item is done when its work has landed: pushed with its checks passed and CI green, or
+  merged. The session deletes it at once and says so in its next message; the owner never has to say "done", and the
+  session does not ask. The item stays when its `Done when:` needs something the work did not give (a trial, a
+  decision). Git has the history; a done entry rots while still reading as authoritative. The commit that deletes it
+  says where it landed (a commit hash, a PR number), so the board leads from the closed item to the work. Measured
+  results go to `notes/`.
 - **Sections are cut along repos or file trees**, so one session (or one worktree) can take a section while another
   session takes another, and their work merges cleanly. A ⚠ cross-repo item runs alone, in the order of its `repos:`
   line, producer first; never inside one section's batch.
