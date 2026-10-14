@@ -1707,6 +1707,14 @@ check "rules per repo: a release tag with no receipt is refused where the rule r
 (cd web && git tag -a v1.0.0 -m one && git push origin v1.0.0) >"$T/rr-push-web.txt" 2>&1
 check "rules per repo: the same tag goes where the repo keeps no rule" \
   eval '[ $? = 0 ] && [ -n "$(git -C web ls-remote --tags origin v1.0.0)" ]'
+# B-88: from a linked worktree, git gives the hook GIT_DIR; the hook still finds the repo pushed (api, not web, the
+# last of REPOS, which keeps no rule) and refuses the tag as it does from the main folder.
+git -C api worktree add -q "$T/rr-api-wt" -b wt-b88 >/dev/null 2>&1
+(cd "$T/rr-api-wt" && git_q commit --allow-empty -m "never gated" && git tag -a v1.0.2 -m two && git push origin v1.0.2) \
+  >"$T/rr-push-wt.txt" 2>&1
+check "rules per repo: a release tag with no receipt is refused from a linked worktree too (B-88)" \
+  eval '[ $? != 0 ] && has "$T/rr-push-wt.txt" "REFUSED: v1.0.2 is on " && [ -z "$(git -C api ls-remote --tags origin v1.0.2)" ]'
+git -C api worktree remove --force "$T/rr-api-wt" && git -C api branch -q -D wt-b88 && git -C api tag -d v1.0.2 >/dev/null
 "$SH" $RR/board.sh --no-open --offline --out "$T/rr-board.html" "$T/rr" >/dev/null 2>&1
 check "rules per repo: the board has the rules of that repo, none and no preset (B-83)" has "$T/rr-board.html" '"repoRules":[["web","",""]]'
 # Only the repo at the project root holds the docs: in a code repo, a notes/ folder is code, and needs the gate (B-65).

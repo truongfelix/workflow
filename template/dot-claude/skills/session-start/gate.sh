@@ -44,6 +44,10 @@
 #   error, or nothing could be read (UNKNOWN).
 
 set -uo pipefail
+# Each repo is found by its folder. Git runs a hook in a linked worktree with GIT_DIR set to that worktree's: left in
+# place, every repo of REPOS would answer with the pushed one's git folder, and the hook would take another repo's
+# rules for it (B-88). The hook runs in the pushed checkout's folder, which finds its repo by itself.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR
 
 usage() { echo "usage: $0 run [<repo>] | check [<repo>] [<rev>] | ci [<repo>] [<rev>] | hook [<repo>]" >&2; exit 2; }
 fail() { echo "UNKNOWN: $*"; exit 2; }
