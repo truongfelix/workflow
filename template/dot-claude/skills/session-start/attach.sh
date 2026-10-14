@@ -72,25 +72,29 @@ if [ "$repo" -ef "$ROOT" ]; then
   fail "$repo is the project root: the docs repo is listed already, or list it by hand"
 fi
 
-# Its line in REPOS: a REPOS+= line, the same list in bash, right after the end of the REPOS=( ... ) array (its first
-# line ending in ")" from "REPOS=(" on). Lines are copied as they are.
+# Its line in REPOS: a REPOS+= line, the same list in bash, after the last line of the list (the end of the
+# REPOS=( ... ) array, its first line ending in ")" from "REPOS=(" on, or of a REPOS+=( ... ) line after it), so the
+# repos keep the order they were attached in. Lines are copied as they are.
 if [ "$new" = 1 ]; then
   entry="$name|$dir|$remote|$branch|$gh"
-  tmp=$(mktemp "$CONF.XXXXXX") || fail "cannot write beside $CONF"
-  state=before
+  last=0 n=0 state=out
   while IFS= read -r line || [ -n "$line" ]; do
-    printf '%s\n' "$line" >>"$tmp"
-    if [ "$state" = before ]; then
-      case $line in REPOS=\(*) state=in ;; esac
+    n=$((n + 1)) stripped=${line%$'\r'}
+    if [ "$state" = out ]; then
+      case $stripped in REPOS=\(* | REPOS+=\(*) state=in ;; esac
     fi
     if [ "$state" = in ]; then
-      stripped=${line%$'\r'}
-      case $stripped in
-        *\)) printf 'REPOS+=("%s")\n' "$entry" >>"$tmp"; state=done ;;
-      esac
+      case $stripped in *\)) last=$n state=out ;; esac
     fi
   done <"$CONF"
-  if [ "$state" != done ]; then rm -f "$tmp"; fail "no REPOS=( ... ) in $CONF to add to"; fi
+  [ "$last" -gt 0 ] || fail "no REPOS=( ... ) in $CONF to add to"
+  tmp=$(mktemp "$CONF.XXXXXX") || fail "cannot write beside $CONF"
+  n=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    printf '%s\n' "$line" >>"$tmp"
+    if [ "$n" = "$last" ]; then printf 'REPOS+=("%s")\n' "$entry" >>"$tmp"; fi
+  done <"$CONF"
   # Keep the file's mode, and its line endings: a CRLF config gets CRLF on the line added (a bash loop, not awk).
   if [ "$(tr -cd '\r' <"$CONF" | wc -c | tr -d ' ')" -gt 0 ]; then
     crlf=$(mktemp "$CONF.XXXXXX") || fail "cannot write beside $CONF"
@@ -127,11 +131,12 @@ import="@$ROOT/CLAUDE.md"
 case $repo in "$ROOT"/*) import="(Inside the docs repo's folder: its CLAUDE.md loads above this one.)" ;; esac
 cat >"$repo/$file" <<PTEOF
 $MARK
-# $name: code repo of a project whose docs are elsewhere
+# $name: code repo of a project whose docs are in \`$ROOT\`
 
 The trackers (BACKLOG.md, questions.md), the handoffs, the lessons and the rules for working on this project are in
-the docs repo, \`$ROOT\`. Work started here follows them. Start the session there, or run \`/session-start\` from
-there, before changing anything.
+the docs repo, \`$ROOT\`. Work started here follows them. Open Claude Code in \`$ROOT\` and start with
+\`/session-start\` before changing anything. A session opened here may not have the project's skills: their
+commands then run by their full path, such as \`bash $ROOT/.claude/skills/session-start/ground-truth.sh\`.
 
 $import
 PTEOF

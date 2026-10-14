@@ -1498,6 +1498,12 @@ check "attach: a repo outside the root, with a CLAUDE.md of its own: that file u
     has "$T/far/CLAUDE.local.md" "workflow pointer: written by attach.sh" && has "$T/far/CLAUDE.local.md" "@$TP/one/CLAUDE.md" && ! git -C "$T/far" status --porcelain | grep -q CLAUDE.local'
 "$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt3.txt" 2>&1
 check "attach: ground truth accepts a CLAUDE.local.md pointer" lacks "$T/at-gt3.txt" "NO POINTER"
+# B-73: repos keep the order they were attached in; the pointer sends a session to the docs, with commands that run.
+check "attach: a repo attached later comes after the others" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| far|$T/far|origin|| " ]
+check "attach: the pointer says to open Claude Code in the docs, and gives a command by its full path" \
+  eval 'has svc/CLAUDE.md "# svc: code repo of a project whose docs are in \`$TP/one\`" &&
+    has svc/CLAUDE.md "Open Claude Code in \`$TP/one\` and start with" &&
+    flat svc/CLAUDE.md | grep -qF "\`bash $TP/one/.claude/skills/session-start/ground-truth.sh\`" && lacks svc/CLAUDE.md "from there"'
 "$SH" "$AT" nope "$T/nowhere" >"$T/at5.txt" 2>&1
 check "attach: a path that is not a git checkout is UNKNOWN (exit 2), REPOS unchanged" \
   eval '[ $? = 2 ] && has "$T/at5.txt" "UNKNOWN: " && [ "$(grep -c "^REPOS+=" .claude/ground-truth.conf)" = 2 ]'
@@ -1545,6 +1551,16 @@ check "rules per repo: the board has the rules of that repo, with its preset" ha
 "$SH" $RR/gate.sh check api >"$T/rr-check-notes.txt" 2>&1
 check "rules per repo: in a code repo, a commit of notes/ alone has no receipt (exit 1)" \
   eval '[ $? = 1 ] && has "$T/rr-check-notes.txt" "NO RECEIPT: "'
+# B-73: a repo that keeps rules but that nothing checks (attached after /checks) is named; with no rules, it is not.
+git_q init extra && cp .claude/ground-truth.conf "$T/rr-conf.bak"
+printf '%s\n' 'REPOS+=("extra|extra|origin|main|")' >>.claude/ground-truth.conf
+"$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-extra.txt" 2>&1
+check "rules per repo: a repo that keeps rules and that nothing checks is named" has "$T/rr-gt-extra.txt" \
+  "  ⚠ extra: nothing checks it, though it keeps receipt regression merge (/checks: its check, or no rules for it)"
+printf '%s\n' 'REPO_RULES+=("extra|")' >>.claude/ground-truth.conf
+"$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-extra2.txt" 2>&1
+check "rules per repo: a repo that keeps no rule is not named" lacks "$T/rr-gt-extra2.txt" "extra: nothing checks it"
+cp "$T/rr-conf.bak" .claude/ground-truth.conf && rm -rf extra
 printf '%s\n' 'REPO_RULES+=("ghost|merge" "api|recipt")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt2.txt" 2>&1
 check "rules per repo: a repo REPOS does not name, and a word that is no rule, are flagged" \
