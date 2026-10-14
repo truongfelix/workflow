@@ -230,7 +230,7 @@ if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; t
 # by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation finds
 # all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never skipped, and
 # so is a BACKLOG or questions bullet that starts with a state and a bold title, as items were written before they had
-# ids. A handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so
+# ids, and the line of a 1.x header that says to cite an item by its title. A handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so
 # that awk failing on its own (exit 2) reads as UNKNOWN.
 awk -v mode="$mode" -v legacy="$legacy" '
 function problem(ln, msg) {
@@ -517,6 +517,9 @@ bad_ln { keep(); next }
 fk == "L" && section != "" && /^[ \t]*[-*+] / { problem(FNR, "a lesson without an id: a lesson is `### L-<n> <title>`") }
 (fk == "B" || fk == "Q") && section != "" && /^[ \t]*[-*+] / && old_item() {
   problem(FNR, "an item without an id, as before items had ids: an item is `### <state> <id> <title>` (notes/item-format.md, \"Moving a project to it\")")
+}
+(fk == "B" || fk == "Q") && /[Cc]ite an? (item|entry) by its \*\*title\*\*/ {
+  problem(FNR, "a 1.x header, which says to cite an item by its title: take the header of the template (notes/item-format.md, \"Moving a project to it\")")
 }
 
 END {

@@ -210,6 +210,7 @@ A project that adopted the workflow before this format (1.x: bullets, cited by t
 item becomes a heading with an id, numbered from 1 in the order the items were created, oldest first
 (`git log --reverse -S'<title>' -- BACKLOG.md` dates one; items created in one commit, in file order); states, ⚠ and
 triggers move into their fields; each lesson in `notes/lessons.md` becomes `### L-<n> <title>` the same way; each file
-gets its `next id` line; and every place that cites an item by its title (the handoff, `CLAUDE.md`, the notes) puts the
-id in front of it. `items.sh check` lists whatever is left. An item's life before its id is under its title
-(`git log -S'<title>'`): `items.sh show` and the board start at the commit that gave it its id.
+gets its `next id` line, and the template's header in place of its own (1.x's says to cite an item by its title); and
+every place that cites an item by its title (the handoff, `CLAUDE.md`, the notes) puts the id in front of it.
+`items.sh check` lists whatever is left. An item's life before its id is under its title (`git log -S'<title>'`):
+`items.sh show` and the board start at the commit that gave it its id.

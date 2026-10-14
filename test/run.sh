@@ -270,7 +270,18 @@ rm -rf "$T/ws-up"
 check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new rows asked without a preset" \
   eval 'has "$WF/README.md" "- \"/handoff commits and pushes the docs\": \"Commit the docs\" and \"Push the docs\"." &&
     flat "$WF/README.md" | grep -qF "with \`/autonomy\`, \"change some steps\", never with a preset" &&
-    flat "$WF/README.md" | grep -qF "run \`/handoff\` once, and it moves it"'
+    flat "$WF/README.md" | grep -qF "Run \`/handoff\` once: it moves it, and commits it as the table says"'
+# B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
+# first /handoff; the conversion replaces the trackers' headers.
+check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \
+  eval 'flat "$WF/README.md" | grep -qF "1.x had \`REPOS\`, \`KEEP_LOCAL\` and \`UNITS\`. Take the template'"'"'s file and put the project'"'"'s three lines back in it" &&
+    ! flat "$WF/README.md" | grep -qF "section \`== gate\` is \`== checks\`" && lacks "$WF/README.md" "behaves as before" &&
+    lacks "$WF/README.md" "Merge the comments above \`GATES\`"'
+check "README, upgrade: committed and pushed as the docs, before the first /handoff" \
+  eval 'flat "$WF/README.md" | grep -qF "An upgrade changes only the docs (\`CLAUDE.md\`, the trackers, \`notes/\`, \`.claude/\`): commit and push it" &&
+    has "$WF/README.md" "5. **Commit and push** the upgrade, as above." && has "$WF/README.md" "6. **The handoff:**"'
+check "the conversion: each tracker takes the template's header" \
+  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "and the template'"'"'s header in place of its own (1.x'"'"'s says to cite an item by its title)"'
 check "the conversion: a tie rule for the ids, and where an item's life before its id is" \
   eval 'flat "$WF/template/notes/item-format.md" | grep -qF "items created in one commit, in file order" &&
     flat "$WF/template/notes/item-format.md" | grep -qF "An item'"'"'s life before its id is under its title"'
@@ -510,6 +521,11 @@ printf '%s\n' '## old' '' '- ⏸️ marks an item that waits for a trigger.' \
   '- 🔲 **An old item**: a bullet. Done when: it has an id.' \
   '- ⏸️ ⚠ **An old cross-repo item**: it waits. Done when: it has an id.' >>"$T/ws/BACKLOG.md"
 echo "# Handoff — 2026-09-30" >"$T/ws/notes/handoff.md"
+cp "$T/ws/questions.md" "$T/questions.bak"
+for f in BACKLOG.md questions.md; do # the line of a 1.x header that says to cite by title, under the title
+  case $f in BACKLOG.md) v1='- Cite an item by its **title**, never by a number: numbers move.' ;; *) v1='guard. Cite an entry by its **title**.' ;; esac
+  { head -n 1 "$T/ws/$f"; printf '%s\n' "$v1"; tail -n +2 "$T/ws/$f"; } >"$T/v1h" && mv "$T/v1h" "$T/ws/$f"
+done
 n=$(grep -n 'An old item' "$T/ws/BACKLOG.md" | cut -d: -f1)
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it-v1.txt" 2>&1
 check "items.sh, 1.x: the check exits 2" [ $? = 2 ]
@@ -520,7 +536,10 @@ check "items.sh, 1.x: the old handoff is listed until /handoff moves it" \
   has "$T/it-v1.txt" "notes/handoff.md:1: a 1.x handoff: the next /handoff moves it to notes/handoff/"
 (cd "$T" && LC_ALL=C "$SH" "$T/ws/$IT" check) >"$T/it-v1c.txt" 2>&1
 check "items.sh, 1.x: a bullet item is listed in the C locale too" has "$T/it-v1c.txt" "BACKLOG.md:$n: an item without an id"
-cp "$T/backlog.bak" "$T/ws/BACKLOG.md" && rm "$T/ws/notes/handoff.md"
+check "items.sh, 1.x: a header that says to cite by title is listed, in each tracker (B-79)" \
+  eval 'has "$T/it-v1.txt" "BACKLOG.md:2: a 1.x header, which says to cite an item by its title" &&
+    has "$T/it-v1.txt" "questions.md:2: a 1.x header, which says to cite an item by its title"'
+cp "$T/backlog.bak" "$T/ws/BACKLOG.md" && cp "$T/questions.bak" "$T/ws/questions.md" && rm "$T/ws/notes/handoff.md"
 (cd "$T" && "$SH" "$T/ws/$IT" check) >/dev/null 2>&1
 check "items.sh, 1.x: converted, the check passes" [ $? = 0 ]
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
