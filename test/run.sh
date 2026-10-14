@@ -325,6 +325,12 @@ check "the template's CLAUDE.md: one yes covers a release's tag, its push and wh
   eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "are one step, the row \"Release: tag, publish\": one yes covers them all"'
 check "README, setup: the commands include what a release publishes besides its tag" \
   eval 'flat "$WF/README.md" | grep -qF "commands (what a release publishes besides its tag, too)"'
+# B-90: an empty first section, the setup as no item, and how to see that a release's commit passed, said where a
+# trial looked for them.
+check "the template: an empty backlog section, the setup as no item, a release's pass and where to see it (B-90)" \
+  eval 'has "$WF/template/BACKLOG.md" "with none yet, the line \`_None open._\`" &&
+    flat "$WF/README.md" | grep -qF "The setup itself is no backlog item, as there was no backlog before it" &&
+    flat "$WF/template/CLAUDE.template.md" | grep -qF "(\`bash .claude/skills/session-start/gate.sh check <repo>\` says it for the project'"'"'s own check"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \

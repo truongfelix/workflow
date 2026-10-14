@@ -226,7 +226,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    for a commit, so none could be kept before this one, and with the rule "merge" the ground truth flags a default
    branch that has none. A check that fails is the first thing to tell the owner.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
-   ground truth. Then end the setup with one sentence for each skill, when to use it and what it is for:
+   ground truth. The setup itself is no backlog item, as there was no backlog before it: the first handoff names it
+   under Done, with no id. Then end the setup with one sentence for each skill, when to use it and what it is for:
    `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's
    task), `/handoff` before you stop or switch machines (it records where things stand, so the next session picks
    up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the

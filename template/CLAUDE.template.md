@@ -88,7 +88,8 @@ command and the rules kept: `/checks` shows and changes them. A gate runs with
 `bash .claude/skills/session-start/gate.sh run <repo>`, which keeps a receipt of each commit that passed it.
 
 A release is an item like any task the owner names. It is an annotated tag on the default branch's last commit, once
-its checks passed there: `git tag -a vX.Y.Z -m "<what it holds>"`, then `git push origin vX.Y.Z`. With the rule
+its checks passed there (`bash .claude/skills/session-start/gate.sh check <repo>` says it for the project's own check,
+the ground truth's section `== checks` for all): `git tag -a vX.Y.Z -m "<what it holds>"`, then `git push origin vX.Y.Z`. With the rule
 "receipt", the pre-push hook refuses a tag whose commit did not pass; a commit that changed only the docs since a pass
 keeps it. The tag, its push and what else the release publishes here (a GitHub release, a package: written above)
 are one step, the row "Release: tag, publish": one yes covers them all.
