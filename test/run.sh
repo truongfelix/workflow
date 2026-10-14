@@ -1644,7 +1644,20 @@ check "attach: outside the root, the pointer says to read the docs' rules when i
     flat "$T/far/CLAUDE.local.md" | grep -qF "If they cannot be read, say so and do no work here."'
 check "attach: inside the root, the pointer has no import to fall back from" lacks svc/CLAUDE.md "If they cannot be read"
 # B-73: repos keep the order they were attached in; the pointer sends a session to the docs, with commands that run.
-check "attach: a repo attached later comes after the others" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| far|$T/far|origin|| " ]
+check "attach: a repo attached later comes after the others" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| far|../far|origin|| " ]
+# B-86: the path written in the tracked config is relative to the root for a repo inside it (svc) or beside it (far);
+# a repo elsewhere keeps its absolute path, and the script says it names a folder of this machine.
+check "attach: a repo given by its absolute path beside the root is written relative to it" \
+  eval 'has "$T/at4.txt" "added to REPOS: far|../far|origin||" && lacks "$T/at4.txt" "names a folder of this machine"'
+EW=$(mktemp -d "${TMPDIR:-/tmp}/wf-elsewhere.XXXXXX") && EWP=$(cd "$EW" && pwd -P) && git -C "$EW" init -q
+cp .claude/ground-truth.conf "$T/at-conf.bak"
+"$SH" "$AT" away "$EW" >"$T/at6.txt" 2>&1
+check "attach: a repo elsewhere keeps its absolute path, said to be a folder of this machine" \
+  eval 'has "$T/at6.txt" "added to REPOS: away|$EWP|origin||" && has "$T/at6.txt" "$EWP names a folder of this machine, in a tracked file"'
+cp "$T/at-conf.bak" .claude/ground-truth.conf && rm -rf "$EW"
+check "README, attach: the path written, and a private repo beside docs that may become public" \
+  eval 'flat "$WF/README.md" | grep -qF "The line holds the repo'"'"'s path relative to the project root when the repo is inside it or beside it" &&
+    flat "$WF/README.md" | grep -qF "tell the owner before attaching it"'
 check "attach: the pointer says to open Claude Code in the docs, and gives a command by its full path" \
   eval 'has svc/CLAUDE.md "# svc: code repo of a project whose docs are in \`$TP/one\`" &&
     has svc/CLAUDE.md "Open Claude Code in \`$TP/one\` and start with" &&

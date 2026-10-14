@@ -14,7 +14,9 @@
 #
 # Usage: bash .claude/skills/session-start/attach.sh <name> [<path>] [--remote <r>] [--branch <b>] [--github <o/r>]
 #   name     the repo's name in REPOS. Already there: only its pointer is written (a repo that has none yet).
-#   path     the repo's folder (relative to the project root, or absolute); needed for a new name
+#   path     the repo's folder (relative to the project root, or absolute); needed for a new name. It is written
+#            relative to the project root for a repo inside it or beside it, so that another machine with the same
+#            layout reads the same line; elsewhere, absolute, and the script says it names a folder of this machine
 #   --remote the remote that counts as "pushed" (default origin); --branch its default branch (default: read from
 #            the remote); --github its GitHub owner/repo (default: from the remote's URL)
 # Exit 0 = the repo is in REPOS and has its pointer. Exit 2 = nothing was done: a usage error, a path that is not a
@@ -71,6 +73,16 @@ if [ "$repo" -ef "$ROOT" ]; then
   [ "$new" = 0 ] && { echo "$name is the project root, the docs repo: it needs no pointer"; exit 0; }
   fail "$repo is the project root: the docs repo is listed already, or list it by hand"
 fi
+# The path written in the tracked config: relative to the root for a repo inside it or beside it; elsewhere absolute.
+far=0
+if [ "$new" = 1 ]; then
+  up=$(dirname "$ROOT")
+  case $repo in
+    "$ROOT"/*) dir=${repo#"$ROOT"/} ;;
+    "$up"/*) dir="../${repo#"$up"/}" ;;
+    *) dir=$repo far=1 ;;
+  esac
+fi
 
 # Its line in REPOS: a REPOS+= line, the same list in bash, after the last line of the list (the end of the
 # REPOS=( ... ) array, its first line ending in ")" from "REPOS=(" on, or of a REPOS+=( ... ) line after it), so the
@@ -104,6 +116,9 @@ if [ "$new" = 1 ]; then
   # Written over the file, not moved onto it: a moved temp file would bring its own mode, 0600.
   { cat "$tmp" >"$CONF" && rm -f "$tmp"; } || fail "cannot write $CONF"
   echo "added to REPOS: $entry"
+  if [ "$far" = 1 ]; then
+    echo "  $dir names a folder of this machine, in a tracked file: on another machine, its line is changed there"
+  fi
 fi
 
 # A repo inside the root that the root's own .gitignore does not cover would show as untracked there: exclude it

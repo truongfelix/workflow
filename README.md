@@ -187,7 +187,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      own). Attach every other repo with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its
      line and writes its pointer (below), also later, whenever a repo joins the project; a repo attached later also
      gets its check (`/checks`) and its line in `CLAUDE.md` (what the project is, repos and layout), with the owner's
-     answer to whether it is public.
+     answer to whether it is public. The line holds the repo's path relative to the project root when the repo is
+     inside it or beside it (`../web`), so another machine with the same layout reads it as it is; a repo elsewhere
+     gets its absolute path, a folder of this machine, in a tracked file. With the docs in the code's repo, the items
+     and notes about a private repo attached later are saved in that repo: when its code may become public, tell the
+     owner before attaching it.
    - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
      project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
      their lines in `.claude/ground-truth.conf` and installs the hook that holds the release rule.
