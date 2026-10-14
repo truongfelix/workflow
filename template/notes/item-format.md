@@ -183,7 +183,7 @@ the item. A new session has a new name: going on with a claim its handoff kept, 
   and a recommendation.
 - When the owner rules, the entry moves to §2 as 🟢 with their words and a `ruled:` date, or it is deleted if nothing
   is left to guard. A ruling that no longer guards anything is deleted too: git keeps it, and the board shows it as
-  archived (the brief of `/session-start` suggests a trim session when the file grows past `QUESTIONS_TRIM_LINES`,
+  archived (the brief of `/session-start` suggests `/trim` when the file grows past `QUESTIONS_TRIM_LINES`,
   and `notes/lessons.md` past `LESSONS_TRIM_LINES`, in `.claude/ground-truth.conf`).
 - Cite an entry by its id, with its title for the reader.
 

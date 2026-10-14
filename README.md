@@ -16,8 +16,7 @@ This template keeps a project going across sessions, machines and weeks with fiv
   on the task, it claims it: `claim.sh` pushes a `claimed:` line that names the agent, so two sessions in parallel
   never take the same item.
 - **`/handoff`** runs the same script, rewrites the handoff from it, updates the trackers (open work, your pending
-  decisions, lessons learned), and commits. When `questions.md` grows past a size you set, it goes through the
-  rulings with you: keep, shorten, move to its doc, or delete (git keeps it).
+  decisions, lessons learned), and commits.
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history, and for
   each claimed item where its work is (on which machine, pushed or not, in an open PR with its CI, or merged) and
   whether it passed the project's own check on this machine; an id shows its item's title on hover. Its Settings tab
@@ -27,6 +26,8 @@ This template keeps a project going across sessions, machines and weeks with fiv
   release, …), and changes it: a preset, or the steps you pick from a list.
 - **`/checks`** shows how the code is checked before a merge (its own check, such as its tests; GitHub CI; both; or
   nothing yet) and the rules kept, such as "a release needs a pass on its exact commit", and changes them.
+- **`/trim`** goes through your rulings and lessons with you, in a session of its own, once the brief says a file grew
+  past the size you set: keep, shorten, move to its doc, or delete (git keeps it).
 
 The handoff is a claim; the script is the fact. `/session-start` and `/handoff` run the same script, so the session
 that writes the note and the session that reads it look at the same picture.
@@ -110,8 +111,8 @@ session N:   /session-start ──► work ──► /handoff
 | `notes/handoff-format.md` | the one shape of a handoff, with its id (`H-12`) |
 | `notes/lessons.md` | what the project learned the hard way, loaded into every session. Ids too (`L-3`) |
 | `CLAUDE.md` | what the project is, what Claude does without asking you, its rules and commands. No to-dos, no history |
-| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` needs a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep, for the project or for one repo |
-| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `attach.sh`, which adds a code repo to the list and writes its pointer; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`) and `/checks` |
+| `.claude/ground-truth.conf` | the repos the script checks, branches that must never be pushed, when a claim is stale, when `questions.md` and `notes/lessons.md` need a trim, how the code is checked before a merge (each repo's gate, the command that says the code is ready, such as its tests; its GitHub CI) and the rules you keep, for the project or for one repo |
+| `.claude/skills/` | `/session-start` (with `ground-truth.sh`; `items.sh`, the parser and format check of the trackers, lessons and handoffs, whose `show <id>` prints any item, live or from git; `claim.sh`, which takes an item for a session, on its branch and machine; `attach.sh`, which adds a code repo to the list and writes its pointer; `gate.sh`, which runs a repo's gate, keeps a receipt of each commit that passed it, and reads a commit's CI on GitHub; `board.sh`, the trackers, lessons and handoffs as one page, with the commits and PRs behind each item and where the work of each claimed item is, and the settings; `lib.sh`, what these scripts share), `/handoff`, `/board`, `/autonomy` (with `autonomy.sh`), `/checks` and `/trim` |
 | `.claude/settings.json` | the hook that rebuilds the board after each change to the trackers, the settings or the git history |
 
 It fits one repo, or several (a fork, an app, a backend). There is one design: a docs repo, and a list of the code
@@ -209,7 +210,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the
    handoffs as one page), `/autonomy` whenever you want Claude to ask you more or less often (it shows each step
    and what Claude does there, and changes the ones you pick), `/checks` when the way the code is checked changes (a
-   first test command, GitHub CI added, a rule kept or dropped).
+   first test command, GitHub CI added, a rule kept or dropped), `/trim` when the brief says a trim is due (it goes
+   through your rulings and lessons with you).
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
@@ -244,10 +246,10 @@ handoff rule became the table "What Claude does alone": copy it from the templat
 what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs" and "Push the docs"; everything:
 "Commit code" and "Push a work branch" too), and ask the owner about the other rows.
 
-`/handoff` gained a trim pass of `questions.md` (step 3), set by `QUESTIONS_TRIM_LINES` in `ground-truth.conf` (150
-lines when the line is missing): merge the skill by hand, and add the line to set another size.
-The ground truth also flags `notes/lessons.md` past `LESSONS_TRIM_LINES`, and both sizes default to 1000 lines when
-the lines are missing; `/session-start` suggests a dedicated trim session on the flag.
+`/trim` is new: it goes through the rulings of `questions.md` and the lessons with the owner, in a session of its own.
+The ground truth flags `questions.md` past `QUESTIONS_TRIM_LINES` and `notes/lessons.md` past `LESSONS_TRIM_LINES`
+(1000 lines each when the lines are missing; set them in `ground-truth.conf`), and `/session-start` suggests `/trim` on
+the flag.
 
 The gate became one way among others to check the code before a merge, beside GitHub CI (`/checks`): the ground
 truth's section `== gate` is `== checks`, and `ground-truth.conf` gained `GITHUB_CI`, the repos whose GitHub CI
@@ -287,6 +289,7 @@ template/                     copied into a project's root by bin/adopt.sh
     skills/board/SKILL.md
     skills/autonomy/{SKILL.md,autonomy.sh}
     skills/checks/SKILL.md
+    skills/trim/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
 bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
 example/                      a filled-in project: the files behind the brief in "What it looks like"

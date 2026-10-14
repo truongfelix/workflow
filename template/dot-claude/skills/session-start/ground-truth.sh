@@ -478,8 +478,8 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
 done
 
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than
-# QUESTIONS_TRIM_LINES, it is flagged, and /handoff proposes a trim pass of its rulings (keep, shorten, move to its
-# doc, delete). Git keeps a deleted ruling, and the board shows it as archived.
+# QUESTIONS_TRIM_LINES, it is flagged, and the /session-start brief suggests /trim: a session that goes through its
+# rulings with the owner (keep, shorten, move to its doc, delete). Git keeps a deleted ruling, and the board shows it as archived.
 echo
 if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null; then echo "== questions.md (trim above $QUESTIONS_TRIM_LINES lines)"
 else echo "== questions.md (no trim: QUESTIONS_TRIM_LINES=0)"; fi
@@ -490,7 +490,7 @@ else
   rulings=$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/questions.md" 2>/dev/null | cut -f1,5 |
     grep -c "^I$(printf '\t')ruling$")
   if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$qlines" -gt "$QUESTIONS_TRIM_LINES" ]; then
-    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: a trim session is due"
+    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: a trim session is due (/trim)"
   else
     echo "  $qlines lines, $rulings ruling(s) in §2"
   fi
@@ -506,7 +506,7 @@ else
   llines=$(wc -l <"$ROOT/notes/lessons.md" | tr -d ' ')
   lessons=$(grep -c '^### L-' "$ROOT/notes/lessons.md")
   if [ "$LESSONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$llines" -gt "$LESSONS_TRIM_LINES" ]; then
-    echo "  ⚠ TRIM: $llines lines, $lessons lesson(s): a trim session is due"
+    echo "  ⚠ TRIM: $llines lines, $lessons lesson(s): a trim session is due (/trim)"
   else
     echo "  $llines lines, $lessons lesson(s)"
   fi

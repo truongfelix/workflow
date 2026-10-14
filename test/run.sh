@@ -289,7 +289,7 @@ qn=$(wc -l <questions.md | tr -d ' ')
 echo "QUESTIONS_TRIM_LINES=$((qn - 1))" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, questions.md: above the threshold, flagged for a trim, its rulings counted" has "$T/gt-trim.txt" \
-  "  ⚠ TRIM: $qn lines, 2 ruling(s) in §2: a trim session is due"
+  "  ⚠ TRIM: $qn lines, 2 ruling(s) in §2: a trim session is due (/trim)"
 echo "QUESTIONS_TRIM_LINES=$qn" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, questions.md: at the threshold, not flagged" \
@@ -305,15 +305,21 @@ ln=$(wc -l <notes/lessons.md | tr -d ' ')
 echo "LESSONS_TRIM_LINES=$((ln - 1))" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, lessons.md: above its threshold, flagged for a trim" has "$T/gt-trim.txt" \
-  "  ⚠ TRIM: $ln lines, 2 lesson(s): a trim session is due"
+  "  ⚠ TRIM: $ln lines, 2 lesson(s): a trim session is due (/trim)"
 echo "LESSONS_TRIM_LINES=$ln" >>.claude/ground-truth.conf
 "$SH" "$GT" --no-fetch >"$T/gt-trim.txt" 2>&1
 check "ground truth, lessons.md: at the threshold, not flagged" \
   eval 'has "$T/gt-trim.txt" "  $ln lines, 2 lesson(s)" && lacks "$T/gt-trim.txt" TRIM:'
 if [ -f "$T/ws-lessons.bak" ]; then cp "$T/ws-lessons.bak" notes/lessons.md; else rm -f notes/lessons.md; fi
 cp "$T/ws-questions.bak" questions.md && cp "$T/ws-conf.bak" .claude/ground-truth.conf
-check "/handoff runs the trim pass on the flag of the ground truth" \
-  has "$WF/template/dot-claude/skills/handoff/SKILL.md" '**Trim `questions.md`** when the ground truth (step 1) says `⚠ TRIM`'
+# The trim is /trim's, in a session of its own, never a pass of /handoff; the brief suggests it on the flag.
+SK="$WF/template/dot-claude/skills"
+check "/handoff does not trim, it points to /trim" \
+  eval 'lacks "$SK/handoff/SKILL.md" "**Trim \`questions.md\`**" && has "$SK/handoff/SKILL.md" "**No trim here**"'
+check "/trim goes through the rulings and the lessons, four at a time" \
+  eval 'has "$SK/trim/SKILL.md" "name: trim" && has "$SK/trim/SKILL.md" "four at a time" &&
+    has "$SK/trim/SKILL.md" "the lessons of \`notes/lessons.md\`"'
+check "/session-start suggests /trim on the flag" has "$SK/session-start/SKILL.md" 'the brief suggests `/trim`'
 check "the template's ground-truth.conf sets both trim thresholds" \
   grep -qx 'LESSONS_TRIM_LINES=1000' "$WF/template/dot-claude/ground-truth.conf"
 check "the template's ground-truth.conf sets the questions trim threshold" \
@@ -853,6 +859,7 @@ if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(mnt /dev/shm)" != "$(mnt "$T")" ];
 fi
 check "adopt.sh installs the hook" has "$T/ws/.claude/settings.json" '/.claude/skills/session-start/board.sh\" --hook'
 check "adopt.sh installs /board" [ -f "$T/ws/.claude/skills/board/SKILL.md" ]
+check "adopt.sh installs /trim" [ -f "$T/ws/.claude/skills/trim/SKILL.md" ]
 if command -v node >/dev/null 2>&1; then
   node -e 'var h = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).hooks.PostToolUse[0];
     process.exit(/Edit/.test(h.matcher) && /Write/.test(h.matcher) && /Bash/.test(h.matcher) && h.hooks[0].async ? 0 : 1);' \

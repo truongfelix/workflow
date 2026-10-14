@@ -825,7 +825,7 @@ D.items.forEach(function (it) {
     var i = l.indexOf(":");
     if (i > 0) it.f[l.slice(0, i)] = l.slice(i + 1).trim();
   });
-  // A deleted ruling is archived (the trim in /handoff): its reason stays in git. A deleted question is closed.
+  // A deleted ruling is archived (by /trim): its reason stays in git. A deleted question is closed.
   it.status = !it.closed ? it.state : it.kind === "Q" && it.state === "ruling" ? "archived" : "closed";
   // Claimed is not a state: a claimed item is still open. Its column names who works on it, or None.
   it.claimedBy = it.kind === "B" && !it.closed && it.f.claimed ? it.f.claimed.split(" on ")[0] : "";
