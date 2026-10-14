@@ -46,8 +46,10 @@
 # Usage: bash .claude/skills/session-start/board.sh [--out <file>] [--no-open] [--offline] [--text] [<project dir>]
 #        bash .claude/skills/session-start/board.sh --hook      (the PostToolUse hook: the tool call as JSON on stdin)
 #   <project dir>  default: the project this script is installed in
-#   --out          where to write the page. Default: <project>-board.html, the same file at each run, in the temp
-#                  folder, or in the default browser's own folder when it is a snap (it cannot read the temp folder)
+#   --out          where to write the page. Default: <project>-<folder>-board.html, the same file at each run, in the
+#                  temp folder, or in the default browser's own folder when it is a snap (it cannot read the temp
+#                  folder); <folder> is a checksum of the project folder's path, so another clone of the project, or
+#                  a project of the same name, writes a page of its own
 #   --no-open      only print the page's path
 #   --offline      do not ask GitHub for the PRs: show the ones last read
 #   --text         also print the open items as text (what it does instead of opening, where no browser can)
@@ -122,7 +124,9 @@ case $project in *FILL*) project="" ;; esac
 pagedir=${TMPDIR:-/tmp}
 browser=$(xdg-mime query default text/html 2>/dev/null) # a snap's: "<snap>_<app>.desktop"
 case $browser in *_*.desktop) [ -d "$HOME/snap/${browser%%_*}/common" ] && pagedir="$HOME/snap/${browser%%_*}/common" ;; esac
-[ -n "$out" ] || out="$pagedir/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-board.html"
+# One page per project folder: a second clone, or another project of the same name, would take over an open tab.
+pathsum=$(printf '%x' "$(pwd -P | tr -d '\n' | cksum | cut -d' ' -f1)")
+[ -n "$out" ] || out="$pagedir/$(printf '%s' "$project" | tr -c 'A-Za-z0-9._-' '-')-$pathsum-board.html"
 cache="${out%.html}-prs.tsv" # the PRs last read, for an --offline build
 cicache="${out%.html}-ci.tsv" # the CI verdicts last read ("<GitHub repo> <commit> <verdict> <time>"), likewise
 

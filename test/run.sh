@@ -733,6 +733,16 @@ check "board, a snap browser: the page in its own folder, which it can read" \
 BROWSER_DESKTOP=firefox.desktop HOME="$T/home" TMPDIR="$T/tmp4" PATH="$T/fakebin4:$PATH" \
   "$SH" "$BD" --no-open --offline "$T/board2" >"$T/board-tmp.txt" 2>&1
 check "board, any other browser: the page in the temp folder" has "$T/board-tmp.txt" "Board: $T/tmp4/"
+# B-82: one page per project folder: another clone of the project writes its own, the same folder the same one.
+cp -R "$T/board2" "$T/board2-clone"
+for d in board2 board2 board2-clone; do
+  HOME="$T/home" TMPDIR="$T/tmp4" PATH="$T/fakebin4:$PATH" BROWSER_DESKTOP=firefox.desktop \
+    "$SH" "$BD" --no-open --offline "$T/$d" 2>/dev/null | sed -n 's/^Board: //p'
+done >"$T/board-pages.txt"
+check "board: one page per project folder, the same at each run" \
+  eval '[ "$(sed -n 1p "$T/board-pages.txt")" = "$(sed -n 2p "$T/board-pages.txt")" ] &&
+    [ "$(sort -u "$T/board-pages.txt" | wc -l | tr -d " ")" = 2 ] && grep -q -- "-board.html$" "$T/board-pages.txt"'
+rm -rf "$T/board2-clone"
 mkdir -p .claude && printf 'REPOS=("docs|.|origin||" "api|%s|origin||")\n' "$T/board2-api" >.claude/ground-truth.conf
 PATH="$T/fakebin:$PATH" "$SH" "$BD" --no-open --out "$T/board3.html" "$T/board2" >"$T/board3.txt" 2>&1
 check "board, commits and PRs: exits 0" [ $? = 0 ]
@@ -968,7 +978,7 @@ check "board, with a display: no text board" lacks "$T/here.txt" "BACKLOG:"
 mkdir -p "$T/unfilled" "$T/tmpdir" && cp "$WF/template/BACKLOG.md" "$WF/template/questions.md" "$T/unfilled/"
 BROWSER_DESKTOP=firefox.desktop PATH="$T/fakebin4:$PATH" TMPDIR="$T/tmpdir" \
   "$SH" "$BD" --no-open --offline "$T/unfilled" >/dev/null 2>&1
-check "board, before the setup: the page is named after the folder" [ -f "$T/tmpdir/unfilled-board.html" ]
+check "board, before the setup: the page is named after the folder" eval 'ls "$T/tmpdir" | grep -qE "^unfilled-[0-9a-f]+-board\.html$"'
 
 # The hook (.claude/settings.json, PostToolUse): the tool call as JSON on stdin. It rebuilds when the call names a
 # tracker or moves git, stays quiet and exits 0 whatever happens, and leaves no lock behind.
