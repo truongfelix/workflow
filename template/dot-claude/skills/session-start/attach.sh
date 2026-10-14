@@ -169,7 +169,7 @@ case $exclude in /*) ;; *) exclude="$repo/$exclude" ;; esac
 mkdir -p "$(dirname "$exclude")"
 grep -qxF "/$file" "$exclude" 2>/dev/null || printf '/%s\n' "$file" >>"$exclude"
 echo "pointer: $repo/$file (not committed: it names a path on this machine)"
-# What the setup or the session does next, and what to tell the owner (README, "Adopt in a new project", step 4).
+# What the setup or the session does next, and what to tell the owner (the workflow's SETUP.md, step 4).
 if [ "$new" = 1 ]; then
   echo "left: its check, /checks asked about $name alone; its line in CLAUDE.md (repos and layout)"
 fi

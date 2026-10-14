@@ -239,7 +239,7 @@ if [ "$root_listed" = 0 ]; then
   echo "== workspace docs (.)"
   top=$(git -C "$ROOT" rev-parse --show-toplevel 2>/dev/null)
   if [ -z "$top" ] || ! [ "$top" -ef "$ROOT" ]; then
-    echo "  ⚠ not a git repo: tracker history is lost at every rewrite (workflow README, 'Adopt in a new project', step 1)"
+    echo "  ⚠ not a git repo: tracker history is lost at every rewrite (the workflow's SETUP.md, step 1)"
   else
     if [ "$FETCH" = 1 ] && git -C "$ROOT" remote get-url origin >/dev/null 2>&1; then
       with_timeout 60 git -C "$ROOT" fetch --quiet origin 2>/dev/null || unknown "git fetch origin failed (workspace docs)"
@@ -587,7 +587,7 @@ if [ "$FAILED" -gt 0 ]; then
   exit 2
 fi
 if [ "$SETUP_OPEN" = 1 ]; then
-  echo "GROUND TRUTH: complete, but the setup is not: finish .claude/ground-truth.conf, then delete its FILL lines (README, 'Adopt in a new project', step 4)"
+  echo "GROUND TRUTH: complete, but the setup is not: finish .claude/ground-truth.conf, then delete its FILL lines (the workflow's SETUP.md, step 4)"
   exit 0
 fi
 echo "GROUND TRUTH: complete"

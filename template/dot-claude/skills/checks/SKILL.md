@@ -1,6 +1,6 @@
 ---
 name: checks
-description: Show and change how the code is checked before a merge in this project - by its own check (a command whose exit code says the code is ready, such as its tests, run on this machine), by GitHub CI, both, or nothing yet - with each repo's check command and the rules kept (a release needs a pass on the code it tags, each bug fix comes with a check that fails without it, the main branch is checked again after a merge). Use it when the user types /checks, asks how the code is checked or wants it changed ("use GitHub CI as the check", "our tests are make check", "stop checking releases"), when a project gets its first test command, and at setup (README, "Adopt in a new project", step 4).
+description: Show and change how the code is checked before a merge in this project - by its own check (a command whose exit code says the code is ready, such as its tests, run on this machine), by GitHub CI, both, or nothing yet - with each repo's check command and the rules kept (a release needs a pass on the code it tags, each bug fix comes with a check that fails without it, the main branch is checked again after a merge). Use it when the user types /checks, asks how the code is checked or wants it changed ("use GitHub CI as the check", "our tests are make check", "stop checking releases"), when a project gets its first test command, and at setup (SETUP.md, step 4).
 ---
 
 # Checks

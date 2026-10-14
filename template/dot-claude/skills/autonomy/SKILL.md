@@ -1,6 +1,6 @@
 ---
 name: autonomy
-description: Show and change what Claude does alone in this project, step by step - for each step (start the day's task, commit, push, add or claim a backlog item, open or merge a pull request, delete a merged branch, release, message), whether Claude asks the owner first or does it and then tells. Switch to a preset (Careful, Balanced, Hands-off) or pick the steps to switch from a list. Use it when the user types /autonomy (with or without a preset's name), asks to see or change what Claude may do without asking ("ask me before pushing", "stop asking before commits", "switch to Balanced", "what do you do without asking?"), and at setup (README, "Adopt in a new project", step 4).
+description: Show and change what Claude does alone in this project, step by step - for each step (start the day's task, commit, push, add or claim a backlog item, open or merge a pull request, delete a merged branch, release, message), whether Claude asks the owner first or does it and then tells. Switch to a preset (Careful, Balanced, Hands-off) or pick the steps to switch from a list. Use it when the user types /autonomy (with or without a preset's name), asks to see or change what Claude may do without asking ("ask me before pushing", "stop asking before commits", "switch to Balanced", "what do you do without asking?"), and at setup (SETUP.md, step 4).
 ---
 
 # Autonomy
@@ -36,7 +36,7 @@ tool cannot show a box already ticked, so each step's question says its answer n
      message; it does the rest, then tells. **Hands-off** asks first only to build something that is not an approved
      backlog item, to release, and to comment or message. At setup the owner has not met these names, so each option
      is labelled by what it does, with no name: "Ask before every step", "Ask before the big steps", "Ask only before
-     new work, a release or a message" (README, "Adopt in a new project", step 4). Before the options, list the steps
+     new work, a release or a message" (SETUP.md, step 4). Before the options, list the steps
      in plain words: start the day's task, commit the docs (the notes and trackers), push them, add an item to the
      backlog, claim one, build something that is not an approved backlog item, commit code, push a work branch, open
      a pull request, merge one (or push code to the default branch), delete a branch whose work has landed, stop a

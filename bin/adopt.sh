@@ -90,7 +90,7 @@ done
 fills=""
 [ ${#installed[@]} -gt 0 ] && fills=$(cd "$dst" && grep -Hn 'FILL' "${installed[@]}" 2>/dev/null || true)
 if [ -n "$fills" ]; then
-  echo "Left to fill (README.md, 'Adopt in a new project'):"
+  echo "Left to fill (SETUP.md, step 4):"
   printf '%s\n' "$fills" | sed 's|^|  |'
 else
   echo "No FILL markers left."
@@ -104,6 +104,6 @@ if [ "$differ" -gt 0 ] && [ "$before" = "$version" ]; then
   echo "was adopted here already)."
 elif [ "$differ" -gt 0 ]; then
   echo "$differ skipped file(s) differ from the template: in an upgrade${before:+ from $before}, merge its generic parts into"
-  echo "each (README.md, 'Upgrade a project from here'), then run this again: it lists the FILL markers the merge"
+  echo "each (UPGRADE.md), then run this again: it lists the FILL markers the merge"
   echo "brought. .claude/workflow-version names $version already."
 fi

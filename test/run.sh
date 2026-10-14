@@ -196,7 +196,7 @@ printf '%s\n' 'REPOS=("app|.|origin||")' >>"$T/fresh/.claude/ground-truth.conf"
 check "ground truth: an unfilled config is read, and the setup says what is left" \
   eval 'has "$T/fresh-gt2.txt" "== app (.)" && has "$T/fresh-gt2.txt" "its setup is not finished: set REPOS, then how the code is checked (/checks), then delete those lines" &&
     lacks "$T/fresh-gt2.txt" "used the defaults"'
-step4_line() { grep -nF -- "$1" "$WF/README.md" | head -n 1 | cut -d: -f1; } # <text>: its first line in the README
+step4_line() { grep -nF -- "$1" "$WF/SETUP.md" | head -n 1 | cut -d: -f1; } # <text>: its first line in SETUP.md
 check "README: the setup asks for a plain complete after /checks" \
   eval '[ "$(step4_line "follow the \`/checks\` skill")" -lt "$(step4_line "until it ends with \`GROUND TRUTH: complete\`")" ]'
 # B-71: the docs say one thing. A task the owner names becomes an item too (PRINCIPLES.md); the setup names no preset,
@@ -206,8 +206,8 @@ check "CLAUDE.md agrees with PRINCIPLES.md: a task the owner names becomes an it
   eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "is approved, and started, by that request, and becomes a backlog item too" &&
     flat "$WF/PRINCIPLES.md" | grep -qF "a task the owner names in the chat becomes an item too, approved and started by that request" &&
     flat "$WF/example/CLAUDE.example.md" | grep -qF "is approved, and started, by that request, and becomes a backlog item too"'
-check "/autonomy labels the presets by what they do at setup, as the README asks" \
-  eval 'flat "$WF/README.md" | grep -qF "with no preset name either" &&
+check "/autonomy labels the presets by what they do at setup, as SETUP.md asks" \
+  eval 'flat "$WF/SETUP.md" | grep -qF "with no preset name either" &&
     flat "$WF/template/dot-claude/skills/autonomy/SKILL.md" | grep -qF "each option is labelled by what it does, with no name"'
 check "the rule for questions names a command the owner runs, as /checks asks" \
   eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "(a command the owner runs is named: it is what they see)" &&
@@ -215,7 +215,7 @@ check "the rule for questions names a command the owner runs, as /checks asks" \
 # B-72: a session goes by one name, the one ListAgents gives, in its handoff as in its claims; a new session takes
 # the last handoff over, and the last one is never deleted.
 check "one name per session: no doc names a handoff after the folder first" \
-  eval '! grep -rqiE "folder name,? unless|unless the owner name" "$WF/template" "$WF/README.md" "$WF/PRINCIPLES.md"'
+  eval '! grep -rqiE "folder name,? unless|unless the owner name" "$WF/template" "$WF/README.md" "$WF/SETUP.md" "$WF/UPGRADE.md" "$WF/PRINCIPLES.md"'
 check "one name per session: the handoff format, /handoff and /session-start use the session's name" \
   eval 'has "$WF/template/notes/handoff-format.md" "\`<session>\` is the session" &&
     has "$WF/template/dot-claude/skills/handoff/SKILL.md" "(\`<session>\`: this session" &&
@@ -228,30 +228,30 @@ check "one name per session: the last handoff is never deleted, the next session
 # Quick start names the notes' question; CLAUDE.md asks who owns the project and what is private; the docs repo is
 # named first in REPOS; a repo outside the folder needs its import allowed; a repo attached later gets its check.
 check "README, setup: both shapes commit and push the setup, with an exact secrets scan" \
-  eval 'has "$WF/README.md" "5. **Commit and push the setup**, in either shape." && has "$WF/README.md" "\`gitleaks git --staged\`"'
+  eval 'has "$WF/SETUP.md" "5. **Commit and push the setup**, in either shape." && has "$WF/SETUP.md" "\`gitleaks git --staged\`"'
 check "README, setup: the Quick start names the question of where the notes live" \
   eval 'flat "$WF/README.md" | grep -qF "then where its notes and to-do lists live"'
 check "README, setup: CLAUDE.md asks who owns the project and what stays private" \
-  eval 'flat "$WF/README.md" | grep -qF "who owns it (ask: a commit" && flat "$WF/README.md" | grep -qF "what is public and what must stay private, repos"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "who owns it (ask: a commit" && flat "$WF/SETUP.md" | grep -qF "what is public and what must stay private, repos"'
 check "README, setup: an old to-do file is deleted only with the owner's yes" \
-  eval 'flat "$WF/README.md" | grep -qF "An old to-do file whose lines are now items: ask the owner whether to delete it"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "An old to-do file whose lines are now items: ask the owner whether to delete it"'
 check "the config: the docs repo comes first in the example of docs in a repo of their own" \
   has "$WF/template/dot-claude/ground-truth.conf" '#   REPOS=("docs|.|origin||" "api|api|origin|main|"'
 check "README, code repos: allow the import of the docs, and give a repo attached later its check" \
-  eval 'flat "$WF/README.md" | grep -qF "allow it. It keeps the answer for that folder" &&
-    flat "$WF/README.md" | grep -qF "a repo attached later also gets its check (\`/checks\`)"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "allow it. It keeps the answer for that folder" &&
+    flat "$WF/SETUP.md" | grep -qF "a repo attached later also gets its check (\`/checks\`)"'
 # B-75: what Claude Code does, seen in real sessions (2.1.299): it asks once per folder, after the folder's trust, and
 # keeps a no; a session that cannot ask (claude -p) loads the import only where one allowed it.
 check "README, code repos: the import is asked once, a no is kept, and claude -p needs it allowed first" \
-  eval 'flat "$WF/README.md" | grep -qF "Claude Code asks whether to allow that import" &&
-    flat "$WF/README.md" | grep -qF "never asks again" &&
-    flat "$WF/README.md" | grep -qF "loads the import only where an interactive session allowed it" &&
-    ! flat "$WF/README.md" | grep -qF "may ask whether"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "Claude Code asks whether to allow that import" &&
+    flat "$WF/SETUP.md" | grep -qF "never asks again" &&
+    flat "$WF/SETUP.md" | grep -qF "loads the import only where an interactive session allowed it" &&
+    ! flat "$WF/SETUP.md" | grep -qF "may ask whether"'
 check "README, code repos: where the import did not load, the pointer has the rules read, or the session stops (B-76)" \
-  eval 'flat "$WF/README.md" | grep -qF "Where it did not load, the pointer tells the session to read the docs" &&
-    flat "$WF/README.md" | grep -qF "\`claude -p\` reads them with \`--add-dir <the docs folder>\`" &&
-    lacks "$WF/README.md" "every session there loads the pointer alone, without the rules"'
-grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
+  eval 'flat "$WF/SETUP.md" | grep -qF "Where it did not load, the pointer tells the session to read the docs" &&
+    flat "$WF/SETUP.md" | grep -qF "\`claude -p\` reads them with \`--add-dir <the docs folder>\`" &&
+    lacks "$WF/SETUP.md" "every session there loads the pointer alone, without the rules"'
+grep -v '^# FILL\|^# workflow'"'"'s SETUP.md, step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
 check "ground truth: a filled config ends with a plain complete, no setup section" \
@@ -278,9 +278,9 @@ check "adopt.sh, run again on the release adopted: a file that differs is not an
 check "adopt.sh, a project the same as the template: no upgrade line" lacks "$T/adopt2.txt" "skipped file(s) differ"
 rm -rf "$T/ws-up"
 check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new rows asked without a preset" \
-  eval 'has "$WF/README.md" "- \"/handoff commits and pushes the docs\": \"Commit the docs\" and \"Push the docs\"." &&
-    flat "$WF/README.md" | grep -qF "six with \`/autonomy\`, naming them: it asks about those alone, never with a preset" &&
-    flat "$WF/README.md" | grep -qF "Run \`/handoff\` once: it moves it, and commits it as the table says"'
+  eval 'has "$WF/UPGRADE.md" "- \"/handoff commits and pushes the docs\": \"Commit the docs\" and \"Push the docs\"." &&
+    flat "$WF/UPGRADE.md" | grep -qF "six with \`/autonomy\`, naming them: it asks about those alone, never with a preset" &&
+    flat "$WF/UPGRADE.md" | grep -qF "Run \`/handoff\` once: it moves it, and commits it as the table says"'
 # B-80: /autonomy takes the steps a request names: with their answer, set with no question; with none (the upgrade's
 # six new steps), asked about alone.
 AUS=$WF/template/dot-claude/skills/autonomy/SKILL.md
@@ -301,21 +301,21 @@ check "the item format: a task with no branch of its own, its section and the br
 # B-83: the rule "receipt" says what the hook holds: a pass on the code a tag names, kept over a change of the docs.
 check "the rule receipt, in plain words: a pass on the code it tags, never its exact commit" \
   eval '"$SH" -c ". \"$WF/template/dot-claude/skills/session-start/lib.sh\"; rule_text receipt" | grep -qx "A release needs the checks to have passed on the code it tags" &&
-    ! grep -rqF "exact commit" "$WF/README.md" "$WF/template"'
+    ! grep -rqF "exact commit" "$WF/README.md" "$WF/SETUP.md" "$WF/UPGRADE.md" "$WF/template"'
 # B-83: adopt.sh overwrites nothing but its version file, and says so; the setup's worktrees and a later repo's
 # visibility are answered.
 check "README: adopt.sh overwrites nothing but its version file" \
-  eval 'lacks "$WF/README.md" "never overwrites a file" && lacks "$WF/README.md" "nothing is overwritten" &&
+  eval 'lacks "$WF/README.md" "never overwrites a file" && lacks "$WF/SETUP.md" "nothing is overwritten" &&
     has "$WF/README.md" "# copies the template; overwrites nothing but its version file"'
 check "README, setup: where worktrees go, and whether a repo attached later is public" \
-  eval 'flat "$WF/README.md" | grep -qF "where worktrees go: beside their repo, \`<repo>-<topic>/\`, unless the owner says otherwise" &&
-    flat "$WF/README.md" | grep -qF "with the owner'"'"'s answer to whether it is public"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "where worktrees go: beside their repo, \`<repo>-<topic>/\`, unless the owner says otherwise" &&
+    flat "$WF/SETUP.md" | grep -qF "with the owner'"'"'s answer to whether it is public"'
 # B-85: the setup ends with a ground truth that has nothing to flag: one word for it, and the check run on the
 # setup's commit, before the first handoff.
 check "README, setup: complete, then the setup's commit checked once, before the first handoff" \
   eval 'lacks "$WF/README.md" "comes back clean" &&
-    flat "$WF/README.md" | grep -qF "commits the setup and runs your check once on it, and runs \`/handoff\` once" &&
-    flat "$WF/README.md" | grep -qF "Then run each repo'"'"'s own check once on its default branch, \`bash .claude/skills/session-start/gate.sh run <repo>\` for each repo of \`GATES\`" &&
+    flat "$WF/README.md" | grep -qF "commits the setup, runs your check once on it, and runs \`/handoff\` once" &&
+    flat "$WF/SETUP.md" | grep -qF "Then run each repo'"'"'s own check once on its default branch, \`bash .claude/skills/session-start/gate.sh run <repo>\` for each repo of \`GATES\`" &&
     [ "$(step4_line "Then run each repo")" -lt "$(step4_line "6. **Close the loop:**")" ]'
 # B-81, after its trial: a change of the docs alone goes in the section of the repo that holds them; the tag, its
 # push and the rest of a release are one yes; the setup asks what a release publishes.
@@ -324,22 +324,31 @@ check "the item format: a change of the docs alone goes in the section of the re
 check "the template's CLAUDE.md: one yes covers a release's tag, its push and what else it publishes" \
   eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "are one step, the row \"Release: tag, publish\": one yes covers them all"'
 check "README, setup: the commands include what a release publishes besides its tag" \
-  eval 'flat "$WF/README.md" | grep -qF "commands (what a release publishes besides its tag, too)"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "commands (what a release publishes besides its tag, too)"'
 # B-90: an empty first section, the setup as no item, and how to see that a release's commit passed, said where a
 # trial looked for them.
 check "the template: an empty backlog section, the setup as no item, a release's pass and where to see it (B-90)" \
   eval 'has "$WF/template/BACKLOG.md" "with none yet, the line \`_None open._\`" &&
-    flat "$WF/README.md" | grep -qF "The setup itself is no backlog item, as there was no backlog before it" &&
+    flat "$WF/SETUP.md" | grep -qF "The setup itself is no backlog item, as there was no backlog before it" &&
     flat "$WF/template/CLAUDE.template.md" | grep -qF "(\`bash .claude/skills/session-start/gate.sh check <repo>\` says it for the project'"'"'s own check"'
+# B-91: the README is for a person, short; the setup and the upgrade are guides of their own, which the README,
+# adopt.sh, the skills and the scripts point to.
+check "README: short, pointing to SETUP.md and UPGRADE.md (B-91)" \
+  eval '[ "$(wc -l <"$WF/README.md" | tr -d " ")" -le 120 ] && has "$WF/README.md" "follow /path/to/workflow/SETUP.md" &&
+    has "$WF/README.md" "[\`UPGRADE.md\`](UPGRADE.md)" && has "$WF/SETUP.md" "# Adopt in a new project" &&
+    has "$WF/SETUP.md" "## A session opened in a code repo" && has "$WF/UPGRADE.md" "# Upgrade a project from here"'
+check "nothing points to the README for the setup or the upgrade any more (B-91)" \
+  eval '! grep -rqE "README[^ ]*,? .(Adopt in a new project|Upgrade a project from here)" "$WF/template" "$WF/bin" "$WF/README.md" "$WF/SETUP.md" "$WF/UPGRADE.md" &&
+    grep -qF "Left to fill (SETUP.md, step 4):" "$WF/bin/adopt.sh" && grep -qF "each (UPGRADE.md)" "$WF/bin/adopt.sh"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \
-  eval 'flat "$WF/README.md" | grep -qF "1.x had \`REPOS\`, \`KEEP_LOCAL\` and \`UNITS\`. Take the template'"'"'s file and put the project'"'"'s three lines back in it" &&
-    ! flat "$WF/README.md" | grep -qF "section \`== gate\` is \`== checks\`" && lacks "$WF/README.md" "behaves as before" &&
-    lacks "$WF/README.md" "Merge the comments above \`GATES\`"'
+  eval 'flat "$WF/UPGRADE.md" | grep -qF "1.x had \`REPOS\`, \`KEEP_LOCAL\` and \`UNITS\`. Take the template'"'"'s file and put the project'"'"'s three lines back in it" &&
+    ! flat "$WF/UPGRADE.md" | grep -qF "section \`== gate\` is \`== checks\`" && lacks "$WF/UPGRADE.md" "behaves as before" &&
+    lacks "$WF/UPGRADE.md" "Merge the comments above \`GATES\`"'
 check "README, upgrade: committed and pushed as the docs, before the first /handoff" \
-  eval 'flat "$WF/README.md" | grep -qF "An upgrade changes only the docs (\`CLAUDE.md\`, the trackers, \`notes/\`, \`.claude/\`): commit and push it" &&
-    has "$WF/README.md" "5. **Commit and push** the upgrade, as above." && has "$WF/README.md" "6. **The handoff:**"'
+  eval 'flat "$WF/UPGRADE.md" | grep -qF "An upgrade changes only the docs (\`CLAUDE.md\`, the trackers, \`notes/\`, \`.claude/\`): commit and push it" &&
+    has "$WF/UPGRADE.md" "5. **Commit and push** the upgrade, as above." && has "$WF/UPGRADE.md" "6. **The handoff:**"'
 check "the conversion: each tracker takes the template's header" \
   eval 'flat "$WF/template/notes/item-format.md" | grep -qF "and the template'"'"'s header in place of its own (1.x'"'"'s says to cite an item by its title)"'
 check "the conversion: a tie rule for the ids, and where an item's life before its id is" \
@@ -1320,7 +1329,7 @@ check "adopt.sh installs gate.sh, executable" [ -x "$GA" ]
 check "adopt.sh installs /checks" [ -f .claude/skills/checks/SKILL.md ]
 check "adopt.sh lists how the code is checked as left to FILL" \
   eval '"$SH" "$WF/bin/adopt.sh" . 2>&1 | grep -q "then how its code is checked with the /checks skill"'
-check "the setup follows /checks for how the code is checked" has "$WF/README.md" '`/checks` skill (`.claude/skills/checks/SKILL.md`)'
+check "the setup follows /checks for how the code is checked" has "$WF/SETUP.md" '`/checks` skill (`.claude/skills/checks/SKILL.md`)'
 check "the template's ground-truth.conf checks nothing and keeps no rule until the setup" \
   eval 'grep -qx "GATE_RULES=\"\"" .claude/ground-truth.conf && grep -qx "GATES=()" .claude/ground-truth.conf &&
     grep -qx "GITHUB_CI=()" .claude/ground-truth.conf'
@@ -1668,8 +1677,8 @@ check "attach: a repo elsewhere keeps its absolute path, said to be a folder of 
   eval 'has "$T/at6.txt" "added to REPOS: away|$EWP|origin||" && has "$T/at6.txt" "$EWP names a folder of this machine, in a tracked file"'
 cp "$T/at-conf.bak" .claude/ground-truth.conf && rm -rf "$EW"
 check "README, attach: the path written, and a private repo beside docs that may become public" \
-  eval 'flat "$WF/README.md" | grep -qF "The line holds the repo'"'"'s path relative to the project root when the repo is inside it or beside it" &&
-    flat "$WF/README.md" | grep -qF "when that code may become public, tell the owner so before the item is written, and wait for a go-ahead"'
+  eval 'flat "$WF/SETUP.md" | grep -qF "The line holds the repo'"'"'s path relative to the project root when the repo is inside it or beside it" &&
+    flat "$WF/SETUP.md" | grep -qF "when that code may become public, tell the owner so before the item is written, and wait for a go-ahead"'
 # B-89: attach.sh says what is left after it and, for a repo outside the folder, what to tell the owner; the README
 # says to pass it on; /checks asks no "keep or change" when the owner said what changes.
 check "attach: what is left after it, and for a repo outside the folder what to tell the owner (B-89)" \
@@ -1677,7 +1686,7 @@ check "attach: what is left after it, and for a repo outside the folder what to 
     has "$T/at4.txt" "tell the owner: the first Claude Code session opened in $TP/far asks to allow an import of the docs" &&
     has "$T/at1.txt" "left: its check, /checks asked about svc alone" && lacks "$T/at1.txt" "tell the owner"'
 check "README, attach: what attach.sh prints last is passed on to the owner; /checks asks nothing already answered" \
-  eval 'flat "$WF/README.md" | grep -qF "What \`attach.sh\` prints last is what is left (the repo'"'"'s check, its line in \`CLAUDE.md\`)" &&
+  eval 'flat "$WF/SETUP.md" | grep -qF "What \`attach.sh\` prints last is what is left (the repo'"'"'s check, its line in \`CLAUDE.md\`)" &&
     flat "$WF/template/dot-claude/skills/checks/SKILL.md" | grep -qF "not when the owner has already said what changes"'
 check "attach: the pointer says to open Claude Code in the docs, and gives a command by its full path" \
   eval 'has svc/CLAUDE.md "# svc: code repo of a project whose docs are in \`$TP/one\`" &&
