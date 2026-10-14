@@ -28,7 +28,8 @@ tests), never a bare "gate".
    - *Both:* both must pass.
    - *Nothing yet:* no check exists (a new project). No rule holds; run this skill again once there is one.
 
-   One answer for every code repo of a workspace (never its docs repo), unless the owner says they differ.
+   One answer for every code repo of a workspace (never its docs repo), unless the owner says they differ. A repo
+   attached later is asked about alone, from this step on: the others keep their checks and their rules.
 3. **Its own check, for each repo:** the command found in step 1, in a question of its own: "Is `<command>` the check
    that says the code is ready?" (another one is typed in the chat). A local CI script the project already has is
    that command: from then on it runs through `gate.sh run`, never beside it, so one run gives both records, and the
@@ -41,10 +42,15 @@ tests), never a bare "gate".
    and the board call the result. This is the project's rules, for every repo. Then, when the project has more than one
    code repo: "Does any repo keep other rules than these?", and for each one the owner names, the same question for that
    repo alone; a repo the owner does not name follows the project's. A repo the owner changes later is changed alone.
+   Two repos keep no rule, with no question, since nothing checks them: the docs repo of a workspace (the docs in a
+   repo of their own), which holds no code, and a repo answered *Nothing yet* while other repos are checked, until its
+   first check.
 5. **Write** the four lines, each repo by its name in `REPOS`: `GATES=("api|make check")`, `GATE_PASS=("api|^All
-   checks passed")`, `GITHUB_CI=("api")`, `GATE_RULES="receipt regression merge"`; nothing yet empties all four. A repo with rules of its own gets an entry in
-   `REPO_RULES=("docs|" "web|regression merge")` (an empty list: it keeps none); a repo given the project's rules again
-   loses its entry.
+   checks passed")`, `GITHUB_CI=("api")`, `GATE_RULES="receipt regression merge"`; nothing yet, for every repo,
+   empties all four. A repo with rules of its own gets an entry in `REPO_RULES=("docs|" "web|regression merge")` (an
+   empty list: it keeps none), and so do the two of step 4 that keep no rule: the docs repo of a workspace, and a repo
+   with nothing yet, which has no line in `GATES` or `GITHUB_CI`. A repo given the project's rules again loses its
+   entry, as does a repo at its first check.
    With `receipt` kept for a repo (its own rules, else the project's), run `bash .claude/skills/session-start/gate.sh hook
    <repo>` for each such repo checked. Exit 1: the repo
    has a pre-push hook of its own; add the lines printed to it, with the owner's yes.

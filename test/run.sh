@@ -1602,6 +1602,21 @@ printf '%s\n' 'REPO_RULES+=("extra|")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-extra2.txt" 2>&1
 check "rules per repo: a repo that keeps no rule is not named" lacks "$T/rr-gt-extra2.txt" "extra: nothing checks it"
 cp "$T/rr-conf.bak" .claude/ground-truth.conf && rm -rf extra
+# B-78: /checks gives no rule to the docs repo of a workspace, nor to a repo with nothing yet among checked ones, so
+# the ground truth names neither at each run; the other repos keep their checks.
+CK=$WF/template/dot-claude/skills/checks/SKILL.md
+check "checks: the docs repo of a workspace and a repo with nothing yet keep no rule, with no question" \
+  eval 'flat "$CK" | grep -qF "Two repos keep no rule, with no question, since nothing checks them: the docs repo of a workspace" &&
+    flat "$CK" | grep -qF "and a repo answered *Nothing yet* while other repos are checked, until its first check" &&
+    flat "$CK" | grep -qF "nothing yet, for every repo, empties all four" && ! flat "$CK" | grep -qF "nothing yet empties all four"'
+check "checks: a repo attached later is asked about alone, the others keep their checks" \
+  eval 'flat "$CK" | grep -qF "A repo attached later is asked about alone, from this step on: the others keep their checks"'
+git_q init extra
+printf '%s\n' 'REPOS+=("docs|.|origin|main|" "extra|extra|origin|main|")' 'REPO_RULES+=("docs|" "extra|")' >>.claude/ground-truth.conf
+"$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-b78.txt" 2>&1
+check "rules per repo: as /checks writes them, neither the docs repo nor a repo with no check is named, api still checked" \
+  eval 'lacks "$T/rr-gt-b78.txt" "nothing checks it" && grep "^  api (" "$T/rr-gt-b78.txt" | grep -qF "gate: true"'
+cp "$T/rr-conf.bak" .claude/ground-truth.conf && rm -rf extra
 printf '%s\n' 'REPO_RULES+=("ghost|merge" "api|recipt")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt2.txt" 2>&1
 check "rules per repo: a repo REPOS does not name, and a word that is no rule, are flagged" \
