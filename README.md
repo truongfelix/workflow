@@ -26,8 +26,10 @@ This template keeps a project going across sessions, machines and weeks with fiv
   release, …), and changes it: a preset, or the steps you pick from a list.
 - **`/checks`** shows how the code is checked before a merge (its own check, such as its tests; GitHub CI; both; or
   nothing yet) and the rules kept, such as "a release needs a pass on its exact commit", and changes them.
-- **`/trim`** goes through your rulings and lessons with you, in a session of its own, once the brief says a file grew
-  past the size you set: keep, shorten, move to its doc, or delete (git keeps it).
+- **`/trim`** proposes one plan for your rulings and lessons, in a session of its own, once the brief says a file grew
+  past the size you set. It asks the same questions of each entry (still true? enforced by a check? said by a doc?
+  would the mistake come back?), then keeps, shortens, moves, merges or deletes it (git keeps it); you change only the
+  lines you disagree with.
 
 The handoff is a claim; the script is the fact. `/session-start` and `/handoff` run the same script, so the session
 that writes the note and the session that reads it look at the same picture.
@@ -210,8 +212,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    up from there), `/board` whenever you want to see the work (the backlog, your decisions, the lessons and the
    handoffs as one page), `/autonomy` whenever you want Claude to ask you more or less often (it shows each step
    and what Claude does there, and changes the ones you pick), `/checks` when the way the code is checked changes (a
-   first test command, GitHub CI added, a rule kept or dropped), `/trim` when the brief says a trim is due (it goes
-   through your rulings and lessons with you).
+   first test command, GitHub CI added, a rule kept or dropped), `/trim` when the brief says a trim is due (it proposes
+   what to keep, shorten, move or delete in your rulings and lessons, and you decide).
 
 Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
 project's content and the template's structure.
@@ -246,7 +248,7 @@ handoff rule became the table "What Claude does alone": copy it from the templat
 what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs" and "Push the docs"; everything:
 "Commit code" and "Push a work branch" too), and ask the owner about the other rows.
 
-`/trim` is new: it goes through the rulings of `questions.md` and the lessons with the owner, in a session of its own.
+`/trim` is new: it proposes a plan for the rulings of `questions.md` and the lessons, in a session of its own.
 The ground truth flags `questions.md` past `QUESTIONS_TRIM_LINES` and `notes/lessons.md` past `LESSONS_TRIM_LINES`
 (1000 lines each when the lines are missing; set them in `ground-truth.conf`), and `/session-start` suggests `/trim` on
 the flag.

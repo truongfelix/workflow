@@ -316,9 +316,23 @@ cp "$T/ws-questions.bak" questions.md && cp "$T/ws-conf.bak" .claude/ground-trut
 SK="$WF/template/dot-claude/skills"
 check "/handoff does not trim, it points to /trim" \
   eval 'lacks "$SK/handoff/SKILL.md" "**Trim \`questions.md\`**" && has "$SK/handoff/SKILL.md" "**No trim here**"'
-check "/trim goes through the rulings and the lessons, four at a time" \
-  eval 'has "$SK/trim/SKILL.md" "name: trim" && has "$SK/trim/SKILL.md" "four at a time" &&
-    has "$SK/trim/SKILL.md" "the lessons of \`notes/lessons.md\`"'
+check "/trim covers the rulings and the lessons" \
+  eval 'has "$SK/trim/SKILL.md" "name: trim" && has "$SK/trim/SKILL.md" "each lesson of \`notes/lessons.md\`"'
+for q in "Still true?" "Enforced by a check?" "Said by a doc?" "About how the tools or the code work" \
+  "Could a check enforce it?" "Would the mistake come back without it" "Said twice?" "Fewer words?"; do
+  check "/trim asks of each entry: $q" has "$SK/trim/SKILL.md" "**$q"
+done
+check "/trim gathers each entry's facts: its history, the last commit that names it" \
+  eval 'has "$SK/trim/SKILL.md" "items.sh show <id>" && has "$SK/trim/SKILL.md" "--grep='"'"'<id>([^0-9]|\$)'"'"'"'
+# The pattern the skill gives, run as written: the last commit that names L-1, never one that names L-12.
+git_q init "$T/cite" && git_q -C "$T/cite" commit --allow-empty -m "L-1 first" &&
+  git_q -C "$T/cite" commit --allow-empty -m "L-12 later"
+cite=$(sed -n "s/.*--grep='<id>\([^']*\)'.*/\1/p" "$SK/trim/SKILL.md")
+check "/trim: the last commit that names L-1 is not one that names L-12" \
+  [ -n "$cite" -a "$(git -C "$T/cite" log -1 --format=%s -E --grep="L-1$cite")" = "L-1 first" ]
+check "/trim proposes one plan, and the owner changes only some lines" \
+  eval 'has "$SK/trim/SKILL.md" "**One plan, to the owner, in the chat:**" &&
+    has "$SK/trim/SKILL.md" "the rest follow the plan once the owner says yes"'
 check "/session-start suggests /trim on the flag" has "$SK/session-start/SKILL.md" 'the brief suggests `/trim`'
 check "/session-start's brief names the last handoff's Next and Unfinished" \
   eval 'has "$SK/session-start/SKILL.md" "**Left by the last handoff**" &&
