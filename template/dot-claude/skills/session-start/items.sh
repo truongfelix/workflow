@@ -8,7 +8,8 @@
 # `check` lists each place a tracker departs from it, with its file and line: /session-start runs it after the ground
 # truth, /handoff before committing the trackers. A handoff is checked for its heading, its six sections in order, and
 # the B- or Q- id that each task in Next and Waiting for the user starts with: an id that is in no tracker read in the
-# same run is reported. `list` prints the items themselves, for board.sh, ground-truth.sh and claim.sh. `show` prints
+# same run, and that its tracker never gave (at or above its `next id`), is reported; one given, then closed since the
+# handoff, is not: the next /handoff moves it under Done. `list` prints the items themselves, for board.sh, ground-truth.sh and claim.sh. `show` prints
 # one item, live or deleted, from the files and git: a session finds it without the board.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
@@ -294,7 +295,7 @@ function next_id(   tok, rest) {
   }
   tok = substr($0, 10, RLENGTH - 11); rest = substr($0, RLENGTH + 1)
   if (tok !~ ("^" fk "-[1-9][0-9]*$")) { problem(FNR, "`next id` " tok " is not a " fk "- id"); return }
-  nid = substr(tok, 3) + 0
+  nid = substr(tok, 3) + 0; next_of[fk] = nid
   if (rest ~ /^none given yet\)$/) {
     if (nid != 1) problem(FNR, "`next id` says none given yet, but is not " fk "-1")
   } else if (rest !~ /^last given to [^ @()]+@[^ @()]+\)$/) {
@@ -490,7 +491,8 @@ function h_final(   i, k) {
   for (i = 1; i <= ncite; i++) {
     file = cite_file[i]; k = substr(cite_id[i], 1, 1)
     if (!(k in read_kind)) problem(cite_ln[i], cite_h[i] cite_id[i] ": not checked, no " (k == "B" ? "BACKLOG.md" : "questions.md") " given")
-    else if (!(cite_id[i] in all)) problem(cite_ln[i], cite_h[i] cite_id[i] " is in no tracker: a task names an open item (one that landed goes under `## Done`)")
+    else if (!(cite_id[i] in all) && !((k in next_of) && substr(cite_id[i], 3) + 0 < next_of[k]))
+      problem(cite_ln[i], cite_h[i] cite_id[i] " is in no tracker: a task names an open item (one that landed goes under `## Done`)")
   }
   if (hfiles && !hreadme_seen) { file = hfirst; problem(1, "no handoff/README.md given: the ids of the handoffs are not checked against its `next id`") }
   else if (hreadme_seen && hnid && hmax >= hnid) { file = hreadme_file; problem(hnid_ln, "`next id` is H-" hnid ", not above the highest handoff, H-" hmax) }

@@ -114,6 +114,11 @@ for spec in "${REPOS[@]}"; do
     fi
     [ -n "$gh_repo" ] || gh_repo=$(github_repo "$repo" "$remote")
   fi
+  # The latest release tag here (v*, by version): a release made by a session that wrote no handoff shows all the same.
+  vtag=$(git -C "$repo" tag -l 'v*' --sort=-v:refname 2>/dev/null | head -n 1)
+  if [ -n "$vtag" ]; then
+    echo "  latest release tag: $vtag, on $(git -C "$repo" log -1 --format='%h %cd' --date=format:'%m-%d %H:%M' "$vtag^{commit}" 2>/dev/null)"
+  fi
   R_NAME+=("$name") R_DIR+=("$repo") R_REMOTE+=("$remote") R_BASE+=("$base") R_DEF+=("$def") R_GH+=("$gh_repo")
   [ "$repo" -ef "$ROOT" ] && DOCS_BASE=$base
 
@@ -212,7 +217,7 @@ for spec in "${REPOS[@]}"; do
 
   # Open PRs with their CI in a few words (lib.sh).
   if [ -z "$gh_repo" ]; then
-    echo "  open PRs: not a GitHub repo (set its GitHub owner/repo in REPOS to check)"
+    echo "  open PRs: none to read, not on GitHub"
   elif ! command -v gh >/dev/null; then
     unknown "gh is not installed: open PRs and CI not checked"
   elif ! prs=$(with_timeout 60 gh pr list -R "$gh_repo" --state open --limit 30 \

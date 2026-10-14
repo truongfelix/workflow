@@ -417,6 +417,9 @@ while IFS="$tab" read -r id sec f; do
   elif [ "$rmt" = 1 ]; then
     w="pushed"
     if [ "$own" = 0 ]; then w="$w, no commit beyond $def yet"
+    elif [ "$b" != "$def" ] && [ -n "$pr_repo" ] &&
+      [ -z "$(awk -F '\t' -v n="$pr_repo" '$1 == n { print $3; exit }' "$T/repos")" ]; then
+      : # not on GitHub: no PR to read, nothing to say of one
     elif [ "$b" != "$def" ]; then
       case $st in "ok: as read "*) w="$w, no PR as read $asof" ;; ok*) w="$w, no PR yet" ;; *) w="$w, PRs not read" ;; esac
     fi

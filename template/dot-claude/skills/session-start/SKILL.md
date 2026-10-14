@@ -32,8 +32,9 @@ open that already shipped, "done" items whose code changed since).
      when its session no longer runs (`ListAgents` does not list it) and its claims are not on another machine: this
      session takes it over. Say so in the brief, and read it in full; `/handoff` names it in `continues:` and deletes
      its file, and its claims are taken over with `--from` when their work goes on (step 5). Any other session's
-     handoff is taken over only with the owner's yes. A handoff older than the latest activity in git or on GitHub:
-     say so, and lean on `BACKLOG.md`, `questions.md` and the ground truth.
+     handoff is taken over only with the owner's yes.
+   - A handoff older than the latest activity in git or on GitHub (commits, a release tag the ground truth lists, a
+     PR): say so, and lean on `BACKLOG.md`, `questions.md` and the ground truth.
    - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: when a handoff or a
      question points to one, `bash .claude/skills/session-start/items.sh show <id>` prints it, with its history and
      the handoffs that name it.

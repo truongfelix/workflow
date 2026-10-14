@@ -263,6 +263,10 @@ check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new
 check "the conversion: a tie rule for the ids, and where an item's life before its id is" \
   eval 'flat "$WF/template/notes/item-format.md" | grep -qF "items created in one commit, in file order" &&
     flat "$WF/template/notes/item-format.md" | grep -qF "An item'"'"'s life before its id is under its title"'
+check "B-74: the trim size, gate.sh run's exit 2, and the rule on an old handoff say what they mean" \
+  eval 'flat "$WF/template/dot-claude/ground-truth.conf" | grep -qF "The size is the whole file" &&
+    flat "$WF/template/dot-claude/skills/session-start/gate.sh" | grep -qF "2 = not # run: uncommitted changes" &&
+    has "$WF/template/dot-claude/skills/session-start/SKILL.md" "   - A handoff older than the latest activity in git"'
 check "a 1.x handoff is named by its date, and printed from git" \
   eval 'flat "$WF/template/notes/handoff-format.md" | grep -qF "A 1.x handoff has no id: the board shows it by its date"'
 
@@ -476,6 +480,17 @@ printf '%s\n' '# H-1 2026-10-12 18:40 CEST · claude@ws' '' '## Next' '1. B-1 An
   '## Learned' 'None.' >"$T/ws/notes/handoff/ws.md"
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the handoffs too" has "$T/it.txt" "notes/handoff/ws.md:4: H-1: B-1 is in no tracker"
+# B-74: an id its tracker gave (below `next id`) and closed since the handoff is no problem: the next /handoff moves
+# it under Done. One never given still is.
+cp "$T/ws/BACKLOG.md" "$T/backlog-closed.bak"
+sed 's/^next id: B-1 (none given yet)$/next id: B-5 (last given to claude@ws)/' "$T/backlog-closed.bak" >"$T/ws/BACKLOG.md"
+sed -i.bak 's/^1\. B-1 An item that does not exist$/1. B-3 An item that landed since/' "$T/ws/notes/handoff/ws.md" && rm -f "$T/ws/notes/handoff/ws.md.bak"
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it-closed.txt" 2>&1
+check "items.sh: a handoff naming an item closed since is no problem" lacks "$T/it-closed.txt" "B-3"
+sed -i.bak 's/^1\. B-3 An item that landed since$/1. B-7 An item never given/' "$T/ws/notes/handoff/ws.md" && rm -f "$T/ws/notes/handoff/ws.md.bak"
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it-closed.txt" 2>&1
+check "items.sh: a handoff naming an id never given is a problem" has "$T/it-closed.txt" "H-1: B-7 is in no tracker"
+cp "$T/backlog-closed.bak" "$T/ws/BACKLOG.md"
 rm "$T/ws/notes/handoff/ws.md"
 # A 1.x project after adopt.sh: its items still bullets, its one notes/handoff.md not moved yet. The check lists both
 # until they are converted (B-67); a bullet that only names a state, as the 1.x rules did, is no item.
@@ -1263,6 +1278,11 @@ check "gate hook: a release tag on a commit with a receipt goes" \
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt2.txt" 2>&1
 gate_section() { sed -n '/^== checks/,/^$/p' "$1"; } # <ground truth output>
 check "ground truth, gate: no flag once gated and hooked" eval '[ -z "$(gate_section "$T/gate-gt2.txt" | grep "⚠")" ]'
+# B-74: a repo not on GitHub has no PRs to read, and no advice to set one; its latest release tag is listed.
+check "ground truth: a repo not on GitHub, no PR to read and no advice" \
+  eval 'has "$T/gate-gt2.txt" "  open PRs: none to read, not on GitHub" && lacks "$T/gate-gt2.txt" "set its GitHub owner/repo"'
+check "ground truth: the latest release tag, and its commit" \
+  has "$T/gate-gt2.txt" "  latest release tag: v1.0.0, on $(git rev-parse --short HEAD) "
 # Docs and code in one repo: a commit that changes only the docs (a handoff, a claim) keeps the receipt of the code it
 # follows, for the rule merge and for a release tag; a code change after it needs the gate again (B-65).
 gated=$(git rev-parse --short HEAD)
@@ -1488,8 +1508,11 @@ check "attach: a name already in REPOS gets its pointer back, no path needed" \
 git_q add .claude/ground-truth.conf && git_q commit -m "svc attached" && git_q push origin main
 "$SH" .claude/skills/session-start/claim.sh B-2 feat/two claude@test >"$T/at-claim.txt" 2>&1
 check "attach: a claim still works with two repos" eval '[ $? = 0 ] && has "$T/at-claim.txt" "CLAIMED: B-2 Second"'
+(cd svc && git_q checkout -b feat/two && git_q commit --allow-empty -m two && git_q push origin feat/two && git_q checkout main)
 "$SH" .claude/skills/session-start/board.sh --no-open --offline --out "$T/at-board.html" "$T/one" >/dev/null 2>&1
 check "attach: the board lists both repos" has "$T/at-board.html" '"repos":["one","svc"]'
+check "board, where: a branch pushed to a remote not on GitHub, with no word on PRs (B-74)" \
+  has "$T/at-board.html" '"B-2":"feat/two: pushed"'
 # A repo with a CLAUDE.md of its own keeps it; the pointer is CLAUDE.local.md. A repo outside the root is allowed.
 git_q clone "$T/remote-svc.git" "$T/far" && printf '%s\n' '# the repo own rules' >"$T/far/CLAUDE.md"
 "$SH" "$AT" far "$T/far" >"$T/at4.txt" 2>&1

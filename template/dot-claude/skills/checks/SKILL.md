@@ -49,7 +49,8 @@ tests), never a bare "gate".
    <repo>` for each such repo checked. Exit 1: the repo
    has a pre-push hook of its own; add the lines printed to it, with the owner's yes.
 6. **Verify:** `bash .claude/skills/session-start/ground-truth.sh --no-fetch`, its section `== checks`. A ⚠ NO
-   RECEIPT goes away with `gate.sh run <repo>` on the default branch; a ⚠ CI that is not green is news for the owner;
+   RECEIPT goes away with `gate.sh run <repo>` on the default branch, once committed (a receipt is for a commit: at
+   setup, after the setup's commit); a ⚠ CI that is not green is news for the owner;
    an UNKNOWN on CI means `gh` cannot read it (not installed, not logged in, no GitHub repo): fix that, or drop GitHub
    CI for that repo.
 7. **Say what changed** in plain words, and commit `.claude/ground-truth.conf` as the row "Commit the docs" says,

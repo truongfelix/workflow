@@ -37,7 +37,8 @@
 #   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): while the repo's rules keep
 #             "receipt", refuses a v* tag whose commit has no receipt (a repo of GATES) or no green CI (GITHUB_CI)
 #   <repo> can be left out when the current directory is in a repo the command takes, or when it takes only one.
-# Exit: run 0 = passed, receipt written; 1 = the gate failed, or the checkout changed while it ran: no receipt.
+# Exit: run 0 = passed, receipt written; 1 = the gate failed, or the checkout changed while it ran: no receipt; 2 = not
+#   run: uncommitted changes (a receipt is for a commit: commit them first).
 #   check 0 = a receipt; 1 = none. ci 0 = CI green; 1 = any other verdict. hook 0 = installed, updated, or already there;
 #   1 = another hook is there (add the lines printed). pre-push 0 = the push goes; 1 = refused. Any: 2 = a usage
 #   error, or nothing could be read (UNKNOWN).
