@@ -99,7 +99,17 @@ for f in notes/lessons.md notes/handoff/README.md notes/handoff/*.md; do
   [ -f "$f" ] && trackers+=("$f")
 done
 T=$(mktemp -d "${TMPDIR:-/tmp}/board.XXXXXX") || { echo "UNKNOWN: no temp folder"; exit 2; }
-trap 'rm -rf "$T"' EXIT
+placing=""
+trap 'rm -rf "$T" ${placing:+"$placing"}' EXIT
+# A file built in $T goes to its place through a copy beside it, so the last move is a rename, atomic: a build running
+# at the same time (the hook's, while /session-start runs its own) finds the old file or the new one. A move from
+# another filesystem (/tmp is often tmpfs) copies: it deletes the target, then creates it, and fails with "File exists"
+# when the other build created it in between.
+place() { # <file in $T> <target>
+  placing=$(mktemp "$2.XXXXXX") || return 1
+  cat "$1" >"$placing" && mv -f "$placing" "$2" || return 1
+  placing=""
+}
 
 # The project's name: the trackers' title up to its dash ("# Pantry — Backlog"), else the folder's name (also while
 # the title is still the template's FILL marker).
@@ -313,7 +323,7 @@ if [ -s "$T/read-now" ]; then # keep what was read now, and what an earlier buil
     awk -F '\t' 'NR == FNR { now[$1] = 1; next } $2 in now' "$T/read-now" "$T/prs"; } >"$T/cache"
   { cat "$T/read-now"; awk -F '\t' 'NR == FNR { now[$1] = 1; next } !($1 in now)' "$T/read-now" "$cache.read" 2>/dev/null; } \
     >"$T/cache.read"
-  mv -f "$T/cache" "$cache" && mv -f "$T/cache.read" "$cache.read"
+  place "$T/cache" "$cache" && place "$T/cache.read" "$cache.read"
 fi
 
 # Where the work of each claimed item is (notes/item-format.md, Claims): computed at each build, never written in the
@@ -432,7 +442,7 @@ if [ -s "$T/ci-now" ]; then # keep what was read now, and what earlier builds re
   { cat "$T/ci-now"
     if [ -f "$cicache" ]; then # a missing file would fail the awk, and pipefail the whole pipeline
       awk -F '\t' 'NR == FNR { now[$1 "\t" $2] = 1; next } !(($1 "\t" $2) in now)' "$T/ci-now" "$cicache"
-    fi; } | head -n 200 >"$T/ci-cache" && mv -f "$T/ci-cache" "$cicache"
+    fi; } | head -n 200 >"$T/ci-cache" && place "$T/ci-cache" "$cicache"
 fi
 
 # The commits: the history's, every commit of each repo that names an id, then every hash quoted in the text, each
@@ -1292,7 +1302,7 @@ probe();
 </html>
 <!-- */ -->
 PAGE
-} >"$T/page.html" && mv -f "$T/page.html" "$out" || { echo "UNKNOWN: cannot write $out"; exit 2; }
+} >"$T/page.html" && place "$T/page.html" "$out" || { echo "UNKNOWN: cannot write $out"; exit 2; }
 
 echo "Board: $out"
 

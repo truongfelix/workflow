@@ -824,6 +824,33 @@ cp "$T/backlog.bak" "$T/board/BACKLOG.md"
 mkdir -p "$T/empty"
 hook '{"tool_name":"Edit","tool_input":{"file_path":"/p/BACKLOG.md"}}' "$T/empty"
 check "hook: a folder with no tracker still exits 0, silently" [ $? = 0 -a ! -s "$T/hook.txt" ]
+
+# Builds at once (the hook's, while /session-start runs its own): the page goes to its place by a rename beside it,
+# never by a move from the temp folder, which copies across filesystems (/tmp is often tmpfs) and fails with "File
+# exists" when another build created the page in between (B-59).
+mkdir -p "$T/fakemv" "$T/placed" "$T/tmp59"
+printf '#!/usr/bin/env bash\necho "$*" >>"%s/mv.log"\nexec "%s" "$@"\n' "$T" "$(command -v mv)" >"$T/fakemv/mv"
+chmod +x "$T/fakemv/mv"
+TMPDIR="$T/tmp59" PATH="$T/fakemv:$PATH" "$SH" "$BD" --no-open --offline --out "$T/placed/board.html" "$T/board" \
+  >/dev/null 2>&1
+check "board: the page is moved to its place" has "$T/mv.log" " $T/placed/board.html"
+check "board: the page is moved from beside its place only (a rename)" [ -z "$(awk -v d="$T/placed/" \
+  'index($NF, d) == 1 && index($(NF - 1), d) != 1' "$T/mv.log")" ]
+check "board: no copy left beside the page" [ -z "$(ls "$T/placed" | grep -v '^board\.html$')" ]
+# For real, where the temp folder and the page are on two filesystems (Linux: /dev/shm is tmpfs).
+mnt() { df -P "$1" | awk 'NR == 2 { print $NF }'; } # <path>: its filesystem's mount point
+if [ -d /dev/shm ] && [ -w /dev/shm ] && [ "$(mnt /dev/shm)" != "$(mnt "$T")" ]; then
+  failed59=0
+  for _ in 1 2 3; do
+    pids=""
+    for _ in 1 2 3 4 5 6; do
+      TMPDIR=/dev/shm "$SH" "$BD" --no-open --offline --out "$T/placed/race.html" "$T/board" >/dev/null 2>&1 &
+      pids="$pids $!"
+    done
+    for p in $pids; do wait "$p" || failed59=$((failed59 + 1)); done
+  done
+  check "board: 6 builds at once, 3 times, across two filesystems: each one writes the page" [ "$failed59" = 0 ]
+fi
 check "adopt.sh installs the hook" has "$T/ws/.claude/settings.json" '/.claude/skills/session-start/board.sh\" --hook'
 check "adopt.sh installs /board" [ -f "$T/ws/.claude/skills/board/SKILL.md" ]
 if command -v node >/dev/null 2>&1; then
