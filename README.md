@@ -325,6 +325,7 @@ workspace/gitignore           whitelist .gitignore for a multi-repo workspace's 
 bin/adopt.sh                  installs the template, overwrites nothing but its version file, lists what is left to FILL
 example/                      a filled-in project: the files behind the brief in "What it looks like"
 test/run.sh                   tests adopt.sh, the skills' scripts and the table "What Claude does alone"; CI runs it
+test/macos.sh                 runs test/run.sh on Linux as macOS would (bash 3.2.57, Apple's awk), for work with no CI
                               on Linux, macOS and Windows
 test/fixtures/broken/         trackers, lessons and a handoff that break their format in every way items.sh reports
 test/fixtures/two-sessions/   two sessions' handoffs that pass the check
