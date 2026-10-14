@@ -92,8 +92,8 @@ Then open Claude Code in your project and ask:
 Claude first asks for your project's git remote, then where its notes and to-do lists live (with the code, or in a
 repo of their own), then what it may do without asking you (commit, push, open a PR, merge, …: a preset, then any
 change), then fills in the blanks (what the project is, its repos, how its code is
-checked, its rules), runs the ground truth until it comes back clean, and runs `/handoff` once to write the first
-handoff. You change any of those answers whenever you want, in words ("from now on, push the docs without asking")
+checked, its rules), runs the ground truth until it is complete, commits the setup and runs your check once on it,
+and runs `/handoff` once to write the first handoff, from a ground truth with nothing to flag. You change any of those answers whenever you want, in words ("from now on, push the docs without asking")
 or with `/autonomy` and `/checks`. From then on: `/session-start` when you sit down, `/handoff` before you stop,
 `/board` whenever you want to see the work at a glance.
 
@@ -215,7 +215,10 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    and read the staged list (`git diff --cached --name-only`). Docs in a repo of their own: at the root, the repo of
    step 1, check `git status --ignored` too; never track a datadir, a key or a binary. Scan the staged files for
    secrets: `gitleaks git --staged` (gitleaks 8.19 and later; before: `gitleaks protect --staged`). Commit, then push
-   to the remote of step 1 as the table allows: the setup's files are the docs.
+   to the remote of step 1 as the table allows: the setup's files are the docs. Then run each repo's own check once on
+   its default branch, `bash .claude/skills/session-start/gate.sh run <repo>` for each repo of `GATES`: a receipt is
+   for a commit, so none could be kept before this one, and with the rule "merge" the ground truth flags a default
+   branch that has none. A check that fails is the first thing to tell the owner.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
    ground truth. Then end the setup with one sentence for each skill, when to use it and what it is for:
    `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's

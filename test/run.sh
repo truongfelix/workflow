@@ -310,6 +310,13 @@ check "README: adopt.sh overwrites nothing but its version file" \
 check "README, setup: where worktrees go, and whether a repo attached later is public" \
   eval 'flat "$WF/README.md" | grep -qF "where worktrees go: beside their repo, \`<repo>-<topic>/\`, unless the owner says otherwise" &&
     flat "$WF/README.md" | grep -qF "with the owner'"'"'s answer to whether it is public"'
+# B-85: the setup ends with a ground truth that has nothing to flag: one word for it, and the check run on the
+# setup's commit, before the first handoff.
+check "README, setup: complete, then the setup's commit checked once, before the first handoff" \
+  eval 'lacks "$WF/README.md" "comes back clean" &&
+    flat "$WF/README.md" | grep -qF "commits the setup and runs your check once on it, and runs \`/handoff\` once" &&
+    flat "$WF/README.md" | grep -qF "Then run each repo'"'"'s own check once on its default branch, \`bash .claude/skills/session-start/gate.sh run <repo>\` for each repo of \`GATES\`" &&
+    [ "$(step4_line "Then run each repo")" -lt "$(step4_line "6. **Close the loop:**")" ]'
 # B-81, after its trial: a change of the docs alone goes in the section of the repo that holds them; the tag, its
 # push and the rest of a release are one yes; the setup asks what a release publishes.
 check "the item format: a change of the docs alone goes in the section of the repo at . in REPOS" \
