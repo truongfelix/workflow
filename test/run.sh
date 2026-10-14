@@ -642,6 +642,12 @@ for problem in 'BACKLOG.md:9: B-1: no `Done when:` line' 'BACKLOG.md:12: B-2: �
 done
 "$SH" "$ITS" check "$T/nowhere/BACKLOG.md" >"$T/it-missing.txt" 2>&1
 check "items.sh: a file it cannot read exits 2" [ $? = 2 ]
+# B-87: a `Done when:` line outside any item is what a deletion by hand leaves: reported, with its line.
+mkdir -p "$T/stray" && printf '%s\n' '# Demo — Backlog' '' 'next id: B-2 (last given to claude@s1)' '' '## app' '' \
+  'Done when: a line left behind.' '' '### 🔲 B-1 One' 'Done when: done.' >"$T/stray/BACKLOG.md"
+"$SH" "$ITS" check "$T/stray/BACKLOG.md" >"$T/it-stray.txt" 2>&1
+check "items.sh: a Done when: line outside any item is reported (B-87)" \
+  eval '[ $? = 2 ] && has "$T/it-stray.txt" "BACKLOG.md:7: a \`Done when:\` line outside any item"'
 check "items.sh: a file it cannot read says UNKNOWN" has "$T/it-missing.txt" "UNKNOWN: $T/nowhere/BACKLOG.md"
 
 # items.sh list: the records the board reads. A heading it cannot read is kept as written, never dropped.
@@ -1717,7 +1723,7 @@ check "rules per repo: a repo that keeps rules and that nothing checks is named"
   "  ⚠ extra: nothing checks it, though it keeps receipt regression merge (/checks: its check, or no rules for it)"
 printf '%s\n' 'REPO_RULES+=("extra|")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-extra2.txt" 2>&1
-check "rules per repo: a repo that keeps no rule is not named" lacks "$T/rr-gt-extra2.txt" "extra: nothing checks it"
+check "rules per repo: a repo that keeps no rule is not flagged" lacks "$T/rr-gt-extra2.txt" "⚠ extra: nothing checks it"
 cp "$T/rr-conf.bak" .claude/ground-truth.conf && rm -rf extra
 # B-78: /checks gives no rule to the docs repo of a workspace, nor to a repo with nothing yet among checked ones, so
 # the ground truth names neither at each run; the other repos keep their checks.
@@ -1732,7 +1738,10 @@ git_q init extra
 printf '%s\n' 'REPOS+=("docs|.|origin|main|" "extra|extra|origin|main|")' 'REPO_RULES+=("docs|" "extra|")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt-b78.txt" 2>&1
 check "rules per repo: as /checks writes them, neither the docs repo nor a repo with no check is named, api still checked" \
-  eval 'lacks "$T/rr-gt-b78.txt" "nothing checks it" && grep "^  api (" "$T/rr-gt-b78.txt" | grep -qF "gate: true"'
+  eval 'lacks "$T/rr-gt-b78.txt" "⚠ docs: nothing checks it" && lacks "$T/rr-gt-b78.txt" "⚠ extra: nothing checks it" &&
+    grep "^  api (" "$T/rr-gt-b78.txt" | grep -qF "gate: true"'
+check "rules per repo: the checks section names the repos nothing checks and that keep no rule (B-87)" \
+  has "$T/rr-gt-b78.txt" "  docs, extra: nothing checks them, and they keep no rule"
 cp "$T/rr-conf.bak" .claude/ground-truth.conf && rm -rf extra
 printf '%s\n' 'REPO_RULES+=("ghost|merge" "api|recipt")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt2.txt" 2>&1

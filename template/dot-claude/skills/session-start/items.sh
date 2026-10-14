@@ -520,6 +520,7 @@ fence { keep(); text_line(); next }
 /^##? / || /^---+[ \t]*$/ { end_item(); if ($0 ~ /^#/) { section = $0; sub(/^#+ +/, "", section) }; next }
 id != "" { item_line(); next }
 bad_ln { keep(); next }
+fk == "B" && /^Done when:/ { problem(FNR, "a `Done when:` line outside any item: what is left of an item deleted by hand?") }
 fk == "L" && section != "" && /^[ \t]*[-*+] / { problem(FNR, "a lesson without an id: a lesson is `### L-<n> <title>`") }
 (fk == "B" || fk == "Q") && section != "" && /^[ \t]*[-*+] / && old_item() {
   problem(FNR, "an item without an id, as before items had ids: an item is `### <state> <id> <title>` (notes/item-format.md, \"Moving a project to it\")")

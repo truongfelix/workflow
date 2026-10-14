@@ -489,13 +489,22 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
 done
 # A repo that keeps rules (its own, else the project's) but that no gate or CI checks: one attached later, or left out
 # by /checks. Only once something checks the code: before that, the line above says it for the whole project.
+# A repo that keeps no rule and that nothing checks (the docs repo of a workspace, a repo with no check yet) is named
+# too, so the section lists every repo.
 if [ "$named" != " " ]; then
+  unchecked=""
   for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
     n=${R_NAME[$i]}
     case $named in *" $n "*) continue ;; esac
     nr=$(echo $(repo_rules "$n"))
-    if [ -n "$nr" ]; then echo "  ⚠ $n: nothing checks it, though it keeps $nr (/checks: its check, or no rules for it)"; fi
+    if [ -n "$nr" ]; then echo "  ⚠ $n: nothing checks it, though it keeps $nr (/checks: its check, or no rules for it)"
+    else unchecked="$unchecked${unchecked:+, }$n"; fi
   done
+  case $unchecked in
+    "") ;;
+    *", "*) echo "  $unchecked: nothing checks them, and they keep no rule" ;;
+    *) echo "  $unchecked: nothing checks it, and it keeps no rule" ;;
+  esac
 fi
 
 # The count of a tracker leaves out an item with no id (a 1.x bullet not converted yet): say so.
