@@ -126,8 +126,16 @@ if [ -e "$repo/$file" ] && ! grep -qF -- "$MARK" "$repo/$file"; then
   fail "$repo/$file exists and is not a pointer: move it, then run this again (the repo is in REPOS)"
 fi
 # Inside the root, Claude Code loads the root's CLAUDE.md above the session's folder already: no import there (it
-# would load twice). Elsewhere the import is what brings the rules.
-import="@$ROOT/CLAUDE.md"
+# would load twice). Elsewhere the import is what brings the rules, but Claude Code loads it only where an interactive
+# session allowed it (it asks once per folder and keeps a no; claude -p never asks): the pointer, which loads in any
+# case, then says to read the rules before any work, or to stop.
+import="@$ROOT/CLAUDE.md
+
+The line above imports the docs' \`CLAUDE.md\`, and with it the project's rules and lessons. Claude Code loads it only
+where an interactive session allowed it, and keeps a no: when \`$ROOT/CLAUDE.md\` is not among the files loaded at the
+start of this session (the line above shows as a bare path), read it, and each file it imports with an \`@\` line
+(relative to it), before anything else, and follow them as if they had loaded. If they cannot be read, say so and do
+no work here."
 case $repo in "$ROOT"/*) import="(Inside the docs repo's folder: its CLAUDE.md loads above this one.)" ;; esac
 cat >"$repo/$file" <<PTEOF
 $MARK

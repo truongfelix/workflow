@@ -246,6 +246,10 @@ check "README, code repos: the import is asked once, a no is kept, and claude -p
     flat "$WF/README.md" | grep -qF "never asks again" &&
     flat "$WF/README.md" | grep -qF "loads the import only where an interactive session allowed it" &&
     ! flat "$WF/README.md" | grep -qF "may ask whether"'
+check "README, code repos: where the import did not load, the pointer has the rules read, or the session stops (B-76)" \
+  eval 'flat "$WF/README.md" | grep -qF "Where it did not load, the pointer tells the session to read the docs" &&
+    flat "$WF/README.md" | grep -qF "\`claude -p\` reads them with \`--add-dir <the docs folder>\`" &&
+    lacks "$WF/README.md" "every session there loads the pointer alone, without the rules"'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
@@ -1528,6 +1532,13 @@ check "attach: a repo outside the root, with a CLAUDE.md of its own: that file u
     has "$T/far/CLAUDE.local.md" "workflow pointer: written by attach.sh" && has "$T/far/CLAUDE.local.md" "@$TP/one/CLAUDE.md" && ! git -C "$T/far" status --porcelain | grep -q CLAUDE.local'
 "$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt3.txt" 2>&1
 check "attach: ground truth accepts a CLAUDE.local.md pointer" lacks "$T/at-gt3.txt" "NO POINTER"
+# B-76: Claude Code loads the import only where an interactive session allowed it (a no is kept, claude -p never
+# asks); there the pointer alone loads, and a session worked without the rules. The pointer says to read them first.
+check "attach: outside the root, the pointer says to read the docs' rules when its import did not load, or stop" \
+  eval 'flat "$T/far/CLAUDE.local.md" | grep -qF "when \`$TP/one/CLAUDE.md\` is not among the files loaded at the start of this session" &&
+    flat "$T/far/CLAUDE.local.md" | grep -qF "each file it imports with an \`@\` line (relative to it), before anything else" &&
+    flat "$T/far/CLAUDE.local.md" | grep -qF "If they cannot be read, say so and do no work here."'
+check "attach: inside the root, the pointer has no import to fall back from" lacks svc/CLAUDE.md "If they cannot be read"
 # B-73: repos keep the order they were attached in; the pointer sends a session to the docs, with commands that run.
 check "attach: a repo attached later comes after the others" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| far|$T/far|origin|| " ]
 check "attach: the pointer says to open Claude Code in the docs, and gives a command by its full path" \
