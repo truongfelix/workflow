@@ -1153,7 +1153,8 @@ echo edit >state.txt && git_q commit -am edits
 check "gate run: a gate that edits the tree, no receipt (exit 1)" eval '[ $? = 1 ] && has "$T/gate-edit.txt" "NO RECEIPT: the gate passed, but the checkout changed" &&
   [ ! -e ".git/gate-receipts/$(git rev-parse HEAD)" ]'
 check "gate run: a checkout changed while the gate passed is no failure" [ ! -e ".git/gate-failures/$(git rev-parse HEAD)" ]
-echo pass >state.txt && git_q commit -am fixed
+# Code never gated: code the same as a gated commit's keeps that receipt (B-65).
+printf '%s\n' pass fixed >state.txt && git_q commit -am fixed
 # The rule "receipt": the pre-push hook refuses a release tag whose commit has no receipt.
 "$SH" "$GA" hook >"$T/gate-hook.txt" 2>&1
 check "gate hook: installed" eval '[ $? = 0 ] && [ -x .git/hooks/pre-push ] && has "$T/gate-hook.txt" "HOOK: installed in "'
@@ -1175,6 +1176,35 @@ check "gate hook: a release tag on a commit with a receipt goes" \
 "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt2.txt" 2>&1
 gate_section() { sed -n '/^== checks/,/^$/p' "$1"; } # <ground truth output>
 check "ground truth, gate: no flag once gated and hooked" eval '[ -z "$(gate_section "$T/gate-gt2.txt" | grep "⚠")" ]'
+# Docs and code in one repo: a commit that changes only the docs (a handoff, a claim) keeps the receipt of the code it
+# follows, for the rule merge and for a release tag; a code change after it needs the gate again (B-65).
+gated=$(git rev-parse --short HEAD)
+mkdir -p notes/handoff && echo "# H-1" >notes/handoff/s1.md
+printf '%s\n' '# Demo — Backlog' '' 'next id: B-2 (last given to claude@s1)' '' '## project' '' '### 🔲 B-1 First' \
+  'claimed: claude@s1 on docs-only at laptop' 'Done when: done.' >BACKLOG.md
+git add notes BACKLOG.md && git_q commit -m "a handoff" && git_q push origin main && git branch docs-only
+CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --out "$T/gate-board-docs.html" "$T/gate/p" >/dev/null 2>&1
+check "board, gate: a branch whose last commits changed the docs alone, the pass before them" \
+  grep -qF "\"B-1\":\"passed (${gated:0:7}; the docs alone changed since)\"" "$T/gate-board-docs.html"
+"$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt-docs.txt" 2>&1
+check "ground truth, gate: a commit of the docs alone keeps the receipt of the code before it" \
+  eval 'has "$T/gate-gt-docs.txt" "  project (gate: sh bin/gate): origin/main at $(git rev-parse --short=7 HEAD), receipt of " &&
+    has "$T/gate-gt-docs.txt" " (on ${gated:0:7}; the docs alone changed since)" && [ -z "$(gate_section "$T/gate-gt-docs.txt" | grep "⚠")" ]'
+"$SH" "$GA" check >"$T/gate-check-docs.txt" 2>&1
+check "gate check: a commit of the docs alone, the receipt before it (exit 0)" \
+  eval '[ $? = 0 ] && has "$T/gate-check-docs.txt" "RECEIPT: $(git rev-parse --short HEAD) changed only the docs since $gated, which passed the gate of project on "'
+git tag -a v1.0.0-docs -m docs && git push origin v1.0.0-docs >"$T/gate-push-docs.txt" 2>&1
+check "gate hook: a release tag on a commit of the docs alone after a receipt goes" \
+  eval '[ $? = 0 ] && [ -n "$(git ls-remote --tags origin v1.0.0-docs)" ]'
+printf '%s\n' pass more >state.txt && git_q commit -am "code after the docs" && git_q push origin main
+"$SH" "$GA" check >/dev/null 2>&1
+check "gate check: a code change after the docs has no receipt (exit 1)" [ $? = 1 ]
+"$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/gate-gt-code.txt" 2>&1
+check "ground truth, gate: a code change after the docs is flagged" has "$T/gate-gt-code.txt" \
+  "origin/main at $(git rev-parse --short=7 HEAD), ⚠ NO RECEIPT: not gated since it last changed"
+git tag -a v1.0.0-code -m code && git push origin v1.0.0-code >"$T/gate-push-code.txt" 2>&1
+check "gate hook: a release tag on a code change after the docs is refused" \
+  eval '[ $? != 0 ] && has "$T/gate-push-code.txt" "REFUSED: v1.0.0-code is on " && [ -z "$(git ls-remote --tags origin v1.0.0-code)" ]'
 cp .claude/ground-truth.conf "$T/gate-conf.bak"
 git_q commit --allow-empty -m "not gated" && git tag v1.0.1
 echo 'GATE_RULES="regression merge"' >>.claude/ground-truth.conf
@@ -1406,6 +1436,12 @@ check "rules per repo: the same tag goes where the repo keeps no rule" \
   eval '[ $? = 0 ] && [ -n "$(git -C web ls-remote --tags origin v1.0.0)" ]'
 "$SH" $RR/board.sh --no-open --offline --out "$T/rr-board.html" "$T/rr" >/dev/null 2>&1
 check "rules per repo: the board has the rules of that repo, with its preset" has "$T/rr-board.html" '"repoRules":[["web","","Prototype"]]'
+# Only the repo at the project root holds the docs: in a code repo, a notes/ folder is code, and needs the gate (B-65).
+"$SH" $RR/gate.sh run api >/dev/null 2>&1
+(cd api && mkdir -p notes && echo x >notes/x.md && git add notes && git_q commit -m "notes of the code")
+"$SH" $RR/gate.sh check api >"$T/rr-check-notes.txt" 2>&1
+check "rules per repo: in a code repo, a commit of notes/ alone has no receipt (exit 1)" \
+  eval '[ $? = 1 ] && has "$T/rr-check-notes.txt" "NO RECEIPT: "'
 printf '%s\n' 'REPO_RULES+=("ghost|merge" "api|recipt")' >>.claude/ground-truth.conf
 "$SH" $RR/ground-truth.sh --no-fetch >"$T/rr-gt2.txt" 2>&1
 check "rules per repo: a repo REPOS does not name, and a word that is no rule, are flagged" \

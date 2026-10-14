@@ -50,6 +50,28 @@ git_common_dir() { # <dir>: the git directory that the worktrees of its repo sha
   (cd "$d" && pwd -P)
 }
 
+# The docs (CLAUDE.md, "What Claude does alone"): the handoffs, the trackers, notes/, CLAUDE.md and .claude/, as git
+# pathspecs that leave them out. They are in the repo at the project root, beside the code when docs and code share one
+# repo: there a commit that changes only the docs (a handoff, a claim) leaves the code as it was gated.
+DOCS_EXCLUDE=(':(top)' ':(top,exclude)CLAUDE.md' ':(top,exclude)BACKLOG.md' ':(top,exclude)questions.md'
+  ':(top,exclude)notes' ':(top,exclude).claude')
+receipt_of() { # <repo dir> <commit> <project root>: sets RECEIPT, the receipt file that holds for that commit, and
+  # RECEIPT_ON, the commit it was written for: its own; else, in the repo at the project root, the receipt of the last
+  # commit before it (first parents) when only the docs changed since. 1 when none holds.
+  local gd a
+  RECEIPT="" RECEIPT_ON=""
+  gd=$(git_common_dir "$1") || return 1
+  if [ -f "$gd/gate-receipts/$2" ]; then RECEIPT="$gd/gate-receipts/$2" RECEIPT_ON=$2; return 0; fi
+  [ "$gd" = "$(git_common_dir "$3")" ] || return 1
+  for a in $(git -C "$1" rev-list --first-parent --max-count=200 "$2" 2>/dev/null); do
+    [ -f "$gd/gate-receipts/$a" ] || continue
+    git -C "$1" diff --quiet "$a" "$2" -- "${DOCS_EXCLUDE[@]}" 2>/dev/null || return 1
+    RECEIPT="$gd/gate-receipts/$a" RECEIPT_ON=$a
+    return 0
+  done
+  return 1
+}
+
 # The CI of an open PR in a few words, for `gh pr list --json number,statusCheckRollup --jq`: CI red, CI running,
 # CI green, or no CI (an empty rollup is never "green"). `pr_verdict` is the PR's.
 PR_CI_JQ='def pr_verdict: [ .statusCheckRollup[]?

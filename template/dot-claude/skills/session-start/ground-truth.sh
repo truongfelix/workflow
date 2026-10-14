@@ -444,9 +444,9 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
     gsha=$(git -C "$gdir" rev-parse "$gbase")
     st="$gbase at ${gsha:0:7}"
     if [ -n "$gcmd" ]; then
-      gcommon=$(git_common_dir "$gdir")
-      if [ -f "$gcommon/gate-receipts/$gsha" ]; then
-        st="$st, receipt of $(sed -n 's/^passed: //p' "$gcommon/gate-receipts/$gsha")"
+      if receipt_of "$gdir" "$gsha" "$ROOT"; then
+        st="$st, receipt of $(sed -n 's/^passed: //p' "$RECEIPT")"
+        [ "$RECEIPT_ON" = "$gsha" ] || st="$st (on ${RECEIPT_ON:0:7}; the docs alone changed since)"
       elif [ "$m" = 1 ]; then
         st="$st, ⚠ NO RECEIPT: not gated since it last changed (gate.sh run $gname, on it)"
       else

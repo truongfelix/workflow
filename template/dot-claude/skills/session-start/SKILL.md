@@ -54,9 +54,9 @@ open that already shipped, "done" items whose code changed since).
      this session's handoff ("Unfinished") names the session before this one: this session takes it over when it goes on
      with that work (step 5). An item another session claimed is not proposed: it is taken. A claim marked ⚠ STALE,
      GONE, NOT HERE or NOT PUSHED goes in the brief: only the owner releases another session's claim.
-   - **The checks** → the checks section: a ⚠ NO RECEIPT or a CI not green (the rule "merge": a default branch not
-     checked since it last changed) or a ⚠ NO HOOK (the rule "receipt") goes in the brief, with the command the
-     section names.
+   - **The checks** → the checks section: a ⚠ NO RECEIPT or a CI not green (the rule "merge": a default branch whose
+     code was not checked since it last changed) or a ⚠ NO HOOK (the rule "receipt") goes in the brief, with the
+     command the section names.
    - **A trim due** → the `questions.md` or `notes/lessons.md` section says `⚠ TRIM` (the file passed its own size in
      `.claude/ground-truth.conf`): the brief suggests `/trim`, in a session of its own, and trims nothing itself.
    - **Landed work**: an item whose work is pushed with its checks passed and CI green, or merged, is deleted now

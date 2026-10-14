@@ -6,7 +6,9 @@
 # clone's git directory (gate-receipts/<commit>), shared by its worktrees, never tracked and never pushed: another
 # clone runs the gate again. Untracked files are not counted as uncommitted: a build leaves some, and the owner drops
 # working files into the tree. A failed run leaves a record beside the receipts (gate-failures/<commit>), which the
-# board shows; a later pass on that commit removes it, and a failure never removes a receipt.
+# board shows; a later pass on that commit removes it, and a failure never removes a receipt. In the repo at the project
+# root, a receipt also holds for the later commits that change only the docs (lib.sh, receipt_of): when docs and code
+# share one repo, a handoff or a claim does not call for the gate again.
 #
 # How the code is checked before a merge (.claude/ground-truth.conf, set by /checks): by a gate (GATES, each repo's
 # command), by GitHub CI (GITHUB_CI), both, or nothing yet. The rules the project keeps (GATE_RULES, or a repo's own in REPO_RULES) read the receipts
@@ -140,7 +142,7 @@ if [ "$cmd" = pre-push ]; then
     case $lsha in *[!0]*) ;; *) continue ;; esac # all zeros: the tag is deleted
     c=$(git rev-parse -q --verify "$lsha^{commit}") || continue
     tag=${rref#refs/tags/} short=$(git rev-parse --short "$c")
-    if [ "$gated" = 1 ] && [ ! -f "$here/gate-receipts/$c" ]; then
+    if [ "$gated" = 1 ] && ! receipt_of . "$c" "$ROOT"; then
       echo "REFUSED: $tag is on $short, which has not passed the gate here (the gate rule \"receipt\"): check it" \
         "out, run gate.sh run, then push again" >&2
       refused=1
@@ -277,9 +279,11 @@ case $cmd in
     wt=$(worktree)
     sha=$(git -C "$wt" rev-parse -q --verify "${rev:-HEAD}^{commit}") || fail "no commit ${rev:-HEAD} in $wt"
     short=$(git -C "$wt" rev-parse --short "$sha")
-    receipt="$(git_common_dir "$wt")/gate-receipts/$sha"
-    if [ -f "$receipt" ]; then
-      echo "RECEIPT: $short passed the gate of ${R_NAME[$g]} on $(sed -n 's/^passed: //p' "$receipt")"
+    if receipt_of "$wt" "$sha" "$ROOT"; then
+      when=$(sed -n 's/^passed: //p' "$RECEIPT")
+      if [ "$RECEIPT_ON" = "$sha" ]; then echo "RECEIPT: $short passed the gate of ${R_NAME[$g]} on $when"
+      else echo "RECEIPT: $short changed only the docs since $(git -C "$wt" rev-parse --short "$RECEIPT_ON"), which" \
+        "passed the gate of ${R_NAME[$g]} on $when"; fi
       exit 0
     fi
     echo "NO RECEIPT: $short has not passed the gate of ${R_NAME[$g]} here (gate.sh run ${R_NAME[$g]}, on it)"

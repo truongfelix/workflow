@@ -448,6 +448,8 @@ while IFS="$tab" read -r id sec f; do
     elif [ -f "$pass" ]; then res=passed
     else k=$((k + 1)); continue; fi
     if [ "$k" = 0 ]; then gt="$res (${cm:0:7})"
+    elif [ "$res" = passed ] && receipt_of "$rpath" "$(git -C "$rpath" rev-parse -q --verify "$ref^{commit}")" "$(pwd)" &&
+      [ "$RECEIPT_ON" = "$cm" ]; then gt="passed (${cm:0:7}; the docs alone changed since)"
     elif [ "$k" = 1 ]; then gt="not run on the last commit; $res at ${cm:0:7}"
     else gt="not run on the last $k commits; $res at ${cm:0:7}"; fi
     break
