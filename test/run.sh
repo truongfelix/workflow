@@ -1663,7 +1663,16 @@ check "attach: a repo elsewhere keeps its absolute path, said to be a folder of 
 cp "$T/at-conf.bak" .claude/ground-truth.conf && rm -rf "$EW"
 check "README, attach: the path written, and a private repo beside docs that may become public" \
   eval 'flat "$WF/README.md" | grep -qF "The line holds the repo'"'"'s path relative to the project root when the repo is inside it or beside it" &&
-    flat "$WF/README.md" | grep -qF "tell the owner before attaching it"'
+    flat "$WF/README.md" | grep -qF "when that code may become public, tell the owner so before the item is written, and wait for a go-ahead"'
+# B-89: attach.sh says what is left after it and, for a repo outside the folder, what to tell the owner; the README
+# says to pass it on; /checks asks no "keep or change" when the owner said what changes.
+check "attach: what is left after it, and for a repo outside the folder what to tell the owner (B-89)" \
+  eval 'has "$T/at4.txt" "left: its check, /checks asked about far alone; its line in CLAUDE.md (repos and layout)" &&
+    has "$T/at4.txt" "tell the owner: the first Claude Code session opened in $TP/far asks to allow an import of the docs" &&
+    has "$T/at1.txt" "left: its check, /checks asked about svc alone" && lacks "$T/at1.txt" "tell the owner"'
+check "README, attach: what attach.sh prints last is passed on to the owner; /checks asks nothing already answered" \
+  eval 'flat "$WF/README.md" | grep -qF "What \`attach.sh\` prints last is what is left (the repo'"'"'s check, its line in \`CLAUDE.md\`)" &&
+    flat "$WF/template/dot-claude/skills/checks/SKILL.md" | grep -qF "not when the owner has already said what changes"'
 check "attach: the pointer says to open Claude Code in the docs, and gives a command by its full path" \
   eval 'has svc/CLAUDE.md "# svc: code repo of a project whose docs are in \`$TP/one\`" &&
     has svc/CLAUDE.md "Open Claude Code in \`$TP/one\` and start with" &&

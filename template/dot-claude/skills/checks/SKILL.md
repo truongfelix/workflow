@@ -20,7 +20,8 @@ tests), never a bare "gate".
 1. **Read** `REPOS`, `GATES`, `GATE_PASS`, `GITHUB_CI` and `GATE_RULES` and `REPO_RULES` in `.claude/ground-truth.conf`, then look in
    each code repo for what it already has: a `.github/workflows/` folder (GitHub CI), a test command or a local CI
    script (its own check). Outside setup, say in a few lines what checks each repo now and the rules kept (each as
-   its sentence in step 4), then ask: keep it as it is, or change it.
+   its sentence in step 4), then ask: keep it as it is, or change it; not when the owner has already said what
+   changes (a repo attached later and its check, or "no check yet": step 2 with that answer).
 2. **How is the code checked:** "How is your code checked before a merge?", four options, the one the repos already
    have recommended:
    - *Its own check:* a command run on this machine, such as its tests; a release needs it to have passed here.
