@@ -677,7 +677,10 @@ check "board, gate: no column and no gate text in a project with no gate" \
 # before a merge, as the conf sets it: each repo, each rule in plain words, kept or not.
 cp "$WF/template/CLAUDE.template.md" CLAUDE.md && "$SH" "$AU" preset balanced -f CLAUDE.md >/dev/null
 printf '%s\n' 'GATES=("api|true")' 'GATE_PASS=("api|^ok$")' 'GITHUB_CI=("api")' 'GATE_RULES="receipt merge recipt"' \
-  >>.claude/ground-truth.conf
+  'QUESTIONS_TRIM_LINES=2' 'LESSONS_TRIM_LINES=many' >>.claude/ground-truth.conf
+qn8=$(wc -l <questions.md | tr -d ' ')
+ln8=null
+[ -f notes/lessons.md ] && ln8=$(wc -l <notes/lessons.md | tr -d ' ')
 CLAIM_MACHINE=laptop "$SH" "$BD" --no-open --offline --out "$T/board8.html" "$T/board5" >/dev/null 2>&1
 check "board, settings: each step with its answer, as autonomy.sh reads CLAUDE.md" \
   has "$T/board8.html" '["Commit the docs","do, then tell"]'
@@ -689,6 +692,8 @@ check "board, settings: each rule in plain words, kept or not" \
   has "$T/board8.html" '["regression",false,"Each bug fix comes with a check that fails without the fix"]'
 check "board, settings: the rules make no preset, and a word that is no rule" \
   has "$T/board8.html" '"rulesPreset":"","rulesUnknown":"recipt","repoRules":[]}'
+check "board, settings: each file's trim size (no number: never) and its length now" \
+  has "$T/board8.html" "\"trim\":[[\"questions.md\",2,$qn8],[\"notes/lessons.md\",0,$ln8]],"
 # The page's own script, run in node on a stand-in for the browser's document: page.js <page> <expression> prints
 # what the expression gives once the page has loaded. What the Settings tab shows, and an id's title on hover.
 cat >"$T/page.js" <<'JSEOF'
@@ -716,6 +721,10 @@ if command -v node >/dev/null 2>&1; then
   check "board page, settings: a rule not kept" has "$T/board8-settings.txt" \
     '<li class="muted">✗ Each bug fix comes with a check that fails without the fix</li>'
   check "board page, settings: the filters, which no setting has, are hidden" has "$T/board8-settings.txt" "filters hidden: true"
+  check "board page, settings: when to trim, a file past its size" has "$T/board8-settings.txt" \
+    "<tr><td>questions.md</td><td>2 lines</td><td>$qn8 lines · ⚠ a trim is due</td></tr>"
+  check "board page, settings: when to trim, a file never flagged" has "$T/board8-settings.txt" \
+    '<tr><td>notes/lessons.md</td><td><span class="muted">never</span></td>'
   node "$T/page.js" "$T/board8.html" 'fmt("see B-2, L-2 and B-99")' >"$T/board8-ids.txt" 2>&1
   check "board page, ids: an item's title on hover" has "$T/board8-ids.txt" '<a href="#" data-id="B-2" title="Second">B-2</a>'
   check "board page, ids: a closed item's title, and its state" \

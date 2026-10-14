@@ -20,7 +20,7 @@ This template keeps a project going across sessions, machines and weeks with fiv
 - **`/board`** opens the trackers, lessons and handoffs as one page, with filters and each item's history, and for
   each claimed item where its work is (on which machine, pushed or not, in an open PR with its CI, or merged) and
   whether it passed the project's own check on this machine; an id shows its item's title on hover. Its Settings tab
-  shows what Claude does alone and how the code is checked. A hook rebuilds it after each change, and an open tab
+  shows what Claude does alone, how the code is checked, and when the rulings and lessons are due a trim. A hook rebuilds it after each change, and an open tab
   updates itself. Where no browser can show it (a cloud session, SSH), it prints the open items instead.
 - **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
   release, …), and changes it: a preset, or the steps you pick from a list.

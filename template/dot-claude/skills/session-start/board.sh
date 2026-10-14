@@ -37,8 +37,9 @@
 # last read of that commit, with the time (<page>-ci.tsv).
 # Only what checks the project's code is shown (/checks): the Gate column when it has a gate (GATES) or GitHub CI, the
 # CI of a PR when GitHub CI checks its repo (GITHUB_CI).
-# Settings, a tab of its own: what Claude does alone (the table in CLAUDE.md, as autonomy.sh reads it) and how the code
-# is checked before a merge (each repo's gate and GitHub CI, the rules kept), as .claude/ground-truth.conf sets them.
+# Settings, a tab of its own: what Claude does alone (the table in CLAUDE.md, as autonomy.sh reads it), how the code is
+# checked before a merge (each repo's gate and GitHub CI, the rules kept) and when questions.md and notes/lessons.md are
+# due a trim (each one's size and its length now), as .claude/ground-truth.conf sets them.
 #
 # Generic (from the workflow repo): upgrade this file from there; never put project data in it.
 #
@@ -143,11 +144,15 @@ if [ -n "$queue" ]; then
   exit 0
 fi
 
-# The config: each entry of REPOS, GATES ("<repo>|<command>"), GATE_PASS and GITHUB_CI, a line each, GATE_RULES, and
-# each entry of REPO_RULES ("<repo>|<rules>": the rules of one repo, else GATE_RULES holds).
+# The config: each entry of REPOS, GATES ("<repo>|<command>"), GATE_PASS and GITHUB_CI, a line each, GATE_RULES, each
+# entry of REPO_RULES ("<repo>|<rules>": the rules of one repo, else GATE_RULES holds), and the two trim sizes (1000
+# lines each when unset, as in ground-truth.sh).
 : >"$T/conf" && : >"$T/gate-cmds" && : >"$T/pass" && : >"$T/cis" && : >"$T/rules" && : >"$T/repo-rules"
+printf '1000\t1000\n' >"$T/trim"
 if [ -f .claude/ground-truth.conf ]; then
-  (REPOS=(); GATES=(); GATE_PASS=(); GITHUB_CI=(); GATE_RULES=""; REPO_RULES=(); . ./.claude/ground-truth.conf >/dev/null 2>&1
+  (REPOS=(); GATES=(); GATE_PASS=(); GITHUB_CI=(); GATE_RULES=""; REPO_RULES=(); QUESTIONS_TRIM_LINES=1000
+    LESSONS_TRIM_LINES=1000; . ./.claude/ground-truth.conf >/dev/null 2>&1
+    printf '%s\t%s\n' "$QUESTIONS_TRIM_LINES" "$LESSONS_TRIM_LINES" >"$T/trim"
     for r in ${REPOS[@]+"${REPOS[@]}"}; do printf '%s\n' "$r"; done >"$T/conf"
     for g in ${GATES[@]+"${GATES[@]}"}; do printf '%s\n' "$g"; done >"$T/gate-cmds"
     for g in ${GATE_PASS[@]+"${GATE_PASS[@]}"}; do printf '%s\n' "$g"; done >"$T/pass"
@@ -248,7 +253,9 @@ fi
 # "AP", the project's own rows "AO", or why it could not be read "AE"), and how the code is checked before a merge:
 # each repo with its gate, the line its gate passes on and its GitHub CI ("G"), each rule, kept or not, in plain words
 # ("R"), their preset ("RP") and the words of GATE_RULES that are no rule ("RX"); a repo with rules of its own
-# ("RO\t<repo>\t<its rules>\t<their preset>"). One record per line in $T/settings.
+# ("RO\t<repo>\t<its rules>\t<their preset>"); when each file is due a trim: its size, 0 = never (a size that is no
+# number is 0, as in ground-truth.sh), and its length now, empty with no file ("T\t<file>\t<size>\t<lines>"). One
+# record per line in $T/settings.
 au="$HERE/../autonomy/autonomy.sh"
 {
   if [ ! -f CLAUDE.md ]; then printf 'AE\tno CLAUDE.md in %s\n' "$(pwd)"
@@ -281,6 +288,15 @@ au="$HERE/../autonomy/autonomy.sh"
     printf 'RO\t%s\t%s\t%s\n' "${g%%|*}" "$(echo ${g#*|})" "$(rules_preset "${g#*|}")"
   done <"$T/repo-rules"
   [ -z "$no_rule" ] || printf 'RX\t%s\n' "$no_rule"
+  IFS="$tab" read -r trim_q trim_l <"$T/trim"
+  for trim_f in questions.md notes/lessons.md; do
+    trim_n=$trim_q
+    [ "$trim_f" = questions.md ] || trim_n=$trim_l
+    case $trim_n in '' | *[!0-9]*) trim_n=0 ;; esac
+    trim_len=""
+    [ -f "$trim_f" ] && trim_len=$(wc -l <"$trim_f" | tr -d ' ')
+    printf 'T\t%s\t%s\t%s\n' "$trim_f" "$trim_n" "$trim_len"
+  done
 } >"$T/settings"
 
 # The PRs of each GitHub repo, once per repo: @tsv escapes a tab, a newline and a backslash as items.sh does. Those
@@ -635,7 +651,7 @@ BEGIN {
     i = index(rec, "\t")
     printf "%s%s:%s", sep, js(substr(rec, 1, i - 1)), js(substr(rec, i + 1)); sep = ","
   }
-  steps = ""; checks = ""; rules = ""; ap = ""; ao = ""; ae = ""; rp = ""; rx = ""; ro = ""
+  steps = ""; checks = ""; rules = ""; ap = ""; ao = ""; ae = ""; rp = ""; rx = ""; ro = ""; trims = ""
   while ((getline rec < sfile) > 0) {
     split(rec, F, "\t")
     if (F[1] == "A") steps = steps (steps == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "]"
@@ -647,9 +663,10 @@ BEGIN {
     else if (F[1] == "RP") rp = F[2]
     else if (F[1] == "RX") rx = F[2]
     else if (F[1] == "RO") ro = ro (ro == "" ? "" : ",") "[" js(F[2]) "," js(F[3]) "," js(F[4]) "]"
+    else if (F[1] == "T") trims = trims (trims == "" ? "" : ",") "[" js(F[2]) "," (F[3] + 0) "," (F[4] == "" ? "null" : F[4] + 0) "]"
   }
-  printf "},\n\"gated\":%s,\n\"settings\":{\"steps\":[%s],\"autoPreset\":%s,\"autoOwn\":%s,\"autoError\":%s,", \
-    gated, steps, js(ap), js(ao), js(ae)
+  printf "},\n\"gated\":%s,\n\"settings\":{\"steps\":[%s],\"autoPreset\":%s,\"autoOwn\":%s,\"autoError\":%s,\"trim\":[%s],", \
+    gated, steps, js(ap), js(ao), js(ae), trims
   printf "\"repos\":[%s],\"rules\":[%s],\"rulesPreset\":%s,\"rulesUnknown\":%s,\"repoRules\":[%s]},\n\"machine\":%s}\n", \
     checks, rules, js(rp), js(rx), ro, js(machine)
 }' >>"$T/data.json" || { echo "UNKNOWN: building the data failed"; exit 2; }
@@ -1137,7 +1154,16 @@ function settingsView() { // what Claude does alone, and how the code is checked
       }).join("") + "</ul>";
   });
   if (st.rulesUnknown) h += "<div class=\"note\">Not a rule, in GATE_RULES: " + esc(st.rulesUnknown) + "</div>";
-  return h + "<div class=\"muted\">Changed with /checks. The rules above hold for every repo without rules of its own.</div></div>";
+  h += "<div class=\"muted\">Changed with /checks. The rules above hold for every repo without rules of its own.</div>" +
+    "<h2>When to trim</h2><table><thead><tr><th>File</th><th>Trim above</th><th>Now</th></tr></thead><tbody>" +
+    (st.trim || []).map(function (t) { // [file, size (0 = never), its length now (null: no file)]
+      return "<tr><td>" + esc(t[0]) + "</td><td>" + (t[1] > 0 ? t[1] + " lines" : "<span class=\"muted\">never</span>") +
+        "</td><td>" + (t[2] === null ? "<span class=\"muted\">no file</span>" : t[2] + " lines" +
+        (t[1] > 0 && t[2] > t[1] ? " · ⚠ a trim is due" : "")) + "</td></tr>";
+    }).join("") + "</tbody></table>";
+  return h + "<div class=\"muted\">Past its size, the brief of /session-start suggests /trim. Changed in words (\"trim the " +
+    "lessons above 500 lines\"), or in .claude/ground-truth.conf: QUESTIONS_TRIM_LINES, LESSONS_TRIM_LINES (0 = never)." +
+    "</div></div>";
 }
 function backLink() {
   var b = byId[S.back] ? S.back : "";
