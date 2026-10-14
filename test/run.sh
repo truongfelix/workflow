@@ -1205,6 +1205,22 @@ check "ground truth, gate: a code change after the docs is flagged" has "$T/gate
 git tag -a v1.0.0-code -m code && git push origin v1.0.0-code >"$T/gate-push-code.txt" 2>&1
 check "gate hook: a release tag on a code change after the docs is refused" \
   eval '[ $? != 0 ] && has "$T/gate-push-code.txt" "REFUSED: v1.0.0-code is on " && [ -z "$(git ls-remote --tags origin v1.0.0-code)" ]'
+# A branch from before the workflow has no .claude/: the hook, which runs gate.sh from this checkout, lets it go, and
+# refuses only a release tag from there (B-66). A hook from an earlier release is updated in place.
+git_q checkout --orphan before && git_q rm -rq --cached . && rm -rf .claude && echo old >old.txt && git add old.txt &&
+  git_q commit -m "from before the workflow"
+git push origin before >"$T/gate-push-before.txt" 2>&1
+check "gate hook: a branch from before the workflow, with no gate.sh, goes" \
+  eval '[ $? = 0 ] && [ -n "$(git ls-remote --heads origin before)" ]'
+git tag -a v0.9.0 -m old && git push origin v0.9.0 >"$T/gate-push-before-tag.txt" 2>&1
+check "gate hook: a release tag from a checkout with no gate.sh is refused, and says why" \
+  eval '[ $? != 0 ] && has "$T/gate-push-before-tag.txt" "REFUSED: v0.9.0: this checkout has no gate.sh" &&
+    [ -z "$(git ls-remote --tags origin v0.9.0)" ]'
+git_q checkout -f main && git_q clean -fdq -- old.txt
+printf '%s\n' '#!/bin/sh' "exec bash \"$T/gate/p/$GA\" pre-push \"\$@\"" >.git/hooks/pre-push
+"$SH" "$GA" hook >"$T/gate-hook-old.txt" 2>&1
+check "gate hook: a hook from an earlier release is updated" \
+  eval '[ $? = 0 ] && has "$T/gate-hook-old.txt" "HOOK: updated in " && has .git/hooks/pre-push "a release tag waits"'
 cp .claude/ground-truth.conf "$T/gate-conf.bak"
 git_q commit --allow-empty -m "not gated" && git tag v1.0.1
 echo 'GATE_RULES="regression merge"' >>.claude/ground-truth.conf

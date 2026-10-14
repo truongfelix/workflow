@@ -32,13 +32,13 @@
 #   check     is there a receipt for <rev> (default: the commit checked out, as for run)?
 #   ci        the CI of <rev> (default as for check) on GitHub, for a repo of GITHUB_CI: one line, its verdict first
 #             (CI green, CI red, CI running, no CI, not on GitHub), on the GitHub repo of REPOS, else of its remote
-#   hook      install the pre-push hook that holds the rule "receipt" in a repo of GATES or GITHUB_CI; never over
-#             another hook
+#   hook      install the pre-push hook that holds the rule "receipt" in a repo of GATES or GITHUB_CI, or update ours
+#             from an earlier release; never over another hook
 #   pre-push  the hook itself (gate.sh pre-push <remote> <url>, the refs pushed on stdin): while the repo's rules keep
 #             "receipt", refuses a v* tag whose commit has no receipt (a repo of GATES) or no green CI (GITHUB_CI)
 #   <repo> can be left out when the current directory is in a repo the command takes, or when it takes only one.
 # Exit: run 0 = passed, receipt written; 1 = the gate failed, or the checkout changed while it ran: no receipt.
-#   check 0 = a receipt; 1 = none. ci 0 = CI green; 1 = any other verdict. hook 0 = installed, or already there;
+#   check 0 = a receipt; 1 = none. ci 0 = CI green; 1 = any other verdict. hook 0 = installed, updated, or already there;
 #   1 = another hook is there (add the lines printed). pre-push 0 = the push goes; 1 = refused. Any: 2 = a usage
 #   error, or nothing could be read (UNKNOWN).
 
@@ -307,22 +307,41 @@ case $cmd in
     wt=$(worktree)
     hooks=$(cd "$wt" 2>/dev/null && p=$(git rev-parse --git-path hooks) && mkdir -p "$p" && cd "$p" && pwd -P) ||
       fail "cannot reach the hooks of $wt"
+    # The hook runs this script. A checkout without it (in a repo whose docs are beside the code, a branch from before
+    # the workflow) lets a branch go, and refuses only a release tag, which nothing there can check.
+    hook_text() {
+      printf '%s\n' '#!/bin/sh' \
+        '# The gate rule "receipt" (.claude/ground-truth.conf): a release tag (v*) is pushed only when its commit' \
+        '# passed its checks. Installed by gate.sh hook; delete this file to remove it.' \
+        "if [ -f \"$SELF\" ]; then" \
+        "  exec bash \"$SELF\" pre-push \"\$@\"" \
+        'fi' \
+        '# This checkout has no gate.sh (a branch from before the workflow): a branch goes, a release tag waits.' \
+        'while read -r _ lsha rref _; do' \
+        '  case $lsha in *[!0]*) ;; *) continue ;; esac' \
+        '  case $rref in refs/tags/v*)' \
+        '    echo "REFUSED: ${rref#refs/tags/}: this checkout has no gate.sh (a branch from before the workflow), so" \' \
+        '      "the tag cannot be checked: check out the default branch, then push it again" >&2' \
+        '    exit 1 ;;' \
+        '  esac' \
+        'done'
+    }
+    verb=installed
     if [ -f "$hooks/pre-push" ]; then
-      if grep -qF "gate.sh\" pre-push" "$hooks/pre-push"; then
+      if ! grep -qF "gate.sh\" pre-push" "$hooks/pre-push"; then
+        echo "NOT INSTALLED: $hooks/pre-push is another hook. Make it read git's input once, and pass it on:"
+        echo "  input=\$(cat)"
+        echo "  printf '%s\\n' \"\$input\" | bash \"$SELF\" pre-push \"\$@\" || exit 1"
+        exit 1
+      fi
+      if [ "$(cat "$hooks/pre-push")" = "$(hook_text)" ]; then
         echo "HOOK: already in $hooks/pre-push"
         exit 0
       fi
-      echo "NOT INSTALLED: $hooks/pre-push is another hook. Make it read git's input once, and pass it on:"
-      echo "  input=\$(cat)"
-      echo "  printf '%s\\n' \"\$input\" | bash \"$SELF\" pre-push \"\$@\" || exit 1"
-      exit 1
+      verb=updated # ours, from an earlier release
     fi
-    printf '%s\n' '#!/bin/sh' \
-      '# The gate rule "receipt" (.claude/ground-truth.conf): a release tag (v*) is pushed only when its commit' \
-      '# passed its checks. Installed by gate.sh hook; delete this file to remove it.' \
-      "exec bash \"$SELF\" pre-push \"\$@\"" >"$hooks/pre-push" && chmod +x "$hooks/pre-push" ||
-      fail "cannot write $hooks/pre-push"
-    echo "HOOK: installed in $hooks/pre-push"
+    hook_text >"$hooks/pre-push" && chmod +x "$hooks/pre-push" || fail "cannot write $hooks/pre-push"
+    echo "HOOK: $verb in $hooks/pre-push"
     ;;
   *) usage ;;
 esac
