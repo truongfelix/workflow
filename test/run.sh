@@ -410,6 +410,26 @@ printf '%s\n' '# H-1 2026-10-12 18:40 CEST · claude@ws' '' '## Next' '1. B-1 An
 (cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it.txt" 2>&1
 check "items.sh: with no file, it checks the handoffs too" has "$T/it.txt" "notes/handoff/ws.md:4: H-1: B-1 is in no tracker"
 rm "$T/ws/notes/handoff/ws.md"
+# A 1.x project after adopt.sh: its items still bullets, its one notes/handoff.md not moved yet. The check lists both
+# until they are converted (B-67); a bullet that only names a state, as the 1.x rules did, is no item.
+cp "$T/ws/BACKLOG.md" "$T/backlog.bak"
+printf '%s\n' '## old' '' '- ⏸️ marks an item that waits for a trigger.' \
+  '- 🔲 **An old item**: a bullet. Done when: it has an id.' \
+  '- ⏸️ ⚠ **An old cross-repo item**: it waits. Done when: it has an id.' >>"$T/ws/BACKLOG.md"
+echo "# Handoff — 2026-09-30" >"$T/ws/notes/handoff.md"
+n=$(grep -n 'An old item' "$T/ws/BACKLOG.md" | cut -d: -f1)
+(cd "$T" && "$SH" "$T/ws/$IT" check) >"$T/it-v1.txt" 2>&1
+check "items.sh, 1.x: the check exits 2" [ $? = 2 ]
+check "items.sh, 1.x: a bullet item is listed" has "$T/it-v1.txt" "BACKLOG.md:$n: an item without an id, as before items had ids"
+check "items.sh, 1.x: a bullet item with ⚠ is listed" has "$T/it-v1.txt" "BACKLOG.md:$((n + 1)): an item without an id"
+check "items.sh, 1.x: a bullet that only names a state is no item" lacks "$T/it-v1.txt" "BACKLOG.md:$((n - 1)):"
+check "items.sh, 1.x: the old handoff is listed until /handoff moves it" \
+  has "$T/it-v1.txt" "notes/handoff.md:1: a 1.x handoff: the next /handoff moves it to notes/handoff/"
+(cd "$T" && LC_ALL=C "$SH" "$T/ws/$IT" check) >"$T/it-v1c.txt" 2>&1
+check "items.sh, 1.x: a bullet item is listed in the C locale too" has "$T/it-v1c.txt" "BACKLOG.md:$n: an item without an id"
+cp "$T/backlog.bak" "$T/ws/BACKLOG.md" && rm "$T/ws/notes/handoff.md"
+(cd "$T" && "$SH" "$T/ws/$IT" check) >/dev/null 2>&1
+check "items.sh, 1.x: converted, the check passes" [ $? = 0 ]
 check "items.sh: adopt.sh makes it executable" [ -x "$T/ws/$IT" ]
 BR="$WF/test/fixtures/broken"
 "$SH" "$ITS" check "$BR/BACKLOG.md" "$BR/questions.md" "$BR/lessons.md" "$BR/notes/handoff/README.md" \

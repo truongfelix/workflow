@@ -182,8 +182,10 @@ case ${1:-} in
   *) echo "usage: $0 check|list [file...] | show <id>" >&2; exit 1 ;;
 esac
 shift
+legacy="" # a 1.x handoff not moved yet: the next /handoff moves it (notes/handoff-format.md, "Moving a project to it")
 if [ $# = 0 ]; then
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || { echo "UNKNOWN: cannot reach the project root"; exit 2; }
+  [ -f notes/handoff.md ] && legacy=notes/handoff.md
   set -- BACKLOG.md questions.md notes/lessons.md notes/handoff/README.md
   for f in notes/handoff/*.md; do
     [ "$f" = notes/handoff/README.md ] || [ ! -e "$f" ] || set -- "$@" "$f"
@@ -225,10 +227,11 @@ if [ "$(uname -s)" = Darwin ] && [ "$(locale charmap 2>/dev/null)" != UTF-8 ]; t
 # One pass per file. An item runs from its `###` heading to the next heading of any level, a `---` line, or the end
 # of the file. Fenced code and multi-line HTML comments are skipped: they hold examples, not items. A state is kept
 # by an ASCII name, never compared as an emoji: macOS awk compares strings with strcoll, and its UTF-8 collation finds
-# all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never skipped. A
-# handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so that awk
-# failing on its own (exit 2) reads as UNKNOWN.
-awk -v mode="$mode" '
+# all these emoji equal. A lesson outside an item (a bullet, as before lessons had ids) is reported, never skipped, and
+# so is a BACKLOG or questions bullet that starts with a state and a bold title, as items were written before they had
+# ids. A handoff is read line by line apart (h_line), as it is one item made of sections. Exit 3 = problems found, so
+# that awk failing on its own (exit 2) reads as UNKNOWN.
+awk -v mode="$mode" -v legacy="$legacy" '
 function problem(ln, msg) {
   problems++
   if (mode == "list") print "P\t" file "\t" ln "\t" esc(msg)
@@ -243,6 +246,15 @@ function swap(s, a, b,   out, i) { # every a in s becomes b: index(), not gsub()
 function keep() { if (mode == "list" && (id != "" || bad_ln)) body = body (body == "" ? "" : "\n") $0 }
 function starts(p) { if (index(R, p) != 1) return 0; R = substr(R, length(p) + 1); return 1 }
 function same(a, b) { return index(a, b) == 1 && length(a) == length(b) } # non-ASCII text: never ==
+function old_item(   r, st, n, i) { # an item as written before items had ids (1.x): `- <state> [⚠ ]**<title>**`
+  r = $0; sub(/^[ \t]*[-*+][ \t]+/, "", r)
+  n = split("🔲 ⏸️ ⏸ 💬 🟢", st, " ")
+  for (i = 1; i <= n; i++) if (index(r, st[i]) == 1) { r = substr(r, length(st[i]) + 1); break }
+  if (i > n) return 0
+  sub(/^[ \t]+/, "", r)
+  if (index(r, "⚠") == 1) { r = substr(r, length("⚠") + 1); sub(/^[ \t]+/, "", r) }
+  return index(r, "**") == 1
+}
 
 function start_file() {
   file = FILENAME; fk = kind; fence = 0; in_comment = 0; id = ""; bad_ln = 0; section = ""
@@ -501,10 +513,14 @@ fence { keep(); text_line(); next }
 id != "" { item_line(); next }
 bad_ln { keep(); next }
 fk == "L" && section != "" && /^[ \t]*[-*+] / { problem(FNR, "a lesson without an id: a lesson is `### L-<n> <title>`") }
+(fk == "B" || fk == "Q") && section != "" && /^[ \t]*[-*+] / && old_item() {
+  problem(FNR, "an item without an id, as before items had ids: an item is `### <state> <id> <title>` (notes/item-format.md, \"Moving a project to it\")")
+}
 
 END {
   end_file()
   h_final()
+  if (legacy != "") { file = legacy; problem(1, "a 1.x handoff: the next /handoff moves it to notes/handoff/ (notes/handoff-format.md, \"Moving a project to it\")") }
   if (mode == "list") exit (problems ? 3 : 0)
   if (problems) { printf "%d problem(s) in %d item(s); the formats: notes/item-format.md, notes/handoff-format.md\n", problems, items; exit 3 }
   printf "OK: %d item(s), all in their format (notes/item-format.md, notes/handoff-format.md)\n", items
