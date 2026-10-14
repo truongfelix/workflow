@@ -189,6 +189,16 @@ check "ground truth: an unfilled config exits 0 and says so in a section" \
   eval 'has "$T/fresh-gt.txt" "== setup" && has "$T/fresh-gt.txt" "still has its FILL lines"'
 check "ground truth: an unfilled config does not end with a plain complete" \
   eval 'tail -n 1 "$T/fresh-gt.txt" | grep -q "^GROUND TRUTH: complete, but the setup is not"'
+# B-68: the config is read all the same, so the run says what is left, never that it used the defaults; and the
+# README asks for a plain complete only after the step that allows it (/checks, then the FILL lines deleted).
+printf '%s\n' 'REPOS=("app|.|origin||")' >>"$T/fresh/.claude/ground-truth.conf"
+(cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt2.txt" 2>&1)
+check "ground truth: an unfilled config is read, and the setup says what is left" \
+  eval 'has "$T/fresh-gt2.txt" "== app (.)" && has "$T/fresh-gt2.txt" "its setup is not finished: set REPOS, then how the code is checked (/checks), then delete those lines" &&
+    lacks "$T/fresh-gt2.txt" "used the defaults"'
+step4_line() { grep -nF -- "$1" "$WF/README.md" | head -n 1 | cut -d: -f1; } # <text>: its first line in the README
+check "README: the setup asks for a plain complete after /checks" \
+  eval '[ "$(step4_line "follow the \`/checks\` skill")" -lt "$(step4_line "until it ends with \`GROUND TRUTH: complete\`")" ]'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)

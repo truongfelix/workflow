@@ -60,14 +60,14 @@ relpath() { # <path from git>: relative to ROOT when inside it, else as given
 
 echo "GROUND TRUTH — $(date '+%Y-%m-%d %H:%M %Z')"
 
-# A config still holding the template's "# FILL:" lines was never set up: the defaults above were read, not the project's
-# repos and checks. That is a finding (the last line says so), not a failed probe.
+# A config still holding the template's "# FILL:" lines is not set up yet: it is read all the same, and the run says what
+# is left. That is a finding (the last line says so), not a failed probe.
 SETUP_OPEN=0
 if [ -f "$CONF" ] && grep -q '^# FILL' "$CONF"; then
   SETUP_OPEN=1
   echo
   echo "== setup"
-  echo "  ⚠ .claude/ground-truth.conf still has its FILL lines (line $(grep -n '^# FILL' "$CONF" | head -n 1 | cut -d: -f1)): this run used the defaults, not the project's repos and checks"
+  echo "  ⚠ .claude/ground-truth.conf still has its FILL lines (line $(grep -n '^# FILL' "$CONF" | head -n 1 | cut -d: -f1)): its setup is not finished: set REPOS, then how the code is checked (/checks), then delete those lines"
 fi
 
 root_listed=0
@@ -548,7 +548,7 @@ if [ "$FAILED" -gt 0 ]; then
   exit 2
 fi
 if [ "$SETUP_OPEN" = 1 ]; then
-  echo "GROUND TRUTH: complete, but the setup is not: fill .claude/ground-truth.conf (README, 'Adopt in a new project', step 4)"
+  echo "GROUND TRUTH: complete, but the setup is not: finish .claude/ground-truth.conf, then delete its FILL lines (README, 'Adopt in a new project', step 4)"
   exit 0
 fi
 echo "GROUND TRUTH: complete"

@@ -184,10 +184,11 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      upstream), and KEEP_LOCAL for branches that must never be pushed. The docs repo is `.`; attach every other repo
      with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its line and writes its pointer
      (below), also later, whenever a repo joins the project.
-   - Run `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
      project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
      their lines in `.claude/ground-truth.conf` and installs the hook that holds the release rule.
+   - Delete the two FILL lines at the top of `.claude/ground-truth.conf`, then run
+     `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
