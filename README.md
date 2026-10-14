@@ -235,9 +235,11 @@ repo whose own `CLAUDE.md` loads alone, is not. So `attach.sh` writes a **pointe
 docs are, to start the session there, and, for a repo outside the docs repo's folder, imports the docs' `CLAUDE.md` so its
 rules load too (inside the folder they load already). It is kept out of the
 repo's commits (`.git/info/exclude`), since it names a path on this machine, and `ground-truth.sh` reports an attached repo
-that has none (`NO POINTER`). The first time a session opens in a repo outside the folder, Claude Code may ask whether
-to allow that import, a file outside the repo: allow it, or the session there loads the pointer alone, without the
-rules.
+that has none (`NO POINTER`). The first time a session opens in a repo outside the folder, after asking whether you
+trust the folder, Claude Code asks whether to allow that import, files outside the repo (the docs' lessons too):
+allow it. It keeps the answer for that folder and never asks again (`hasClaudeMdExternalIncludesApproved` in
+`~/.claude.json`): after a no, every session there loads the pointer alone, without the rules. A session that cannot
+ask (`claude -p`, a script) loads the import only where an interactive session allowed it: open one there first.
 
 Two limits. The pointer exists on the machine where `attach.sh` ran: a clone on another machine needs the script run
 again there. And a cloud session works on one repo, so it cannot work on a project with several: the docs repo and the

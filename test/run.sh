@@ -237,8 +237,15 @@ check "README, setup: an old to-do file is deleted only with the owner's yes" \
 check "the config: the docs repo comes first in the example of docs in a repo of their own" \
   has "$WF/template/dot-claude/ground-truth.conf" '#   REPOS=("docs|.|origin||" "api|api|origin|main|"'
 check "README, code repos: allow the import of the docs, and give a repo attached later its check" \
-  eval 'flat "$WF/README.md" | grep -qF "allow it, or the session there loads the pointer alone" &&
+  eval 'flat "$WF/README.md" | grep -qF "allow it. It keeps the answer for that folder" &&
     flat "$WF/README.md" | grep -qF "a repo attached later also gets its check (\`/checks\`)"'
+# B-75: what Claude Code does, seen in real sessions (2.1.299): it asks once per folder, after the folder's trust, and
+# keeps a no; a session that cannot ask (claude -p) loads the import only where one allowed it.
+check "README, code repos: the import is asked once, a no is kept, and claude -p needs it allowed first" \
+  eval 'flat "$WF/README.md" | grep -qF "Claude Code asks whether to allow that import" &&
+    flat "$WF/README.md" | grep -qF "never asks again" &&
+    flat "$WF/README.md" | grep -qF "loads the import only where an interactive session allowed it" &&
+    ! flat "$WF/README.md" | grep -qF "may ask whether"'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
