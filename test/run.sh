@@ -223,6 +223,22 @@ check "one name per session: the last handoff is never deleted, the next session
   eval 'flat "$WF/template/notes/handoff-format.md" | grep -qF "last handoff is never deleted" &&
     flat "$WF/template/dot-claude/skills/handoff/SKILL.md" | grep -qF "last handoff is never deleted" &&
     flat "$WF/template/notes/handoff/README.md" | grep -qF "last handoff is never deleted"'
+# B-69: what the setup had to guess, answered. Both shapes commit and push the setup, with an exact secrets scan; the
+# Quick start names the notes' question; CLAUDE.md asks who owns the project and what is private; the docs repo is
+# named first in REPOS; a repo outside the folder needs its import allowed; a repo attached later gets its check.
+check "README, setup: both shapes commit and push the setup, with an exact secrets scan" \
+  eval 'has "$WF/README.md" "5. **Commit and push the setup**, in either shape." && has "$WF/README.md" "\`gitleaks git --staged\`"'
+check "README, setup: the Quick start names the question of where the notes live" \
+  eval 'flat "$WF/README.md" | grep -qF "then where its notes and to-do lists live"'
+check "README, setup: CLAUDE.md asks who owns the project and what stays private" \
+  eval 'flat "$WF/README.md" | grep -qF "who owns it (ask: a commit" && flat "$WF/README.md" | grep -qF "what is public and what must stay private, repos"'
+check "README, setup: an old to-do file is deleted only with the owner's yes" \
+  eval 'flat "$WF/README.md" | grep -qF "An old to-do file whose lines are now items: ask the owner whether to delete it"'
+check "the config: the docs repo comes first in the example of docs in a repo of their own" \
+  has "$WF/template/dot-claude/ground-truth.conf" '#   REPOS=("docs|.|origin||" "api|api|origin|main|"'
+check "README, code repos: allow the import of the docs, and give a repo attached later its check" \
+  eval 'flat "$WF/README.md" | grep -qF "allow it, or the session there loads the pointer alone" &&
+    flat "$WF/README.md" | grep -qF "a repo attached later also gets its check (\`/checks\`)"'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)

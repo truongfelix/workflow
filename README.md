@@ -89,8 +89,9 @@ Then open Claude Code in your project and ask:
 
 > Set up the workflow: follow "Adopt in a new project" in /path/to/workflow/README.md
 
-Claude first asks for your project's git remote, then what it may do without asking you (commit, push, open a PR,
-merge, …: a preset, then any change), then fills in the blanks (what the project is, its repos, how its code is
+Claude first asks for your project's git remote, then where its notes and to-do lists live (with the code, or in a
+repo of their own), then what it may do without asking you (commit, push, open a PR, merge, …: a preset, then any
+change), then fills in the blanks (what the project is, its repos, how its code is
 checked, its rules), runs the ground truth until it comes back clean, and runs `/handoff` once to write the first
 handoff. You change any of those answers whenever you want, in words ("from now on, push the docs without asking")
 or with `/autonomy` and `/checks`. From then on: `/session-start` when you sit down, `/handoff` before you stop,
@@ -160,8 +161,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    are valid, and the owner knows what the folder holds or will hold. Ask it in these words (they follow the rule "A
    question to the owner" of `CLAUDE.md`), changing only what the owner has told you:
    > **Where should this project's notes and to-do lists live?**
-   > 1. **With the code, in this repo.** The notes are saved in the same repo as your code. This is simpler. You can
-   >    add other repos to the project later. The notes stay with this repo and can't be moved out afterwards.
+   > 1. **With the code, in one repo.** The notes are saved in the same repo as your code. This is simpler. You can
+   >    add other repos to the project later. The notes stay with that repo and can't be moved out afterwards.
    > 2. **In a separate repo of their own.** The notes get a private repo, and every code repo is attached to it. This
    >    takes one more repo to set up. Pick it if your code may become public and your notes must stay private. It
    >    also suits a project with several repos from the start.
@@ -181,31 +182,37 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      (`.claude/skills/autonomy/SKILL.md`): the owner picks a preset, with each step listed in plain words, then keeps
      it or picks the steps to switch. Its script sets the rows and deletes the FILL comment.
    - `.claude/ground-truth.conf`: one line per repo (the remote that counts as "pushed" is YOURS in a fork, not
-     upstream), and KEEP_LOCAL for branches that must never be pushed. The docs repo is `.`; attach every other repo
-     with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its line and writes its pointer
-     (below), also later, whenever a repo joins the project.
+     upstream), and KEEP_LOCAL for branches that must never be pushed. The docs repo is `.`, first in the list: give
+     it a name in place of the template's `project` (the project's, or `docs` when the docs have a repo of their
+     own). Attach every other repo with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its
+     line and writes its pointer (below), also later, whenever a repo joins the project; a repo attached later also
+     gets its check (`/checks`) and its line in `CLAUDE.md` (what the project is, repos and layout).
    - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
      project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
      their lines in `.claude/ground-truth.conf` and installs the hook that holds the release rule.
    - Delete the two FILL lines at the top of `.claude/ground-truth.conf`, then run
      `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
-   - The rest of `CLAUDE.md`: what the project is, repos and layout, commands, and the project's rules. A rule is
+   - The rest of `CLAUDE.md`: what the project is, who owns it (ask: a commit's author is only a guess), what is
+     public and what must stay private, repos and layout, commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
      above and that none is fine: rules come as the project meets them. Move any existing to-do list out of
      `CLAUDE.md` into `BACKLOG.md`.
    - `BACKLOG.md`: one section per repo or file tree, filled from what the project already tracks (issues, notes, an
      old TODO). Each item in the shape of `notes/item-format.md`: an id from `next id`, what is wrong or missing, a
-     pointer, `Done when:`.
+     pointer, `Done when:`. An old to-do file whose lines are now items: ask the owner whether to delete it (git keeps
+     it); it is not the docs, so a commit that deletes it is pushed as code (the table's rows for code).
    - `questions.md`: decisions the owner still has to make, and rulings already made that a newcomer would undo,
      in the same shape. Then `bash .claude/skills/session-start/items.sh check` until it exits 0.
    - The skills' FILL item (project-specific checks, what is expected and not news).
    - `.claude/settings.json`, only when `adopt.sh` listed it as skipped (the project had its own): add the
      template's `PostToolUse` hook to it, which rebuilds the board after each change. When `adopt.sh` installed it,
      the hook is there and there is nothing to do or report.
-5. **Docs in a repo of their own only:** at the root, the repo of step 1, check `git status --ignored` and the staged list
-   before the first commit; scan for secrets (`gitleaks`); never track a datadir, a key or a binary. Push to the
-   remote of step 1 as the table allows.
+5. **Commit and push the setup**, in either shape. Stage the setup's paths by name (`git add <paths>`, never `-A`)
+   and read the staged list (`git diff --cached --name-only`). Docs in a repo of their own: at the root, the repo of
+   step 1, check `git status --ignored` too; never track a datadir, a key or a binary. Scan the staged files for
+   secrets: `gitleaks git --staged` (gitleaks 8.19 and later; before: `gitleaks protect --staged`). Commit, then push
+   to the remote of step 1 as the table allows: the setup's files are the docs.
 6. **Close the loop:** run `/handoff` once, so the first handoff (`notes/handoff/<session>.md`) is written from the
    ground truth. Then end the setup with one sentence for each skill, when to use it and what it is for:
    `/session-start` when you sit down (it checks git and the machine, reads the last handoff and proposes the day's
@@ -228,7 +235,9 @@ repo whose own `CLAUDE.md` loads alone, is not. So `attach.sh` writes a **pointe
 docs are, to start the session there, and, for a repo outside the docs repo's folder, imports the docs' `CLAUDE.md` so its
 rules load too (inside the folder they load already). It is kept out of the
 repo's commits (`.git/info/exclude`), since it names a path on this machine, and `ground-truth.sh` reports an attached repo
-that has none (`NO POINTER`).
+that has none (`NO POINTER`). The first time a session opens in a repo outside the folder, Claude Code may ask whether
+to allow that import, a file outside the repo: allow it, or the session there loads the pointer alone, without the
+rules.
 
 Two limits. The pointer exists on the machine where `attach.sh` ran: a clone on another machine needs the script run
 again there. And a cloud session works on one repo, so it cannot work on a project with several: the docs repo and the
