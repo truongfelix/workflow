@@ -17,7 +17,13 @@ tool cannot show a box already ticked, so each step's question says its answer n
 1. **Read the table:** `bash .claude/skills/autonomy/autonomy.sh show`. It prints each step with its answer, then the
    preset the steps make, or the closest one and the steps that differ. Exit 2: say what it printed (no table, or a
    row answered neither way) and stop; the table is fixed by hand first.
-2. **A preset's name was given** (`/autonomy balanced`, "switch to Careful"): `autonomy.sh preset <name>`, then step 5.
+2. **What the request names**, then step 5 (with none of these, step 3):
+   - **A preset's name** (`/autonomy balanced`, "switch to Careful"): `autonomy.sh preset <name>`.
+   - **Steps, with their answer** ("ask me before pushing a work branch", "stop asking before commits"): `autonomy.sh
+     ask <step>...` or `autonomy.sh tell <step>...`, with no question. When the words fit more than one step
+     ("pushing": the docs, a work branch), ask which first: one question with those steps and "None of these".
+   - **Steps to ask about**, with no answer (the upgrade from 1.x names its six new steps; "ask me about the backlog
+     steps"): the questions of "Change some steps" (step 4) with those steps alone, at most three to a question.
 3. **Show it** in a few lines: the preset ("Careful, with 2 steps switched"), the steps Claude asks you about first,
    and the steps it does, then tells you. Each step in plain words ("Commit code"), never a row number. At setup,
    the preset by what it does ("asks before every step, with 2 steps switched"), as in step 4.

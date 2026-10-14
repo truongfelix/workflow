@@ -269,8 +269,16 @@ check "adopt.sh, a project the same as the template: no upgrade line" lacks "$T/
 rm -rf "$T/ws-up"
 check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new rows asked without a preset" \
   eval 'has "$WF/README.md" "- \"/handoff commits and pushes the docs\": \"Commit the docs\" and \"Push the docs\"." &&
-    flat "$WF/README.md" | grep -qF "with \`/autonomy\`, \"change some steps\", never with a preset" &&
+    flat "$WF/README.md" | grep -qF "six with \`/autonomy\`, naming them: it asks about those alone, never with a preset" &&
     flat "$WF/README.md" | grep -qF "Run \`/handoff\` once: it moves it, and commits it as the table says"'
+# B-80: /autonomy takes the steps a request names: with their answer, set with no question; with none (the upgrade's
+# six new steps), asked about alone.
+AUS=$WF/template/dot-claude/skills/autonomy/SKILL.md
+check "/autonomy: steps named with their answer are set with no question, asked about alone without one" \
+  eval 'flat "$AUS" | grep -qF "**Steps, with their answer** (\"ask me before pushing a work branch\"" &&
+    flat "$AUS" | grep -qF "\`autonomy.sh ask <step>...\` or \`autonomy.sh tell <step>...\`, with no question" &&
+    flat "$AUS" | grep -qF "**Steps to ask about**, with no answer (the upgrade from 1.x names its six new steps" &&
+    flat "$AUS" | grep -qF "with those steps alone, at most three to a question"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \

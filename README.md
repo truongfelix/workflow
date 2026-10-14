@@ -272,8 +272,8 @@ From 1.x, in this order:
    The old rules settled the commits and the outward actions (pushes, pull requests, merges, releases, messages). Six
    rows are new: start the day's task, add an item to the backlog, claim one, build something that is not an approved
    backlog item, delete a branch or worktree whose work has landed, stop a background job. Ask the owner about those
-   with `/autonomy`, "change some steps", never with a preset. Copy the bullet "A question to the owner" from the
-   template's Rules too: `/autonomy`, `/checks` and the setup ask the owner as it says.
+   six with `/autonomy`, naming them: it asks about those alone, never with a preset. Copy the bullet "A question to
+   the owner" from the template's Rules too: `/autonomy`, `/checks` and the setup ask the owner as it says.
 3. **`.claude/ground-truth.conf`:** 1.x had `REPOS`, `KEEP_LOCAL` and `UNITS`. Take the template's file and put the
    project's three lines back in it, the docs repo (`.`) first in `REPOS`: it adds when a claim is stale, the sizes
    that call for `/trim`, and how the code is checked. Run `/checks` (the project's own check, GitHub CI, both or
