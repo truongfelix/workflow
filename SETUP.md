@@ -1,8 +1,8 @@
 # Adopt in a new project
 
 The setup, step by step, written for the Claude session doing it (you can follow it by hand too). The owner starts it
-with one sentence in a Claude Code session opened in the project: *Set up the workflow: follow
-/path/to/workflow/SETUP.md*. Read [`PRINCIPLES.md`](PRINCIPLES.md) first; then:
+with one sentence in a Claude Code session opened in the project: *Set up the workflow: follow ~/workflow/SETUP.md*
+(the clone of this repo; another folder works the same). Read [`PRINCIPLES.md`](PRINCIPLES.md) first; then:
 
 1. **Get the workflow:** a clone of this repo on the machine. **Then a git remote, before any other question:** the
    workflow does not work without one (the ground truth compares each branch with it, a claim is a push to it, and

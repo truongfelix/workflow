@@ -334,12 +334,21 @@ check "the template: an empty backlog section, the setup as no item, a release's
 # B-91: the README is for a person, short; the setup and the upgrade are guides of their own, which the README,
 # adopt.sh, the skills and the scripts point to.
 check "README: short, pointing to SETUP.md and UPGRADE.md (B-91)" \
-  eval '[ "$(wc -l <"$WF/README.md" | tr -d " ")" -le 120 ] && has "$WF/README.md" "follow /path/to/workflow/SETUP.md" &&
-    has "$WF/README.md" "[\`UPGRADE.md\`](UPGRADE.md)" && has "$WF/SETUP.md" "# Adopt in a new project" &&
+  eval '[ "$(wc -l <"$WF/README.md" | tr -d " ")" -le 120 ] && has "$WF/README.md" "> Set up the workflow: follow ~/workflow/SETUP.md" &&
+    has "$WF/SETUP.md" "# Adopt in a new project" &&
     has "$WF/SETUP.md" "## A session opened in a code repo" && has "$WF/UPGRADE.md" "# Upgrade a project from here"'
 check "nothing points to the README for the setup or the upgrade any more (B-91)" \
   eval '! grep -rqE "README[^ ]*,? .(Adopt in a new project|Upgrade a project from here)" "$WF/template" "$WF/bin" "$WF/README.md" "$WF/SETUP.md" "$WF/UPGRADE.md" &&
     grep -qF "Left to fill (SETUP.md, step 4):" "$WF/bin/adopt.sh" && grep -qF "each (UPGRADE.md)" "$WF/bin/adopt.sh"'
+# B-92: Claude follows the clone (read exactly, the version of its scripts), at a real path; people read the guides on
+# GitHub. No placeholder path is left.
+check "README: Claude follows ~/workflow, people read the guides on GitHub (B-92)" \
+  eval 'has "$WF/README.md" "git clone https://github.com/truongfelix/workflow.git ~/workflow" &&
+    has "$WF/README.md" "~/workflow/bin/adopt.sh ~/code/my-project" &&
+    has "$WF/README.md" "(https://github.com/truongfelix/workflow/blob/main/SETUP.md)" &&
+    has "$WF/README.md" "(https://github.com/truongfelix/workflow/blob/main/UPGRADE.md)" &&
+    flat "$WF/README.md" | grep -qF "*Upgrade the workflow: follow ~/workflow/UPGRADE.md*" &&
+    ! grep -rqF "/path/to/workflow" "$WF/README.md" "$WF/SETUP.md" "$WF/UPGRADE.md" "$WF/template" "$WF/bin"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \

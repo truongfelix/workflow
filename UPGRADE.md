@@ -2,7 +2,7 @@
 
 The upgrade, step by step, written for the Claude session doing it (you can follow it by hand too). The owner starts
 it with one sentence in a Claude Code session opened in the project: *Upgrade the workflow: follow
-/path/to/workflow/UPGRADE.md*.
+~/workflow/UPGRADE.md* (the clone of this repo, at the release to upgrade to).
 
 `bin/adopt.sh <project-root>` again lists every skipped file with its `diff -u` command against the current
 template. Merge the generic parts; keep the project's FILL answers. The skills' scripts (`.claude/skills/*/*.sh`)

@@ -53,16 +53,22 @@ You need bash, git and a remote for your project; optionally the GitHub CLI `gh`
 (background jobs). Linux, macOS, and Windows in Git Bash or WSL.
 
 ```bash
-git clone https://github.com/truongfelix/workflow.git
-workflow/bin/adopt.sh ~/code/my-project     # copies the template; overwrites nothing but its version file
+git clone https://github.com/truongfelix/workflow.git ~/workflow
+~/workflow/bin/adopt.sh ~/code/my-project     # copies the template; overwrites nothing but its version file
 ```
 
-Then open Claude Code in your project and ask: *Set up the workflow: follow /path/to/workflow/SETUP.md*.
+Then open Claude Code in your project and ask:
+
+> Set up the workflow: follow ~/workflow/SETUP.md
+
+Claude follows the copy you cloned, the same version as its scripts. To read the guide first:
+[`SETUP.md` on GitHub](https://github.com/truongfelix/workflow/blob/main/SETUP.md).
 
 Claude asks for the git remote, then where its notes and to-do lists live (with the code, or in a repo of their own),
 what it may do without asking you, and how the code is checked; it fills in the rest, commits the setup, runs your
 check once on it, and runs `/handoff` once to write the first handoff. From then on: `/session-start` when you sit
-down, `/handoff` before you stop. A project on 1.x upgrades with [`UPGRADE.md`](UPGRADE.md).
+down, `/handoff` before you stop. A project on 1.x upgrades the same way, *Upgrade the workflow: follow
+~/workflow/UPGRADE.md* ([`UPGRADE.md` on GitHub](https://github.com/truongfelix/workflow/blob/main/UPGRADE.md)).
 
 ## What you get
 
