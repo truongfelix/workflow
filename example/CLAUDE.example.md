@@ -44,8 +44,8 @@ docs", on any branch, the default one included.
 | Comment, or message anyone | ask first |
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
-- **Build something that is not an approved backlog item:** a task the owner names in the chat is approved by that
-  request, and becomes a backlog item too, as part of it: the backlog stays the whole list of the work. An extra, an
+- **Build something that is not an approved backlog item:** a task the owner names in the chat is approved, and
+  started, by that request, and becomes a backlog item too, as part of it: the backlog stays the whole list of the work. An extra, an
   idea or a bug met on the way becomes a backlog item first (the row "Add an item to the backlog"), and is built once
   the owner approved it.
 - The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,

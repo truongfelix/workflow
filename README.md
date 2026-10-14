@@ -195,7 +195,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The rest of `CLAUDE.md`: what the project is, who owns it (ask: a commit's author is only a guess), what is
      public and what must stay private, repos and layout (where worktrees go: beside their repo, `<repo>-<topic>/`,
-     unless the owner says otherwise), commands, and the project's rules. A rule is
+     unless the owner says otherwise), commands (what a release publishes besides its tag, too), and the project's
+     rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
      above and that none is fine: rules come as the project meets them. Move any existing to-do list out of

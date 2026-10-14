@@ -174,8 +174,9 @@ the item. A new session has a new name: going on with a claim its handoff kept, 
 - **Sections are cut along repos or file trees**, so one session (or one worktree) can take a section while another
   session takes another, and their work merges cleanly. A ⚠ cross-repo item runs alone, in the order of its `repos:`
   line, producer first; never inside one section's batch. A task the owner names is an item too, whatever it changes:
-  a release goes in its repo's section, a change of the docs alone (a repo attached, an upgrade) in a section `docs`,
-  added when there is none.
+  a release goes in its repo's section, a change of the docs alone (a repo attached, an upgrade) in the section of the
+  repo that holds the docs, the one at `.` in `REPOS`: in a project of one repo, that repo's section; with the docs in
+  a repo of their own, a section named as it is in `REPOS` (`docs`), added when there is none.
 - An item is what is wrong or missing, a pointer to the detail, and when it is **done**. How it was found goes in the
   commit message.
 - **Cite an item by its id** (with its title for the reader), never by a position: positions move, ids do not.

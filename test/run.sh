@@ -203,8 +203,9 @@ check "README: the setup asks for a plain complete after /checks" \
 # and /autonomy labels them by what they do there; a question may name a command the owner runs (/checks does).
 flat() { tr -s "\n " "  " <"$1"; } # <file>: its text on one line, for a sentence that wraps
 check "CLAUDE.md agrees with PRINCIPLES.md: a task the owner names becomes an item too" \
-  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "is approved by that request, and becomes a backlog item too" &&
-    flat "$WF/PRINCIPLES.md" | grep -qF "a task the owner names in the chat becomes an item too, approved by that request"'
+  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "is approved, and started, by that request, and becomes a backlog item too" &&
+    flat "$WF/PRINCIPLES.md" | grep -qF "a task the owner names in the chat becomes an item too, approved and started by that request" &&
+    flat "$WF/example/CLAUDE.example.md" | grep -qF "is approved, and started, by that request, and becomes a backlog item too"'
 check "/autonomy labels the presets by what they do at setup, as the README asks" \
   eval 'flat "$WF/README.md" | grep -qF "with no preset name either" &&
     flat "$WF/template/dot-claude/skills/autonomy/SKILL.md" | grep -qF "each option is labelled by what it does, with no name"'
@@ -295,7 +296,7 @@ check "the template's CLAUDE.md: a release is an item, an annotated tag on a com
     flat "$WF/template/CLAUDE.template.md" | grep -qF "\`git tag -a vX.Y.Z -m \"<what it holds>\"\`, then \`git push origin vX.Y.Z\`" &&
     flat "$WF/template/CLAUDE.template.md" | grep -qF "what a release publishes besides its tag"'
 check "the item format: a task with no branch of its own, its section and the branch its claim names" \
-  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "a release goes in its repo'"'"'s section, a change of the docs alone (a repo attached, an upgrade) in a section \`docs\`" &&
+  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "a release goes in its repo'"'"'s section, a change of the docs alone (a repo attached, an upgrade) in the section of the repo that holds the docs" &&
     flat "$WF/template/notes/item-format.md" | grep -qF "A task with no branch of its own (a release, a change of the docs alone, such as a repo attached or an upgrade) names the default branch it lands on"'
 # B-83: the rule "receipt" says what the hook holds: a pass on the code a tag names, kept over a change of the docs.
 check "the rule receipt, in plain words: a pass on the code it tags, never its exact commit" \
@@ -309,6 +310,14 @@ check "README: adopt.sh overwrites nothing but its version file" \
 check "README, setup: where worktrees go, and whether a repo attached later is public" \
   eval 'flat "$WF/README.md" | grep -qF "where worktrees go: beside their repo, \`<repo>-<topic>/\`, unless the owner says otherwise" &&
     flat "$WF/README.md" | grep -qF "with the owner'"'"'s answer to whether it is public"'
+# B-81, after its trial: a change of the docs alone goes in the section of the repo that holds them; the tag, its
+# push and the rest of a release are one yes; the setup asks what a release publishes.
+check "the item format: a change of the docs alone goes in the section of the repo at . in REPOS" \
+  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "in the section of the repo that holds the docs, the one at \`.\` in \`REPOS\`: in a project of one repo, that repo'"'"'s section"'
+check "the template's CLAUDE.md: one yes covers a release's tag, its push and what else it publishes" \
+  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "are one step, the row \"Release: tag, publish\": one yes covers them all"'
+check "README, setup: the commands include what a release publishes besides its tag" \
+  eval 'flat "$WF/README.md" | grep -qF "commands (what a release publishes besides its tag, too)"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \

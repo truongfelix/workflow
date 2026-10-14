@@ -46,8 +46,8 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 | Comment, or message anyone | ask first |
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
-- **Build something that is not an approved backlog item:** a task the owner names in the chat is approved by that
-  request, and becomes a backlog item too, as part of it: the backlog stays the whole list of the work. An extra, an
+- **Build something that is not an approved backlog item:** a task the owner names in the chat is approved, and
+  started, by that request, and becomes a backlog item too, as part of it: the backlog stays the whole list of the work. An extra, an
   idea or a bug met on the way becomes a backlog item first (the row "Add an item to the backlog"), and is built once
   the owner approved it.
 - The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,
@@ -90,5 +90,5 @@ command and the rules kept: `/checks` shows and changes them. A gate runs with
 A release is an item like any task the owner names. It is an annotated tag on the default branch's last commit, once
 its checks passed there: `git tag -a vX.Y.Z -m "<what it holds>"`, then `git push origin vX.Y.Z`. With the rule
 "receipt", the pre-push hook refuses a tag whose commit did not pass; a commit that changed only the docs since a pass
-keeps it. Each step goes as the row "Release: tag, publish" says; what else a release publishes here (a GitHub
-release, a package) is written above.
+keeps it. The tag, its push and what else the release publishes here (a GitHub release, a package: written above)
+are one step, the row "Release: tag, publish": one yes covers them all.
