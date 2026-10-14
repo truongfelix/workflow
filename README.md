@@ -25,7 +25,7 @@ This template keeps a project going across sessions, machines and weeks with fiv
 - **`/autonomy`** shows what Claude does without asking you, step by step (commit, push, open or merge a PR,
   release, …), and changes it: a preset, or the steps you pick from a list.
 - **`/checks`** shows how the code is checked before a merge (its own check, such as its tests; GitHub CI; both; or
-  nothing yet) and the rules kept, such as "a release needs a pass on its exact commit", and changes them.
+  nothing yet) and the rules kept, such as "a release needs a pass on the code it tags", and changes them.
 - **`/trim`** proposes one plan for your rulings and lessons, in a session of its own, once the brief says a file grew
   past the size you set. It asks the same questions of each entry (still true? enforced by a check? said by a doc?
   would the mistake come back?), then keeps, shortens, moves, merges or deletes it (git keeps it); you change only the
@@ -82,7 +82,7 @@ Runs on Linux, macOS and Windows: in Git Bash, which Claude Code uses on Windows
 
 ```bash
 git clone https://github.com/truongfelix/workflow.git
-workflow/bin/adopt.sh ~/code/my-project     # copies the template; never overwrites a file
+workflow/bin/adopt.sh ~/code/my-project     # copies the template; overwrites nothing but its version file
 ```
 
 Then open Claude Code in your project and ask:
@@ -186,14 +186,16 @@ The detailed steps, written for the Claude session doing the setup (you can foll
      it a name in place of the template's `project` (the project's, or `docs` when the docs have a repo of their
      own). Attach every other repo with `bash .claude/skills/session-start/attach.sh <name> <path>`, which adds its
      line and writes its pointer (below), also later, whenever a repo joins the project; a repo attached later also
-     gets its check (`/checks`) and its line in `CLAUDE.md` (what the project is, repos and layout).
+     gets its check (`/checks`) and its line in `CLAUDE.md` (what the project is, repos and layout), with the owner's
+     answer to whether it is public.
    - How the code is checked before a merge: follow the `/checks` skill (`.claude/skills/checks/SKILL.md`): the
      project's own check, GitHub CI, both or nothing yet, each repo's check command, and the rules kept. It sets
      their lines in `.claude/ground-truth.conf` and installs the hook that holds the release rule.
    - Delete the two FILL lines at the top of `.claude/ground-truth.conf`, then run
      `bash .claude/skills/session-start/ground-truth.sh` until it ends with `GROUND TRUTH: complete`.
    - The rest of `CLAUDE.md`: what the project is, who owns it (ask: a commit's author is only a guess), what is
-     public and what must stay private, repos and layout, commands, and the project's rules. A rule is
+     public and what must stay private, repos and layout (where worktrees go: beside their repo, `<repo>-<topic>/`,
+     unless the owner says otherwise), commands, and the project's rules. A rule is
      what Claude must always or never do in this project ("greet.sh stays plain bash", "never touch `migrations/`",
      "a change is done when `make test` passes"). Ask the owner with such examples, and say that it is not the table
      above and that none is fine: rules come as the project meets them. Move any existing to-do list out of
@@ -223,8 +225,8 @@ The detailed steps, written for the Claude session doing the setup (you can foll
    first test command, GitHub CI added, a rule kept or dropped), `/trim` when the brief says a trim is due (it proposes
    what to keep, shorten, move or delete in your rulings and lessons, and you decide).
 
-Existing project with its own session docs: adopt anyway (nothing is overwritten), then merge by hand, keeping the
-project's content and the template's structure.
+Existing project with its own session docs: adopt anyway (it overwrites nothing but its version file), then merge by
+hand, keeping the project's content and the template's structure.
 
 ## A session opened in a code repo
 
@@ -320,7 +322,7 @@ template/                     copied into a project's root by bin/adopt.sh
     skills/checks/SKILL.md
     skills/trim/SKILL.md
 workspace/gitignore           whitelist .gitignore for a multi-repo workspace's docs repo
-bin/adopt.sh                  installs the template, never overwrites, lists what is left to FILL
+bin/adopt.sh                  installs the template, overwrites nothing but its version file, lists what is left to FILL
 example/                      a filled-in project: the files behind the brief in "What it looks like"
 test/run.sh                   tests adopt.sh, the skills' scripts and the table "What Claude does alone"; CI runs it
                               on Linux, macOS and Windows

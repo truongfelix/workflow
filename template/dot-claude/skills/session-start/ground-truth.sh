@@ -266,7 +266,7 @@ fi
 # the branch it names in the item's repos (its `repos:` line, else its section's first word, as on the board; all
 # the repos when neither names one). A claim not pushed is seen by no other session. A branch that is
 # gone, or has had no commit for CLAIM_STALE_DAYS days (counted from the claim when the branch is older), holds an
-# item for a session that may have stopped. A branch claimed on another machine (`at <machine>`; "cloud" is never
+# item for a session that may have stopped; one not made yet, within those days of the claim, is work not started. A branch claimed on another machine (`at <machine>`; "cloud" is never
 # this one) and found nowhere here is not gone: its commits may be there alone, not pushed. This machine's name is
 # the one claim.sh writes. Parsed in bash, not awk: titles hold emoji, and macOS awk compares them with strcoll.
 claims() { # <BACKLOG.md>: "<id>\t<claim>\t<repos>\t<title>" for each claimed item
@@ -371,6 +371,11 @@ if [ -n "$CT" ]; then
     done
     if [ "$found" = 0 ] && [ -n "$cmachine" ] && { [ "$cmachine" != "$MACHINE" ] || [ "$cmachine" = cloud ]; }; then
       echo "      ⚠ NOT HERE: no branch $branch in ${names:-any repo}, here or on a remote: its commits are on $cmachine alone (not pushed), or it is gone"
+    elif [ "$found" = 0 ] && [ $(((now - claimed_at) / 86400)) -lt "$CLAIM_STALE_DAYS" ]; then
+      # Claimed before its branch was made, as a session claims when it starts: not gone, not started yet.
+      ago=$(((now - claimed_at) / 86400))
+      if [ "$ago" = 0 ]; then ago=today; else ago="$ago day(s) ago"; fi
+      echo "      no branch $branch in ${names:-any repo} yet: its work has not started (claimed $ago)"
     elif [ "$found" = 0 ]; then
       echo "      ⚠ GONE: no branch $branch in ${names:-any repo}"
     fi
@@ -435,7 +440,8 @@ for i in ${R_NAME[@]+"${!R_NAME[@]}"}; do
   for e in ${REPO_RULES[@]+"${REPO_RULES[@]}"}; do
     if [ "${e%%|*}" = "$gname" ]; then
       rtxt=$(echo $grules)
-      rpre=$(rules_preset "$grules")
+      rpre=""
+      [ -n "$rtxt" ] && rpre=$(rules_preset "$grules") # a repo that keeps none is no prototype: nothing checks it
       own=" [its own rules: ${rtxt:-none}${rpre:+ = $rpre}]"
     fi
   done
@@ -492,6 +498,13 @@ if [ "$named" != " " ]; then
   done
 fi
 
+# The count of a tracker leaves out an item with no id (a 1.x bullet not converted yet): say so.
+not_items() { # <items.sh list output>: ", ⚠ <n> more without an id…" when it holds any, else nothing
+  local n
+  n=$(printf '%s\n' "$1" | grep -c "^P$(printf '\t').*without an id")
+  if [ "$n" -gt 0 ]; then echo ", ⚠ $n more without an id, not counted (items.sh check)"; fi
+}
+
 # questions.md only grows: a ruling stays until someone deletes it, and every session reads the file. Longer than
 # QUESTIONS_TRIM_LINES, it is flagged, and the /session-start brief suggests /trim: a session that goes through its
 # rulings with the owner (keep, shorten, move to its doc, delete). Git keeps a deleted ruling, and the board shows it as archived.
@@ -502,12 +515,13 @@ if [ ! -f "$ROOT/questions.md" ]; then
   echo "  none"
 else
   qlines=$(wc -l <"$ROOT/questions.md" | tr -d ' ')
-  rulings=$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/questions.md" 2>/dev/null | cut -f1,5 |
-    grep -c "^I$(printf '\t')ruling$")
+  qlist=$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/questions.md" 2>/dev/null)
+  rulings=$(printf '%s\n' "$qlist" | cut -f1,5 | grep -c "^I$(printf '\t')ruling$")
+  qbad=$(not_items "$qlist")
   if [ "$QUESTIONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$qlines" -gt "$QUESTIONS_TRIM_LINES" ]; then
-    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2: a trim session is due (/trim)"
+    echo "  ⚠ TRIM: $qlines lines, $rulings ruling(s) in §2$qbad: a trim session is due (/trim)"
   else
-    echo "  $qlines lines, $rulings ruling(s) in §2"
+    echo "  $qlines lines, $rulings ruling(s) in §2$qbad"
   fi
 fi
 
@@ -520,10 +534,11 @@ if [ ! -f "$ROOT/notes/lessons.md" ]; then
 else
   llines=$(wc -l <"$ROOT/notes/lessons.md" | tr -d ' ')
   lessons=$(grep -c '^### L-' "$ROOT/notes/lessons.md")
+  lbad=$(not_items "$("${BASH:-bash}" "$HERE/items.sh" list "$ROOT/notes/lessons.md" 2>/dev/null)")
   if [ "$LESSONS_TRIM_LINES" -gt 0 ] 2>/dev/null && [ "$llines" -gt "$LESSONS_TRIM_LINES" ]; then
-    echo "  ⚠ TRIM: $llines lines, $lessons lesson(s): a trim session is due (/trim)"
+    echo "  ⚠ TRIM: $llines lines, $lessons lesson(s)$lbad: a trim session is due (/trim)"
   else
-    echo "  $llines lines, $lessons lesson(s)"
+    echo "  $llines lines, $lessons lesson(s)$lbad"
   fi
 fi
 

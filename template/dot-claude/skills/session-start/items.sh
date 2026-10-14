@@ -186,12 +186,18 @@ shift
 legacy="" # a 1.x handoff not moved yet: the next /handoff moves it (notes/handoff-format.md, "Moving a project to it")
 if [ $# = 0 ]; then
   cd "$(dirname "${BASH_SOURCE[0]}")/../../.." || { echo "UNKNOWN: cannot reach the project root"; exit 2; }
-  [ -f notes/handoff.md ] && legacy=notes/handoff.md
   set -- BACKLOG.md questions.md notes/lessons.md notes/handoff/README.md
   for f in notes/handoff/*.md; do
     [ "$f" = notes/handoff/README.md ] || [ ! -e "$f" ] || set -- "$@" "$f"
   done
 fi
+# Beside the handoffs read (their README), the 1.x handoff: given the files or not, as the board gives them.
+for f in "$@"; do
+  case $f in
+    handoff/README.md | */handoff/README.md)
+      if [ -f "${f%handoff/README.md}handoff.md" ]; then legacy="${f%handoff/README.md}handoff.md"; fi ;;
+  esac
+done
 
 say() { if [ "$mode" = list ]; then echo "$*" >&2; else echo "$*"; fi; } # list keeps stdout for records
 
@@ -527,7 +533,7 @@ END {
   h_final()
   if (legacy != "") { file = legacy; problem(1, "a 1.x handoff: the next /handoff moves it to notes/handoff/ (notes/handoff-format.md, \"Moving a project to it\")") }
   if (mode == "list") exit (problems ? 3 : 0)
-  if (problems) { printf "%d problem(s) in %d item(s); the formats: notes/item-format.md, notes/handoff-format.md\n", problems, items; exit 3 }
+  if (problems) { printf "%d problem(s); the formats: notes/item-format.md, notes/handoff-format.md\n", problems; exit 3 }
   printf "OK: %d item(s), all in their format (notes/item-format.md, notes/handoff-format.md)\n", items
 }
 ' "${args[@]}"

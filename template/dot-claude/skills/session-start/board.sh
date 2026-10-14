@@ -289,7 +289,8 @@ au="$HERE/../autonomy/autonomy.sh"
   printf 'RP\t%s\n' "$(rules_preset "$kept")"
   while IFS= read -r g; do
     [ -n "$g" ] || continue
-    printf 'RO\t%s\t%s\t%s\n' "${g%%|*}" "$(echo ${g#*|})" "$(rules_preset "${g#*|}")"
+    ro=$(echo ${g#*|}) # a repo that keeps no rule gets no preset: "none", not Prototype
+    printf 'RO\t%s\t%s\t%s\n' "${g%%|*}" "$ro" "${ro:+$(rules_preset "$ro")}"
   done <"$T/repo-rules"
   [ -z "$no_rule" ] || printf 'RX\t%s\n' "$no_rule"
   IFS="$tab" read -r trim_q trim_l <"$T/trim"
@@ -1156,7 +1157,7 @@ function settingsView() { // what Claude does alone, and how the code is checked
   }
   (st.repoRules || []).forEach(function (o) { // a repo with rules of its own: the same list, for that repo
     var own = " " + o[1] + " ";
-    h += "<h3>Rules kept in " + esc(o[0]) + " (its own): " + esc(o[2] || "no preset") + "</h3><ul class=\"rules\">" +
+    h += "<h3>Rules kept in " + esc(o[0]) + " (its own): " + esc(o[1] ? o[2] || "no preset" : "none") + "</h3><ul class=\"rules\">" +
       st.rules.map(function (r) {
         var k = own.indexOf(" " + r[0] + " ") >= 0;
         return "<li" + (k ? "" : " class=\"muted\"") + ">" + (k ? "✓ " : "✗ ") + esc(r[2]) + "</li>";
@@ -1367,7 +1368,7 @@ function unesc(s) { gsub(/\\n/, " · ", s); gsub(/\\t/, " ", s); gsub(/\\\\/, "\
 function mark(st) {
   if (st == "open") return "🔲"; if (st == "waiting") return "⏸️"; if (st == "question") return "💬"; return st
 }
-$1 == "P" || $1 == "U" { problems++; next }
+$1 == "P" { problems++; next } # as items.sh check counts them
 $1 != "I" { next }
 { k = substr($4, 1, 1) }
 k == "B" {

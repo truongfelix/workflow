@@ -85,7 +85,7 @@ PR_CI_JQ='def pr_verdict: [ .statusCheckRollup[]?
 # and the preset a set of them makes, as the ground truth and the board name it.
 rule_text() { # <rule>: the rule in plain words; nothing for a word that is not a rule
   case $1 in
-    receipt) echo "A release needs the checks to have passed on its exact commit" ;;
+    receipt) echo "A release needs the checks to have passed on the code it tags" ;;
     regression) echo "Each bug fix comes with a check that fails without the fix" ;;
     merge) echo "After a merge, the checks run again on the main branch" ;;
   esac

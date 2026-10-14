@@ -59,6 +59,8 @@ if [ -n "$top" ] && [ "$top" -ef "$SRC" ]; then
   version=$(git -C "$SRC" describe --tags --match 'v[0-9]*' 2>/dev/null ||
     git -C "$SRC" log -1 --format='%h %cd' --date=short 2>/dev/null || echo "unversioned")
 fi
+# The release the project had: the same one when the setup runs this again, an older one in an upgrade.
+before=$(sed -n '1s/^workflow \(.*\), adopted .*/\1/p' "$dst/.claude/workflow-version" 2>/dev/null || true)
 echo "workflow $version, adopted $(date +%Y-%m-%d)" >"$dst/.claude/workflow-version"
 
 echo "Adopted the workflow ($version) into $dst"
@@ -93,9 +95,15 @@ if [ -n "$fills" ]; then
 else
   echo "No FILL markers left."
 fi
-# An upgrade: what is left is in the skipped files that differ, the project's own or older than the template. The
-# version file names this release already, so say so: the scripts may still be the old ones.
-if [ "$differ" -gt 0 ]; then
-  echo "$differ skipped file(s) differ from the template: in an upgrade, merge its generic parts into each (README.md,"
-  echo "'Upgrade a project from here'); .claude/workflow-version names $version already."
+# The skipped files that differ: run again on the release the project has (the setup does), they were filled in, are
+# the project's own, or are not merged yet. In an upgrade, they hold the work left: the version file names this
+# release already, so say so (the scripts may still be the old ones), and the merge brings the template's new FILL
+# markers, which a run after it lists.
+if [ "$differ" -gt 0 ] && [ "$before" = "$version" ]; then
+  echo "$differ skipped file(s) differ from the template: filled in, the project's own, or not merged yet ($version"
+  echo "was adopted here already)."
+elif [ "$differ" -gt 0 ]; then
+  echo "$differ skipped file(s) differ from the template: in an upgrade${before:+ from $before}, merge its generic parts into"
+  echo "each (README.md, 'Upgrade a project from here'), then run this again: it lists the FILL markers the merge"
+  echo "brought. .claude/workflow-version names $version already."
 fi

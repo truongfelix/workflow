@@ -261,10 +261,19 @@ check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (id
 check "adopt.sh run again still lists what is left to FILL" has "$T/adopt2.txt" "  CLAUDE.md:1:"
 # B-70: an upgrade's work is in the skipped files that differ; adopt.sh says so, and that the version file moved on.
 cp -R "$T/ws" "$T/ws-up" && echo "an older line" >>"$T/ws-up/.claude/skills/session-start/ground-truth.sh"
+cp "$T/ws-up/.claude/workflow-version" "$T/ws-version"
+echo "workflow v1.0.0, adopted 2026-10-11" >"$T/ws-up/.claude/workflow-version"
 "$SH" "$WF/bin/adopt.sh" "$T/ws-up" --workspace >"$T/adopt-up.txt" 2>&1
 check "adopt.sh, upgrade: a skipped file that differs is named as the work left" \
-  eval 'has "$T/adopt-up.txt" "1 skipped file(s) differ from the template: in an upgrade, merge its generic parts" &&
+  eval 'flat "$T/adopt-up.txt" | grep -qF "1 skipped file(s) differ from the template: in an upgrade from v1.0.0, merge its generic parts" &&
     has "$T/adopt-up.txt" ".claude/workflow-version names "'
+check "adopt.sh, upgrade: run again after the merge, it lists the FILL markers the merge brought (B-83)" \
+  eval 'flat "$T/adopt-up.txt" | grep -qF "then run this again: it lists the FILL markers the merge brought"'
+cp "$T/ws-version" "$T/ws-up/.claude/workflow-version"
+"$SH" "$WF/bin/adopt.sh" "$T/ws-up" --workspace >"$T/adopt-again.txt" 2>&1
+check "adopt.sh, run again on the release adopted: a file that differs is not an upgrade (B-83)" \
+  eval 'flat "$T/adopt-again.txt" | grep -qF "1 skipped file(s) differ from the template: filled in, the project'"'"'s own, or not merged yet" &&
+    lacks "$T/adopt-again.txt" "in an upgrade"'
 check "adopt.sh, a project the same as the template: no upgrade line" lacks "$T/adopt2.txt" "skipped file(s) differ"
 rm -rf "$T/ws-up"
 check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new rows asked without a preset" \
@@ -288,6 +297,18 @@ check "the template's CLAUDE.md: a release is an item, an annotated tag on a com
 check "the item format: a task with no branch of its own, its section and the branch its claim names" \
   eval 'flat "$WF/template/notes/item-format.md" | grep -qF "a release goes in its repo'"'"'s section, a change of the docs alone (a repo attached, an upgrade) in a section \`docs\`" &&
     flat "$WF/template/notes/item-format.md" | grep -qF "A task with no branch of its own (a release, a change of the docs alone, such as a repo attached or an upgrade) names the default branch it lands on"'
+# B-83: the rule "receipt" says what the hook holds: a pass on the code a tag names, kept over a change of the docs.
+check "the rule receipt, in plain words: a pass on the code it tags, never its exact commit" \
+  eval '"$SH" -c ". \"$WF/template/dot-claude/skills/session-start/lib.sh\"; rule_text receipt" | grep -qx "A release needs the checks to have passed on the code it tags" &&
+    ! grep -rqF "exact commit" "$WF/README.md" "$WF/template"'
+# B-83: adopt.sh overwrites nothing but its version file, and says so; the setup's worktrees and a later repo's
+# visibility are answered.
+check "README: adopt.sh overwrites nothing but its version file" \
+  eval 'lacks "$WF/README.md" "never overwrites a file" && lacks "$WF/README.md" "nothing is overwritten" &&
+    has "$WF/README.md" "# copies the template; overwrites nothing but its version file"'
+check "README, setup: where worktrees go, and whether a repo attached later is public" \
+  eval 'flat "$WF/README.md" | grep -qF "where worktrees go: beside their repo, \`<repo>-<topic>/\`, unless the owner says otherwise" &&
+    flat "$WF/README.md" | grep -qF "with the owner'"'"'s answer to whether it is public"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \
@@ -385,6 +406,13 @@ check "ground truth, claims: a stale claim" has "$T/gt-claims.txt" \
 check "ground truth, claims: a live claim is not stale" [ "$(grep -c STALE "$T/gt-claims.txt")" = 1 ]
 check "ground truth, claims: a claim not pushed" has "$T/gt-claims.txt" \
   "  B-14 Mine: claude@ws on spike, ⚠ NOT PUSHED: no other session sees it"
+# B-83: a claim made today, before its branch: its work has not started, it is not gone (B-12, claimed in January, is).
+claims_backlog 'claimed: claude@ws on feat/B-14-new at laptop' >BACKLOG.md
+git add BACKLOG.md && git_q commit -m "claim B-14" && git_q push origin main
+CLAIM_MACHINE=laptop "$SH" "$GT" >"$T/gt-claims2.txt" 2>&1
+check "ground truth, claims: a branch not made yet, claimed today, is work not started, not gone" \
+  eval 'has "$T/gt-claims2.txt" "      no branch feat/B-14-new in api yet: its work has not started (claimed today)" &&
+    [ "$(grep -c "⚠ GONE" "$T/gt-claims2.txt")" = 1 ] && has "$T/gt-claims2.txt" "⚠ GONE: no branch feat/gone in api"'
 cp "$T/ws-backlog.bak" BACKLOG.md && git add BACKLOG.md && git_q commit -m "no claims" && git_q push origin main
 
 # questions.md: its size and its rulings; longer than QUESTIONS_TRIM_LINES (1000 when unset), flagged for a trim
@@ -539,6 +567,7 @@ printf '%s\n' '## old' '' '- ⏸️ marks an item that waits for a trigger.' \
   '- ⏸️ ⚠ **An old cross-repo item**: it waits. Done when: it has an id.' >>"$T/ws/BACKLOG.md"
 echo "# Handoff — 2026-09-30" >"$T/ws/notes/handoff.md"
 cp "$T/ws/questions.md" "$T/questions.bak"
+printf '%s\n' '## old rulings' '' '- 🟢 **An old ruling**: no database. Ruled 2026-01-01.' >>"$T/ws/questions.md"
 for f in BACKLOG.md questions.md; do # the line of a 1.x header that says to cite by title, under the title
   case $f in BACKLOG.md) v1='- Cite an item by its **title**, never by a number: numbers move.' ;; *) v1='guard. Cite an entry by its **title**.' ;; esac
   { head -n 1 "$T/ws/$f"; printf '%s\n' "$v1"; tail -n +2 "$T/ws/$f"; } >"$T/v1h" && mv "$T/v1h" "$T/ws/$f"
@@ -553,6 +582,17 @@ check "items.sh, 1.x: the old handoff is listed until /handoff moves it" \
   has "$T/it-v1.txt" "notes/handoff.md:1: a 1.x handoff: the next /handoff moves it to notes/handoff/"
 (cd "$T" && LC_ALL=C "$SH" "$T/ws/$IT" check) >"$T/it-v1c.txt" 2>&1
 check "items.sh, 1.x: a bullet item is listed in the C locale too" has "$T/it-v1c.txt" "BACKLOG.md:$n: an item without an id"
+check "items.sh, 1.x: the count is of problems, not of the items it could read (B-83)" \
+  eval 'tail -n 1 "$T/it-v1.txt" | grep -qE "^[0-9]+ problem\(s\); the formats: " && lacks "$T/it-v1.txt" " item(s);"'
+"$SH" "$T/ws/.claude/skills/session-start/board.sh" --no-open --offline --text --out "$T/v1-board.html" "$T/ws" >"$T/v1-board.txt" 2>&1
+check "board, 1.x: the problems it counts are those items.sh check lists (B-83)" \
+  has "$T/v1-board.txt" "$(sed -n 's/^\([0-9]*\) problem(s);.*/\1/p' "$T/it-v1.txt") problem(s) in the trackers"
+(cd "$T/ws" && "$SH" .claude/skills/session-start/items.sh list BACKLOG.md questions.md notes/handoff/README.md) >"$T/v1-list.txt" 2>&1
+check "items.sh list, given the files as the board gives them, has the 1.x handoff too (B-83)" \
+  eval 'grep -q "^P$(printf "\t")notes/handoff.md$(printf "\t")1$(printf "\t")a 1.x handoff" "$T/v1-list.txt"'
+(cd "$T/ws" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch) >"$T/v1-gt.txt" 2>&1
+check "ground truth, 1.x: the rulings counted leave out what is not converted, and say so (B-83)" \
+  eval 'grep -A1 "^== questions.md" "$T/v1-gt.txt" | grep -qF "ruling(s) in §2, ⚠ 1 more without an id, not counted (items.sh check)"'
 check "items.sh, 1.x: a header that says to cite by title is listed, in each tracker (B-79)" \
   eval 'has "$T/it-v1.txt" "BACKLOG.md:2: a 1.x header, which says to cite an item by its title" &&
     has "$T/it-v1.txt" "questions.md:2: a 1.x header, which says to cite an item by its title"'
@@ -1537,11 +1577,13 @@ git add CLAUDE.md BACKLOG.md questions.md notes .claude && git_q commit -m docs 
 git_q clone "$T/remote-svc.git" svc && (cd svc && git symbolic-ref HEAD refs/heads/main && git_q commit --allow-empty -m first &&
   git_q push -u origin main && git remote set-head origin main)
 AT=.claude/skills/session-start/attach.sh
+chmod 644 .claude/ground-truth.conf
 "$SH" .claude/skills/session-start/ground-truth.sh >"$T/at-gt0.txt" 2>&1
 check "attach: one repo, the docs repo, needs no pointer" lacks "$T/at-gt0.txt" "NO POINTER"
 "$SH" "$AT" svc svc >"$T/at1.txt" 2>&1
 check "attach: exits 0" [ $? = 0 ]
 check "attach: says the line it added" has "$T/at1.txt" "added to REPOS: svc|svc|origin||"
+check "attach: the config keeps its mode (B-83)" [ "$(ls -l .claude/ground-truth.conf | cut -c1-10)" = "-rw-r--r--" ]
 atrepos() { (REPOS=(); . ./.claude/ground-truth.conf; printf '%s\n' "${REPOS[@]}" | tr '\n' ' '); }
 check "attach: REPOS has both repos, the first one untouched" [ "$(atrepos)" = "one|.|origin|main| svc|svc|origin|| " ]
 check "attach: the pointer is in the repo and names the docs; inside the root it imports nothing (it loads twice)" \
@@ -1616,7 +1658,7 @@ sed 's/^/      | /' "$T/rr-gt.txt" | sed -n '/== checks/,/^      | $/p'
 check "rules per repo: the checks section names the project's rules" has "$T/rr-gt.txt" \
   "== checks (rules kept: receipt regression merge = Production)"
 check "rules per repo: the repo with rules of its own says so" \
-  eval 'grep "^  web (" "$T/rr-gt.txt" | grep -qF "[its own rules: none = Prototype]"'
+  eval 'grep "^  web (" "$T/rr-gt.txt" | grep -qF "[its own rules: none]"'
 check "rules per repo: a repo without an entry follows the project's rules" \
   eval 'grep "^  api (" "$T/rr-gt.txt" | grep -qF "⚠ NO RECEIPT" && grep "^  api (" "$T/rr-gt.txt" | grep -qF "⚠ NO HOOK" && 
     ! grep "^  api (" "$T/rr-gt.txt" | grep -qF "its own rules"'
@@ -1631,7 +1673,7 @@ check "rules per repo: a release tag with no receipt is refused where the rule r
 check "rules per repo: the same tag goes where the repo keeps no rule" \
   eval '[ $? = 0 ] && [ -n "$(git -C web ls-remote --tags origin v1.0.0)" ]'
 "$SH" $RR/board.sh --no-open --offline --out "$T/rr-board.html" "$T/rr" >/dev/null 2>&1
-check "rules per repo: the board has the rules of that repo, with its preset" has "$T/rr-board.html" '"repoRules":[["web","","Prototype"]]'
+check "rules per repo: the board has the rules of that repo, none and no preset (B-83)" has "$T/rr-board.html" '"repoRules":[["web","",""]]'
 # Only the repo at the project root holds the docs: in a code repo, a notes/ folder is code, and needs the gate (B-65).
 "$SH" $RR/gate.sh run api >/dev/null 2>&1
 (cd api && mkdir -p notes && echo x >notes/x.md && git add notes && git_q commit -m "notes of the code")

@@ -143,8 +143,9 @@ and it shows in git even if it is finished the same day. An item waiting for its
 The ground truth lists every claim with its branch: the repo it is in, its last commit, pushed or not. It reports a
 claim not pushed (no other session sees it), a branch that is gone, and a branch with no commit for
 `CLAIM_STALE_DAYS` days (`.claude/ground-truth.conf`, 3 by default; counted from the claim when the branch is
-older): its session may have stopped without a handoff. A branch claimed on another machine and found nowhere here
-is not called gone: its commits may be on that machine alone. Only the owner releases another session's claim.
+older): its session may have stopped without a handoff. A branch not made yet is not called gone during those days:
+its work has not started. A branch claimed on another machine and found nowhere here is not called gone: its
+commits may be on that machine alone. Only the owner releases another session's claim.
 
 Where the work is, is never written in the item: a status written there drifts (a PR merged on GitHub, a push from
 another machine). The board computes it at each build, in its "Where" column (and "Gate", in a project with a gate):

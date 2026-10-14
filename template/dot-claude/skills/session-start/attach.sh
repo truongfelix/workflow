@@ -101,7 +101,8 @@ if [ "$new" = 1 ]; then
     while IFS= read -r line || [ -n "$line" ]; do printf '%s\r\n' "${line%$'\r'}" >>"$crlf"; done <"$tmp"
     mv "$crlf" "$tmp"
   fi
-  mv "$tmp" "$CONF" || fail "cannot write $CONF"
+  # Written over the file, not moved onto it: a moved temp file would bring its own mode, 0600.
+  { cat "$tmp" >"$CONF" && rm -f "$tmp"; } || fail "cannot write $CONF"
   echo "added to REPOS: $entry"
 fi
 
