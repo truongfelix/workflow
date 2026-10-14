@@ -27,8 +27,10 @@ open that already shipped, "done" items whose code changed since).
    session's own first (`<session>`: the worktree's folder name unless the owner names it), in full; then each
    other one's Next, Running and Unfinished, a line each: another session's work, never taken without the owner.
    A project still on 1.x has one `notes/handoff.md`: read it; its next `/handoff` moves it.
-   - If there is none for this session, or it is older than the latest activity in git or on GitHub, say so, and
-     build the brief from `BACKLOG.md`, `questions.md` and the ground truth instead.
+   - If there is none for this session, the latest handoff stands in for it when its session is not running
+     (`ListAgents`): say so, and read it in full; its work is still taken over only with the owner's yes. A handoff
+     older than the latest activity in git or on GitHub: say so, and lean on `BACKLOG.md`, `questions.md` and the
+     ground truth.
    - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: when a handoff or a
      question points to one, `bash .claude/skills/session-start/items.sh show <id>` prints it, with its history and
      the handoffs that name it.
@@ -62,8 +64,12 @@ open that already shipped, "done" items whose code changed since).
      `Done when:` needs a trial or a decision the work did not give.
    - <!-- FILL: project-specific checks (a device, a server, a dashboard), and what is EXPECTED and not news
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
-4. **Brief the user** in under about 20 lines:
+4. **Brief the user** in under about 25 lines:
    - **Since last session:** what finished or changed (jobs, CI, merged PRs), contradictions first.
+   - **Left by the last handoff** (this session's, or the one that stands in for it, step 2), named by its id: its
+     Next and its Unfinished, a line each, what is not an item too (a brainstorm, a leftover to delete, a branch),
+     each with what became of it since (done, in Today, waiting). Each other live handoff: one line, its session and
+     its Next.
    - **Today:** at most 3 items, time-sensitive first. Each with its id and title, its repo or area, its verified
      current state, one line on why now, and what "done" looks like. Default order when the user has no
      preference: work in flight, bugs users hit, decided-but-not-done (🟢), then deferred work.

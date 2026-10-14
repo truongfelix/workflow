@@ -320,6 +320,9 @@ check "/trim goes through the rulings and the lessons, four at a time" \
   eval 'has "$SK/trim/SKILL.md" "name: trim" && has "$SK/trim/SKILL.md" "four at a time" &&
     has "$SK/trim/SKILL.md" "the lessons of \`notes/lessons.md\`"'
 check "/session-start suggests /trim on the flag" has "$SK/session-start/SKILL.md" 'the brief suggests `/trim`'
+check "/session-start's brief names the last handoff's Next and Unfinished" \
+  eval 'has "$SK/session-start/SKILL.md" "**Left by the last handoff**" &&
+    has "$SK/session-start/SKILL.md" "Next and its Unfinished, a line each"'
 check "the template's ground-truth.conf sets both trim thresholds" \
   grep -qx 'LESSONS_TRIM_LINES=1000' "$WF/template/dot-claude/ground-truth.conf"
 check "the template's ground-truth.conf sets the questions trim threshold" \
