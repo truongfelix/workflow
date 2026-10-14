@@ -67,12 +67,14 @@ if [ ${#copied[@]} -gt 0 ]; then
   echo "Copied:"
   printf '  %s\n' "${copied[@]}"
 fi
+differ=0
 if [ ${#skipped[@]} -gt 0 ]; then
   echo
   echo "Skipped (already there; merge by hand if the template is newer):"
   for i in "${!skipped[@]}"; do
     f=${skipped[$i]} src=${skipped_src[$i]}
-    if cmp -s "$src" "$dst/$f"; then echo "  $f (identical)"; else echo "  $f   diff -u $dst/$f $src"; fi
+    if cmp -s "$src" "$dst/$f"; then echo "  $f (identical)"
+    else echo "  $f   diff -u $dst/$f $src"; differ=$((differ + 1)); fi
   done
 fi
 echo
@@ -90,4 +92,10 @@ if [ -n "$fills" ]; then
   printf '%s\n' "$fills" | sed 's|^|  |'
 else
   echo "No FILL markers left."
+fi
+# An upgrade: what is left is in the skipped files that differ, the project's own or older than the template. The
+# version file names this release already, so say so: the scripts may still be the old ones.
+if [ "$differ" -gt 0 ]; then
+  echo "$differ skipped file(s) differ from the template: in an upgrade, merge its generic parts into each (README.md,"
+  echo "'Upgrade a project from here'); .claude/workflow-version names $version already."
 fi

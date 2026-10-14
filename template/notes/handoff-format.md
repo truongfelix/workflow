@@ -86,4 +86,6 @@ A project that adopted the workflow before this format (1.x) has one `notes/hand
 `notes/handoff-archive.md`. Its next `/handoff` distils `notes/handoff.md` as usual, writes
 `notes/handoff/<session>.md` as H-1 with `notes/handoff/README.md` at `next id: H-2`, and deletes both old files,
 once git holds every handoff in the archive (`git log -p -- notes/handoff.md` shows each version); keep the archive,
-frozen, if it holds handoffs older than the repo.
+frozen, if it holds handoffs older than the repo. A 1.x handoff has no id: the board shows it by its date
+(`H~<date>`), a brief names it by its date, and `git log -p -- notes/handoff.md` prints it (`items.sh show <id>`
+lists the ones that name an item).

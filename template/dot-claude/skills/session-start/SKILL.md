@@ -69,8 +69,8 @@ open that already shipped, "done" items whose code changed since).
      (a main checkout that lags on purpose, patched build worktrees). Delete this item if there is none. -->
 4. **Brief the user** in under about 25 lines:
    - **Since last session:** what finished or changed (jobs, CI, merged PRs), contradictions first.
-   - **Left by the last handoff** (this session's, or the one that stands in for it, step 2), named by its id: its
-     Next and its Unfinished, a line each, what is not an item too (a brainstorm, a leftover to delete, a branch),
+   - **Left by the last handoff** (this session's, or the last session's that it takes over, step 2), named by its id
+     (a 1.x handoff, by its date): its Next and its Unfinished, a line each, what is not an item too (a brainstorm, a leftover to delete, a branch),
      each with what became of it since (done, in Today, waiting). Each other live handoff: one line, its session and
      its Next.
    - **Today:** at most 3 items, time-sensitive first. Each with its id and title, its repo or area, its verified

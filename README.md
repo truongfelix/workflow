@@ -253,10 +253,21 @@ From 1.x: the trackers' items and the lessons moved from bullets cited by title 
 `notes/handoff.md` with its archive became one handoff per session, with git as the archive
 (`notes/handoff-format.md`, "Moving a project to it"). `adopt.sh` installs the new
 `notes/item-format.md`, and its last section, "Moving a project to it", is the conversion, done once;
-`.claude/skills/session-start/items.sh check` lists what is left. In `CLAUDE.md`, the "outward actions" rule and the
-handoff rule became the table "What Claude does alone": copy it from the template, every row "ask first", then set
-what the old handoff rule allowed to "do, then tell" (the docs: "Commit the docs" and "Push the docs"; everything:
-"Commit code" and "Push a work branch" too), and ask the owner about the other rows.
+`.claude/skills/session-start/items.sh check` lists what is left, the old `notes/handoff.md` too: run `/handoff` once,
+and it moves it. An item's history before its id is found by its title (`git log -S'<title>' -- BACKLOG.md`): the
+board and `items.sh show` start at the conversion.
+
+In `CLAUDE.md`, the "outward actions" rule and the handoff rule became the table "What Claude does alone": copy it from
+the template with its bullets, and delete its FILL comment (a preset would undo the rows set here). Every row is "ask
+first", except what the old handoff rule allowed, which becomes "do, then tell":
+- "/handoff asks before committing": no row.
+- "/handoff commits and pushes the docs": "Commit the docs" and "Push the docs".
+- "/handoff commits and pushes everything": those two, "Commit code" and "Push a work branch".
+
+The old rules settled the commits and the outward actions (pushes, pull requests, merges, releases, messages). Six
+rows are new: start the day's task, add an item to the backlog, claim one, build something that is not an approved
+backlog item, delete a branch or worktree whose work has landed, stop a background job. Ask the owner about those
+with `/autonomy`, "change some steps", never with a preset.
 
 `/trim` is new: it proposes a plan for the rulings of `questions.md` and the lessons, in a session of its own.
 The ground truth flags `questions.md` past `QUESTIONS_TRIM_LINES` and `notes/lessons.md` past `LESSONS_TRIM_LINES`

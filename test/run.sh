@@ -248,6 +248,23 @@ check "ground truth: a filled config ends with a plain complete, no setup sectio
 check "adopt.sh run again exits 0" [ $? = 0 ]
 check "adopt.sh run again overwrites nothing" has "$T/adopt2.txt" "CLAUDE.md (identical)"
 check "adopt.sh run again still lists what is left to FILL" has "$T/adopt2.txt" "  CLAUDE.md:1:"
+# B-70: an upgrade's work is in the skipped files that differ; adopt.sh says so, and that the version file moved on.
+cp -R "$T/ws" "$T/ws-up" && echo "an older line" >>"$T/ws-up/.claude/skills/session-start/ground-truth.sh"
+"$SH" "$WF/bin/adopt.sh" "$T/ws-up" --workspace >"$T/adopt-up.txt" 2>&1
+check "adopt.sh, upgrade: a skipped file that differs is named as the work left" \
+  eval 'has "$T/adopt-up.txt" "1 skipped file(s) differ from the template: in an upgrade, merge its generic parts" &&
+    has "$T/adopt-up.txt" ".claude/workflow-version names "'
+check "adopt.sh, a project the same as the template: no upgrade line" lacks "$T/adopt2.txt" "skipped file(s) differ"
+rm -rf "$T/ws-up"
+check "README, upgrade from 1.x: each old handoff rule maps to its rows, the new rows asked without a preset" \
+  eval 'has "$WF/README.md" "- \"/handoff commits and pushes the docs\": \"Commit the docs\" and \"Push the docs\"." &&
+    flat "$WF/README.md" | grep -qF "with \`/autonomy\`, \"change some steps\", never with a preset" &&
+    flat "$WF/README.md" | grep -qF "run \`/handoff\` once, and it moves it"'
+check "the conversion: a tie rule for the ids, and where an item's life before its id is" \
+  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "items created in one commit, in file order" &&
+    flat "$WF/template/notes/item-format.md" | grep -qF "An item'"'"'s life before its id is under its title"'
+check "a 1.x handoff is named by its date, and printed from git" \
+  eval 'flat "$WF/template/notes/handoff-format.md" | grep -qF "A 1.x handoff has no id: the board shows it by its date"'
 
 # .claude/workflow-version names the release taken: its tag, or the tag and the commits since; with no tag, the
 # commit and its date; outside a checkout of the workflow (an archive unpacked in another repo), unversioned. On a
