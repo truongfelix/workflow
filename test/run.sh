@@ -199,6 +199,18 @@ check "ground truth: an unfilled config is read, and the setup says what is left
 step4_line() { grep -nF -- "$1" "$WF/README.md" | head -n 1 | cut -d: -f1; } # <text>: its first line in the README
 check "README: the setup asks for a plain complete after /checks" \
   eval '[ "$(step4_line "follow the \`/checks\` skill")" -lt "$(step4_line "until it ends with \`GROUND TRUTH: complete\`")" ]'
+# B-71: the docs say one thing. A task the owner names becomes an item too (PRINCIPLES.md); the setup names no preset,
+# and /autonomy labels them by what they do there; a question may name a command the owner runs (/checks does).
+flat() { tr -s "\n " "  " <"$1"; } # <file>: its text on one line, for a sentence that wraps
+check "CLAUDE.md agrees with PRINCIPLES.md: a task the owner names becomes an item too" \
+  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "is approved by that request, and becomes a backlog item too" &&
+    flat "$WF/PRINCIPLES.md" | grep -qF "a task the owner names in the chat becomes an item too, approved by that request"'
+check "/autonomy labels the presets by what they do at setup, as the README asks" \
+  eval 'flat "$WF/README.md" | grep -qF "with no preset name either" &&
+    flat "$WF/template/dot-claude/skills/autonomy/SKILL.md" | grep -qF "each option is labelled by what it does, with no name"'
+check "the rule for questions names a command the owner runs, as /checks asks" \
+  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "(a command the owner runs is named: it is what they see)" &&
+    has "$WF/template/dot-claude/skills/checks/SKILL.md" "Is \`<command>\` the check"'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)

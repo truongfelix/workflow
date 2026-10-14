@@ -47,8 +47,9 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 
 - A row is a standing answer. A yes in the chat covers that one action, not the next one.
 - **Build something that is not an approved backlog item:** a task the owner names in the chat is approved by that
-  request. An extra, an idea or a bug met on the way becomes a backlog item first (the row "Add an item to the
-  backlog"), and is built once the owner approved it.
+  request, and becomes a backlog item too, as part of it: the backlog stays the whole list of the work. An extra, an
+  idea or a bug met on the way becomes a backlog item first (the row "Add an item to the backlog"), and is built once
+  the owner approved it.
 - The owner changes a row at any time, in words ("from now on, push the docs without asking") or with `/autonomy`,
   which shows the steps to pick: edit the row here, at once; it holds from the next action on.
 - An action that fits no row, or a doubt about which row it is: ask first. Ask once for several: `/handoff` puts
@@ -65,7 +66,8 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 - Stage the paths you changed (`git add <paths>`), never `git add -A` / `git add .`; read `git diff --cached
   --name-only` before committing. The owner drops working files into the tree.
 - No secrets in tracked files. If one is needed, write that it is needed and where it lives, never its value.
-- **A question to the owner** is in plain words: no file, table or setting name, and each choice says what it does.
+- **A question to the owner** is in plain words: no file, table or setting name (a command the owner runs is named:
+  it is what they see), and each choice says what it does.
   Free text is asked in the chat. A question where several can be picked has "None of these": with nothing picked, it
   returns no answer at all, which reads as a skip. A question that fails, or comes back unanswered, is asked again in
   the chat; never answer for the owner.

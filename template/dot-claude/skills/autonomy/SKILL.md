@@ -19,7 +19,8 @@ tool cannot show a box already ticked, so each step's question says its answer n
    row answered neither way) and stop; the table is fixed by hand first.
 2. **A preset's name was given** (`/autonomy balanced`, "switch to Careful"): `autonomy.sh preset <name>`, then step 5.
 3. **Show it** in a few lines: the preset ("Careful, with 2 steps switched"), the steps Claude asks you about first,
-   and the steps it does, then tells you. Each step in plain words ("Commit code"), never a row number.
+   and the steps it does, then tells you. Each step in plain words ("Commit code"), never a row number. At setup,
+   the preset by what it does ("asks before every step, with 2 steps switched"), as in step 4.
 4. **Ask.** At setup there is nothing to keep yet: start with the preset question, then ask whether to keep that
    preset as it is or change some steps (two options). Otherwise ask first, with three options: keep it as it is,
    switch to a preset, change some steps.
@@ -27,11 +28,13 @@ tool cannot show a box already ticked, so each step's question says its answer n
      tells. **Careful** asks first for every step. **Balanced** asks first to start the day's task, to build
      something that is not an approved backlog item, to open or merge a pull request, to release, and to comment or
      message; it does the rest, then tells. **Hands-off** asks first only to build something that is not an approved
-     backlog item, to release, and to comment or message. Before the options, list the steps in plain words: start
-     the day's task, commit the docs (the notes and trackers), push them, add an item to the backlog, claim one, build
-     something that is not an approved backlog item, commit code, push a work branch, open a pull request, merge one
-     (or push code to the default branch), delete a branch whose work has landed, stop a background job it started, release, comment or message anyone. Then
-     `autonomy.sh preset <name>`.
+     backlog item, to release, and to comment or message. At setup the owner has not met these names, so each option
+     is labelled by what it does, with no name: "Ask before every step", "Ask before the big steps", "Ask only before
+     new work, a release or a message" (README, "Adopt in a new project", step 4). Before the options, list the steps
+     in plain words: start the day's task, commit the docs (the notes and trackers), push them, add an item to the
+     backlog, claim one, build something that is not an approved backlog item, commit code, push a work branch, open
+     a pull request, merge one (or push code to the default branch), delete a branch whose work has landed, stop a
+     background job it started, release, comment or message anyone. Then `autonomy.sh preset <name>`.
    - **Change some steps:** one option per step, which the owner picks or not, showing its answer now ("Commit code,
      now: does it, then tells you"); a picked step takes the other answer. Five questions, at most three steps each
      next to "None of these": the docs (commit the docs, push the docs), the backlog (add an item, claim one, build something not approved), code
