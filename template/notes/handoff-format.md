@@ -6,15 +6,19 @@ what is unfinished, what was done and learned. `/handoff` writes it in this shap
 
 ## One per session
 
-- `notes/handoff/<session>.md`: one file per live session. `<session>` is the worktree's folder name, unless the
-  owner names the session. A project worked by one session at a time has one file; two sessions working at once
-  each write their own, so neither overwrites the other.
+- `notes/handoff/<session>.md`: one file per live session. `<session>` is the session's name, the one other sessions
+  message it by (`ListAgents`: "This session is web-offline"), as in its claims (`notes/item-format.md`, Claims); the
+  worktree's folder name where there is none. Two sessions working at once each write their own, so neither
+  overwrites the other.
+- A new session has a new name: it takes the last handoff over when that one's session no longer runs, so a project
+  worked by one session at a time keeps one file.
 - `notes/handoff/README.md`: what the folder holds, and the `next id` line:
   `next id: H-13 (last given to claude@web-offline)`. Two sessions handing off at once conflict on that line and
   renumber, as with items.
 - A session writes only its own file. Taking over another session's work: the new handoff names that session's
   handoff in `continues:`, and deletes its file in the same commit.
-- A session that ends for good (its work landed, or another session took it over) deletes its file.
+- A session that ends for good (its work landed, or another session took it over) deletes its file. The last handoff
+  is never deleted: the next session takes it over.
 
 ## Shape
 

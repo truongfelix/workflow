@@ -24,13 +24,16 @@ open that already shipped, "done" items whose code changed since).
    brief, and an id given twice is fixed before any work cites it.
    Then `bash .claude/skills/session-start/board.sh --no-open`: the board rebuilt, with the PRs, never a new tab.
 2. **Read the handoffs**, one per live session in `notes/handoff/<session>.md` (`notes/handoff-format.md`): this
-   session's own first (`<session>`: the worktree's folder name unless the owner names it), in full; then each
-   other one's Next, Running and Unfinished, a line each: another session's work, never taken without the owner.
+   session's own first (`<session>`: this session's name, "This session is <name>" in `ListAgents`; the worktree's
+   folder name where there is none), in full; then each other one's Next, Running and Unfinished, a line each:
+   another session's work, never taken without the owner.
    A project still on 1.x has one `notes/handoff.md`: read it; its next `/handoff` moves it.
-   - If there is none for this session, the latest handoff stands in for it when its session is not running
-     (`ListAgents`): say so, and read it in full; its work is still taken over only with the owner's yes. A handoff
-     older than the latest activity in git or on GitHub: say so, and lean on `BACKLOG.md`, `questions.md` and the
-     ground truth.
+   - If there is none for this session (a new session has a new name), the latest handoff is the last session's
+     when its session no longer runs (`ListAgents` does not list it) and its claims are not on another machine: this
+     session takes it over. Say so in the brief, and read it in full; `/handoff` names it in `continues:` and deletes
+     its file, and its claims are taken over with `--from` when their work goes on (step 5). Any other session's
+     handoff is taken over only with the owner's yes. A handoff older than the latest activity in git or on GitHub:
+     say so, and lean on `BACKLOG.md`, `questions.md` and the ground truth.
    - Earlier handoffs, closed items and dropped lessons are in git, not in archive files: when a handoff or a
      question points to one, `bash .claude/skills/session-start/items.sh show <id>` prints it, with its history and
      the handoffs that name it.

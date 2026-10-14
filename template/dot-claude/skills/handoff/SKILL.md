@@ -36,9 +36,10 @@ find out what happened and why.
      holds. The rows "Commit code" and "Push a work branch" in CLAUDE.md ("What Claude does alone") say whether that
      needs the user's OK. A worktree listed in an earlier handoff stays listed until it is cleaned up. Branches
      marked "local only BY RULE" are never pushed.
-2. **Distil, then rewrite this session's handoff**, `notes/handoff/<session>.md` (`<session>`: the worktree's
-   folder name unless the owner named the session). Two layers: the live file and what is distilled out of it. Git
-   keeps every earlier version; nobody reads it whole, so a lesson left only in an old handoff is a lesson lost.
+2. **Distil, then rewrite this session's handoff**, `notes/handoff/<session>.md` (`<session>`: this session's name,
+   "This session is <name>" in `ListAgents`; the worktree's folder name where there is none). Two layers: the live
+   file and what is distilled out of it. Git keeps every earlier version; nobody reads it whole, so a lesson left only
+   in an old handoff is a lesson lost.
    - **Distil the old file first** (this session's own, or the one it took over). Each fact under "Learned" that is
      not yet a lesson, and each ⚠ in it: if it still holds, it goes where it acts (a lesson in `notes/lessons.md`, a
      memory, a topic note, CLAUDE.md, a gate script); if it is stale, it is dropped. Anything still LIVE in it (a
@@ -49,7 +50,8 @@ find out what happened and why.
      a BACKLOG item (or a question) first. Absolute dates, times with their zone. Name exact paths, branches, units
      and commands, so the next session can act without searching.
    - **Taking over** another session's handoff: `continues:` its id, and delete its file in the same commit.
-   - **The session ends for good** (its work landed, nothing live is left): delete its file instead of rewriting it.
+   - **The session ends for good** (its work landed, nothing live is left, and another session's handoff goes on):
+     delete its file instead of rewriting it. The last handoff is never deleted: the next session takes it over.
    - **Moving from 1.x, once** (a `notes/handoff.md` and its archive): `notes/handoff-format.md`, "Moving a project
      to it".
 3. **Update the trackers.** `BACKLOG.md`: delete every item that landed, as soon as it did (the owner's word "done" is not

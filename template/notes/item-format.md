@@ -56,8 +56,7 @@ A whole project in this shape: the workflow repo's `example/BACKLOG.md`, `exampl
 
 **Giving an id.** Take the number in `next id`, then raise it and name yourself in the same edit:
 `next id: B-14 (last given to claude@<session>)`. The agent is who writes the item (`claude`, a subagent's name,
-`owner`); the session is the worktree's folder name, unless the owner names it, as for its handoff (a claim names the
-running session instead: Claims). Commit both with the new item. Until
+`owner`); the session is its name, as in its handoff and its claims (Claims). Commit both with the new item. Until
 that commit is pushed, the id is provisional: use it in nothing outside the trackers (no branch name, no commit
 message elsewhere).
 

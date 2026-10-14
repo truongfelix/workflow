@@ -211,6 +211,18 @@ check "/autonomy labels the presets by what they do at setup, as the README asks
 check "the rule for questions names a command the owner runs, as /checks asks" \
   eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "(a command the owner runs is named: it is what they see)" &&
     has "$WF/template/dot-claude/skills/checks/SKILL.md" "Is \`<command>\` the check"'
+# B-72: a session goes by one name, the one ListAgents gives, in its handoff as in its claims; a new session takes
+# the last handoff over, and the last one is never deleted.
+check "one name per session: no doc names a handoff after the folder first" \
+  eval '! grep -rqiE "folder name,? unless|unless the owner name" "$WF/template" "$WF/README.md" "$WF/PRINCIPLES.md"'
+check "one name per session: the handoff format, /handoff and /session-start use the session's name" \
+  eval 'has "$WF/template/notes/handoff-format.md" "\`<session>\` is the session" &&
+    has "$WF/template/dot-claude/skills/handoff/SKILL.md" "(\`<session>\`: this session" &&
+    has "$WF/template/dot-claude/skills/session-start/SKILL.md" "(\`<session>\`: this session"'
+check "one name per session: the last handoff is never deleted, the next session takes it over" \
+  eval 'flat "$WF/template/notes/handoff-format.md" | grep -qF "last handoff is never deleted" &&
+    flat "$WF/template/dot-claude/skills/handoff/SKILL.md" | grep -qF "last handoff is never deleted" &&
+    flat "$WF/template/notes/handoff/README.md" | grep -qF "last handoff is never deleted"'
 grep -v '^# FILL\|^# "Adopt in a new project", step 4' "$T/fresh/.claude/ground-truth.conf" >"$T/fresh-conf" &&
   cp "$T/fresh-conf" "$T/fresh/.claude/ground-truth.conf"
 (cd "$T/fresh" && "$SH" .claude/skills/session-start/ground-truth.sh --no-fetch >"$T/fresh-gt.txt" 2>&1)
