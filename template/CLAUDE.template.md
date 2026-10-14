@@ -80,9 +80,15 @@ keep it or change some steps; it sets the rows and deletes this comment. Until t
 
 ## Commands
 
-<!-- FILL: install, run, test, and the gate (the script whose exit code says "ready"). If a check must hold, it
-belongs in that gate, not in this file: a document is not a gate. -->
+<!-- FILL: install, run, test, the gate (the script whose exit code says "ready"), and what a release publishes besides
+its tag. If a check must hold, it belongs in that gate, not in this file: a document is not a gate. -->
 
 How the code is checked before a merge (the project's own gate, GitHub CI, both or nothing yet), each repo's gate
 command and the rules kept: `/checks` shows and changes them. A gate runs with
 `bash .claude/skills/session-start/gate.sh run <repo>`, which keeps a receipt of each commit that passed it.
+
+A release is an item like any task the owner names. It is an annotated tag on the default branch's last commit, once
+its checks passed there: `git tag -a vX.Y.Z -m "<what it holds>"`, then `git push origin vX.Y.Z`. With the rule
+"receipt", the pre-push hook refuses a tag whose commit did not pass; a commit that changed only the docs since a pass
+keeps it. Each step goes as the row "Release: tag, publish" says; what else a release publishes here (a GitHub
+release, a package) is written above.

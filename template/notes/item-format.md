@@ -130,7 +130,9 @@ It adds `claimed: <agent>@<session> on <branch> at <machine>` under the item's h
   pantry-12"), so Claude knows at once which session works on what; the worktree's folder name where there is none.
   Claude passes it as the third argument, `claude@<name>`. A new session in the same worktree has a new name: it
   takes a claim its handoff kept over with `--from` (below).
-- **branch:** where the work goes: the fact behind the claim, which the ground truth follows.
+- **branch:** where the work goes: the fact behind the claim, which the ground truth follows. A task with no branch of
+  its own (a release, a change of the docs alone, such as a repo attached or an upgrade) names the default branch it
+  lands on, `main` in most projects.
 - **machine:** where the branch's commits are until they are pushed: this machine's name (`uname -n`), `cloud` in a
   Claude Code cloud session, or `CLAIM_MACHINE` when set. Written once: the machine a session runs on does not change.
 
@@ -170,7 +172,9 @@ the item. A new session has a new name: going on with a claim its handoff kept, 
   results go to `notes/`.
 - **Sections are cut along repos or file trees**, so one session (or one worktree) can take a section while another
   session takes another, and their work merges cleanly. A ⚠ cross-repo item runs alone, in the order of its `repos:`
-  line, producer first; never inside one section's batch.
+  line, producer first; never inside one section's batch. A task the owner names is an item too, whatever it changes:
+  a release goes in its repo's section, a change of the docs alone (a repo attached, an upgrade) in a section `docs`,
+  added when there is none.
 - An item is what is wrong or missing, a pointer to the detail, and when it is **done**. How it was found goes in the
   commit message.
 - **Cite an item by its id** (with its title for the reader), never by a position: positions move, ids do not.

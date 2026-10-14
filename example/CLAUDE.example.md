@@ -90,5 +90,7 @@ Staging runs on this machine: Postgres on the `/var/lib/pantry` volume (20 GB), 
 - web: `cd web && npm test`; gate: `web/bin/gate`.
 - Checked before a merge by both gates and GitHub CI, with the rules Production (`/checks`). A gate runs with
   `bash .claude/skills/session-start/gate.sh run api` (or `web`), which keeps a receipt of each commit that passed it.
+- A release of api or web: an item, then an annotated tag `vX.Y.Z` on its `main` once its gate and CI passed there,
+  pushed through the hook (`git push origin vX.Y.Z`), then the GitHub release with its notes (`gh release create`).
 - Backfill into staging, from the workspace root: `systemd-run --user --same-dir --unit pantry-backfill
   api/bin/backfill --from <batch>`.

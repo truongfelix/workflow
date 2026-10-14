@@ -279,6 +279,15 @@ check "/autonomy: steps named with their answer are set with no question, asked 
     flat "$AUS" | grep -qF "\`autonomy.sh ask <step>...\` or \`autonomy.sh tell <step>...\`, with no question" &&
     flat "$AUS" | grep -qF "**Steps to ask about**, with no answer (the upgrade from 1.x names its six new steps" &&
     flat "$AUS" | grep -qF "with those steps alone, at most three to a question"'
+# B-81: how a release is made, in the template's CLAUDE.md; a task with no branch of its own (a release, the docs alone)
+# is an item in a section that says where, claimed on the default branch it lands on.
+check "the template's CLAUDE.md: a release is an item, an annotated tag on a commit that passed, pushed through the hook" \
+  eval 'flat "$WF/template/CLAUDE.template.md" | grep -qF "A release is an item like any task the owner names. It is an annotated tag on the default branch" &&
+    flat "$WF/template/CLAUDE.template.md" | grep -qF "\`git tag -a vX.Y.Z -m \"<what it holds>\"\`, then \`git push origin vX.Y.Z\`" &&
+    flat "$WF/template/CLAUDE.template.md" | grep -qF "what a release publishes besides its tag"'
+check "the item format: a task with no branch of its own, its section and the branch its claim names" \
+  eval 'flat "$WF/template/notes/item-format.md" | grep -qF "a release goes in its repo'"'"'s section, a change of the docs alone (a repo attached, an upgrade) in a section \`docs\`" &&
+    flat "$WF/template/notes/item-format.md" | grep -qF "A task with no branch of its own (a release, a change of the docs alone, such as a repo attached or an upgrade) names the default branch it lands on"'
 # B-79: the upgrade from 1.x speaks of what 1.x had (no gate), is committed and pushed as the docs, and ends with the
 # first /handoff; the conversion replaces the trackers' headers.
 check "README, upgrade from 1.x: what 1.x had, and no gate it never had" \
